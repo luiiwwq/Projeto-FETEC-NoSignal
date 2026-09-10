@@ -1,0 +1,295 @@
+/* =========================================================
+   No Signal — Modal de Nome (Name Modal)
+   Estética: Marte laranja / bordas biseladas retro sci-fi
+   ========================================================= */
+
+/* ─── Overlay ─────────────────────────────────────────────── */
+.name-modal-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    background: rgba(5, 5, 11, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: modalOverlayIn 0.2s ease forwards;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+@keyframes modalOverlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ─── Container do Modal ──────────────────────────────────── */
+.name-modal {
+    position: relative;
+    width: 420px;
+    max-width: 90%;
+    background: #12030a;
+    border: 2px solid #e07228;
+    padding: 0;
+    animation: modalSlideIn 0.25s cubic-bezier(0.22, 0.9, 0.4, 1) forwards;
+    box-shadow:
+        0 0 0 1px #6b2c10,
+        0 0 30px rgba(224, 114, 40, 0.35),
+        0 0 60px rgba(224, 114, 40, 0.12),
+        inset 0 0 0 1px rgba(224, 114, 40, 0.08);
+
+    /* Canto biselado superior direito */
+    clip-path: polygon(
+        0px 0px,
+        calc(100% - 16px) 0px,
+        100% 16px,
+        100% 100%,
+        0px 100%
+    );
+}
+
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translateY(-12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)     scale(1); }
+}
+
+/* ─── Cabeçalho do Modal ──────────────────────────────────── */
+.name-modal__header {
+    background: linear-gradient(180deg, #8c2e0e 0%, #5c1c09 100%);
+    padding: 10px 20px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #e07228;
+    position: relative;
+}
+
+/* Linha de brilho no topo */
+.name-modal__header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 16px;
+    height: 1px;
+    background: #e07228;
+    opacity: 0.7;
+}
+
+.name-modal__title {
+    font-family: var(--font-pixel);
+    font-size: 11px;
+    color: #f6c885;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0 #1a0507;
+}
+
+.name-modal__subtitle {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: rgba(246, 200, 133, 0.5);
+    letter-spacing: 1px;
+    margin-top: 4px;
+}
+
+/* ─── Corpo do Modal ──────────────────────────────────────── */
+.name-modal__body {
+    padding: 28px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.name-modal__label {
+    font-family: var(--font-pixel);
+    font-size: 8px;
+    color: #e07228;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    display: block;
+    text-shadow: 1px 1px 0 #1a0507;
+}
+
+/* ─── Input de Nome ───────────────────────────────────────── */
+.name-modal__input-wrapper {
+    position: relative;
+}
+
+/* Bordas laterais decorativas (estilo HUD) */
+.name-modal__input-wrapper::before,
+.name-modal__input-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: #e07228;
+    opacity: 0.6;
+}
+.name-modal__input-wrapper::before { left: -6px; }
+.name-modal__input-wrapper::after  { right: -6px; }
+
+.name-modal__input {
+    width: 100%;
+    background: #0a020a;
+    border: 1px solid #6b2c10;
+    border-top-color: #e07228;
+    color: #f6c885;
+    font-family: var(--font-pixel);
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 12px 14px;
+    outline: none;
+    caret-color: #e07228;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.6),
+        inset 1px 0 0 rgba(224, 114, 40, 0.08);
+}
+
+.name-modal__input::placeholder {
+    color: rgba(246, 200, 133, 0.2);
+    letter-spacing: 1px;
+}
+
+.name-modal__input:focus {
+    border-color: #e07228;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(224, 114, 40, 0.3),
+        0 0 12px rgba(224, 114, 40, 0.2);
+}
+
+/* Contador de caracteres */
+.name-modal__char-count {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: rgba(246, 200, 133, 0.3);
+    text-align: right;
+    margin-top: 5px;
+    letter-spacing: 0.5px;
+}
+.name-modal__char-count.is-near-limit { color: #e07228; }
+.name-modal__char-count.is-at-limit   { color: #d04010; }
+
+/* ─── Mensagem de Erro ────────────────────────────────────── */
+.name-modal__error {
+    font-family: var(--font-pixel);
+    font-size: 7px;
+    color: #ff5533;
+    letter-spacing: 1px;
+    display: none;
+    animation: errorShake 0.3s ease;
+}
+.name-modal__error.is-visible { display: block; }
+
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    25%       { transform: translateX(-4px); }
+    75%       { transform: translateX(4px); }
+}
+
+/* ─── Botão CONFIRMAR ─────────────────────────────────────── */
+.name-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 4px;
+}
+
+.name-modal__btn {
+    position: relative;
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    padding: 10px 20px;
+    border: 2px solid #230a0d;
+    cursor: pointer;
+    outline: none;
+    transition: background 0.1s ease, transform 0.05s ease, box-shadow 0.1s ease;
+    text-shadow: 2px 2px 0 #1a0507;
+    clip-path: polygon(
+        0px 0px,
+        calc(100% - 8px) 0px,
+        100% 8px,
+        100% 100%,
+        0px 100%
+    );
+}
+
+/* Brilho no topo */
+.name-modal__btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 8px;
+    height: 1px;
+    pointer-events: none;
+}
+
+/* Botão primário: CONFIRMAR */
+.name-modal__btn--primary {
+    background: linear-gradient(180deg, #c75624 0%, #8c3218 100%);
+    color: #fff2d6;
+    box-shadow:
+        inset 1px 1px 0 rgba(255,255,255,0.18),
+        inset -2px -2px 0 rgba(0,0,0,0.5),
+        0 0 12px rgba(224, 114, 40, 0.3);
+}
+.name-modal__btn--primary::before { background: #ed8733; }
+
+.name-modal__btn--primary:hover,
+.name-modal__btn--primary:focus-visible {
+    background: linear-gradient(180deg, #e07228 0%, #a83d18 100%);
+    box-shadow:
+        inset 1px 1px 0 rgba(255,255,255,0.3),
+        inset -2px -2px 0 rgba(0,0,0,0.6),
+        0 0 20px rgba(224, 114, 40, 0.5);
+}
+
+.name-modal__btn--primary:active {
+    transform: translateY(2px);
+    background: linear-gradient(180deg, #682617 0%, #4a190f 100%);
+    box-shadow: inset 2px 2px 0 rgba(0,0,0,0.6);
+}
+
+/* Botão secundário: CANCELAR */
+.name-modal__btn--secondary {
+    background: linear-gradient(180deg, #2a1010 0%, #190808 100%);
+    color: rgba(246, 200, 133, 0.5);
+    border-color: #3a1010;
+    box-shadow:
+        inset 1px 1px 0 rgba(255,255,255,0.05),
+        inset -2px -2px 0 rgba(0,0,0,0.5);
+}
+.name-modal__btn--secondary::before { background: #4a1a1a; }
+
+.name-modal__btn--secondary:hover,
+.name-modal__btn--secondary:focus-visible {
+    color: rgba(246, 200, 133, 0.8);
+    background: linear-gradient(180deg, #3a1515 0%, #241010 100%);
+}
+
+/* ─── Decoração de Scan Line HUD no rodapé do modal ──────── */
+.name-modal::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #e07228 50%, transparent 100%);
+    opacity: 0.4;
+}
+
+/* ─── Responsividade ─────────────────────────────────────── */
+@media (max-width: 600px) {
+    .name-modal {
+        width: 92%;
+    }
+    .name-modal__title {
+        font-size: 9px;
+    }
+    .name-modal__input {
+        font-size: 11px;
+    }
+}

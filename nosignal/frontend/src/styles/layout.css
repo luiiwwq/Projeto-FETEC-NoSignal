@@ -1,0 +1,82 @@
+/* Reset e Base */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background-color: var(--space-black);
+    color: var(--text-cream);
+    font-family: var(--font-pixel);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Container Principal com Proporção Panorâmica Exata da Scene Limpa (1446 x 720) */
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #000;
+    overflow: hidden;
+}
+
+.title-screen-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 1446px;
+    height: 100%;
+    max-height: 720px;
+    aspect-ratio: 1446 / 720;
+    background-color: var(--space-deep);
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: -moz-crisp-edges;
+}
+
+/* Regras de Proporção para Desktop (min-width: 1101px) */
+@media (min-width: 1101px) and (max-aspect-ratio: 1446/720) {
+    .title-screen-wrapper {
+        width: 100vw;
+        height: calc(100vw * (720 / 1446));
+    }
+}
+
+@media (min-width: 1101px) and (min-aspect-ratio: 1446/720) {
+    .title-screen-wrapper {
+        height: 100vh;
+        width: calc(100vh * (720 / 1446));
+    }
+}
+
+/* Regras Isoladas para Tablet (601px até 1100px) */
+@media (min-width: 601px) and (max-width: 1100px) {
+    .title-screen-wrapper {
+        width: 100vw;
+        height: 100vh;
+        max-width: 1100px;
+        max-height: 100vh;
+        aspect-ratio: auto;
+    }
+}
+
+/* Regras Isoladas para Mobile (max-width: 600px em portrait) */
+@media (max-width: 600px) {
+    .title-screen-wrapper {
+        width: 100vw;
+        height: 100vh;
+        aspect-ratio: auto;
+    }
+}

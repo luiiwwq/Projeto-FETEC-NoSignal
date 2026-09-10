@@ -1,0 +1,26 @@
+# Ambientes Virtuais Python
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+
+# Dependências Node.js
+node_modules/
+
+# Arquivos de IDE e Sistema Operacional
+.vscode/
+.idea/
+Thumbs.db
+[Dd]esktop.ini
+.DS_Store
+
+# Logs e arquivos temporários
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Variáveis de ambiente locais
+.env
+.env.local

@@ -1,0 +1,289 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* Camada 1: Cenário Espacial Limpo (Espaço, Marte, Terra) */
+.title-screen__scene {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background-image: url('../assets/references/no-signal-scene-original.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* Resolução 2x para Telas de Alta Densidade / Retina */
+@media (-webkit-min-device-pixel-ratio: 1.5), (min-resolution: 144dpi) {
+    .title-screen__scene {
+        background-image: url('../assets/references/no-signal-scene-master-2x.jpeg');
+    }
+}
+
+/* Variante Mobile da Scene Limpa (Telas Estreitas Portrait <= 600px) */
+@media (max-width: 600px) and (orientation: portrait) {
+    .title-screen__scene {
+        background-image: url('../assets/references/no-signal-scene-mobile.jpg');
+        background-position: center center;
+    }
+}
+
+/* Camada 2: Overlay com Animação Discreta de Estrelas (Starfield Overlay) */
+.starfield-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.25;
+    background-image: 
+        radial-gradient(1px 1px at 15% 20%, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 35% 12%, #f8c070, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 25% 45%, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 10% 75%, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 42% 85%, #f8c070, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 30% 90%, #ffffff, rgba(0,0,0,0));
+    animation: starTwinkle 4s ease-in-out infinite alternate;
+}
+
+@keyframes starTwinkle {
+    0% { opacity: 0.15; }
+    50% { opacity: 0.4; }
+    100% { opacity: 0.25; }
+}
+
+/* Camada 3: Logotipo Independente com Transparência Alpha (Desktop: Próximo ao New Game) */
+.title-screen__brand {
+    position: absolute;
+    top: 11.5%;
+    left: 3.9%;
+    width: 21.8%;
+    min-width: 290px;
+    max-width: 335px;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.title-screen__logo {
+    width: 100%;
+    height: auto;
+    display: block;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* Camada 4: Conteúdo Interativo (Menu Principal) */
+.title-screen__content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+}
+
+/* Área do Menu Principal (Sobreposição ao Lado Esquerdo Abaixo do Logo) */
+.title-screen__menu {
+    position: absolute;
+    top: 38.0%;
+    left: 3.9%;
+    width: 21.8%;
+    min-width: 290px;
+    max-width: 335px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Botões HTML Reais em Pixel Art Placa Sci-Fi */
+.menu-btn {
+    position: relative;
+    width: 100%;
+    height: 45px;
+    background: linear-gradient(180deg, #993a1d 0%, #682417 100%);
+    border: 2px solid #230a0d;
+    outline: none;
+    color: var(--text-cream);
+    font-family: var(--font-pixel);
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-align: left;
+    padding-left: 16px;
+    cursor: pointer;
+    text-shadow: 2px 2px 0px #1a0507;
+    box-shadow: 
+        inset 1px 1px 0px rgba(255, 255, 255, 0.18),
+        inset -2px -2px 0px rgba(0, 0, 0, 0.5),
+        0px 2px 0px #150507;
+    transition: background 0.1s ease, transform 0.05s ease, box-shadow 0.1s ease;
+    clip-path: polygon(
+        0px 0px, 
+        calc(100% - 8px) 0px, 
+        100% 8px, 
+        100% 100%, 
+        0px 100%
+    );
+}
+
+/* Detalhe de linha de brilho no topo do botão */
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 8px;
+    height: 2px;
+    background: #c95c2e;
+    pointer-events: none;
+}
+
+/* Estado de Hover, Focus e Selecionado */
+.menu-btn:hover,
+.menu-btn:focus-visible,
+.menu-btn.is-selected {
+    background: linear-gradient(180deg, #c75624 0%, #8c3218 100%);
+    color: #fff2d6;
+    text-shadow: 2px 2px 0px #1a0507, 0 0 4px rgba(237, 135, 51, 0.6);
+    box-shadow: 
+        inset 1px 1px 0px rgba(255, 255, 255, 0.35),
+        inset -2px -2px 0px rgba(0, 0, 0, 0.6),
+        0 0 10px rgba(216, 90, 34, 0.4);
+}
+
+.menu-btn:hover::before,
+.menu-btn:focus-visible::before,
+.menu-btn.is-selected::before {
+    background: #ed8733;
+}
+
+/* Estado de Clique (Active) */
+.menu-btn:active {
+    transform: translateY(2px);
+    background: linear-gradient(180deg, #682617 0%, #4a190f 100%);
+    box-shadow: 
+        inset 2px 2px 0px rgba(0, 0, 0, 0.6),
+        0px 1px 0px #150507;
+}
+
+/* Foco Visível Personalizado Pixel-Art */
+.menu-btn:focus-visible {
+    outline: 2px dashed var(--mars-light);
+    outline-offset: 3px;
+}
+
+/* Rodapé com Versão / Status no Canto Inferior Esquerdo */
+.title-screen__footer {
+    position: absolute;
+    bottom: 12px;
+    left: 4.1%;
+    font-size: 8px;
+    color: rgba(243, 193, 125, 0.5);
+    letter-spacing: 0.5px;
+    font-family: var(--font-pixel);
+    pointer-events: none;
+}
+
+/* Toast de Feedback Temporário */
+.title-toast {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(35, 10, 13, 0.95);
+    border: 2px solid var(--mars-orange);
+    color: var(--text-cream);
+    padding: 10px 20px;
+    font-size: 10px;
+    font-family: var(--font-pixel);
+    box-shadow: 0 0 15px rgba(216, 90, 34, 0.4);
+    z-index: 100;
+    animation: toastFadeIn 0.3s ease, toastFadeOut 0.3s ease 2.7s forwards;
+    pointer-events: none;
+}
+
+@keyframes toastFadeIn {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes toastFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* Adaptativo Dedicado para TABLETS (601px até 1100px): Logo BEM próxima do botão New Game como no Desktop */
+@media (min-width: 601px) and (max-width: 1100px) {
+    .title-screen__brand {
+        position: absolute;
+        top: calc(38.0% - 150px);
+        left: 4.0%;
+        width: 24%;
+        min-width: 230px;
+        max-width: 275px;
+    }
+
+    .title-screen__menu {
+        position: absolute;
+        top: 38.0%;
+        left: 4.0%;
+        width: 24%;
+        min-width: 230px;
+        max-width: 275px;
+        gap: 4px;
+    }
+
+    .menu-btn {
+        height: 42px;
+        font-size: 11px;
+        padding-left: 14px;
+    }
+
+    .title-screen__footer {
+        bottom: 10px;
+        left: 4.0%;
+        font-size: 7.5px;
+    }
+}
+
+/* Adaptativo para Telas de Celular (Responsividade Mobile <= 600px em portrait) */
+@media (max-width: 600px) and (orientation: portrait) {
+    .title-screen__brand {
+        top: 6%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 70%;
+        max-width: 280px;
+        min-width: unset;
+        display: flex;
+        justify-content: center;
+    }
+
+    .title-screen__menu {
+        position: absolute;
+        top: 48%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 72%;
+        min-width: 250px;
+        max-width: 290px;
+        gap: 5px;
+    }
+
+    .menu-btn {
+        height: 44px;
+        font-size: 11px;
+        text-align: center;
+        padding-left: 0;
+    }
+
+    .title-screen__footer {
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 7px;
+        white-space: nowrap;
+    }
+}

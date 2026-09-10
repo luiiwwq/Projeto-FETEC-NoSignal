@@ -1,0 +1,759 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "d6d39ff5-91e2-489a-8c3d-0720c8d36640",
+        "name": "Astronaut",
+        "prompt": "Make a space pirate sprite. Futuristic pirate with gun holsters on hips. Like the kind that Samus Aran might fight in her games. Be careful not to infringe or rip off copy right! Like a future space adventurer, but dangerous! (Must wear astronaut helmet!)",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "side",
+        "created_at": "2026-07-15T00:21:50.402465+00:00"
+      },
+      "folder": "Astronaut",
+      "frames": {
+        "rotations": {
+          "south": "Astronaut/rotations/south.png",
+          "south-east": "Astronaut/rotations/south-east.png",
+          "east": "Astronaut/rotations/east.png",
+          "north-east": "Astronaut/rotations/north-east.png",
+          "north": "Astronaut/rotations/north.png",
+          "north-west": "Astronaut/rotations/north-west.png",
+          "west": "Astronaut/rotations/west.png",
+          "south-west": "Astronaut/rotations/south-west.png"
+        },
+        "animations": {
+          "Running": {
+            "south": [
+              "Astronaut/animations/Running/south/frame_000.png",
+              "Astronaut/animations/Running/south/frame_001.png",
+              "Astronaut/animations/Running/south/frame_002.png",
+              "Astronaut/animations/Running/south/frame_003.png",
+              "Astronaut/animations/Running/south/frame_004.png",
+              "Astronaut/animations/Running/south/frame_005.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Running/north-west/frame_000.png",
+              "Astronaut/animations/Running/north-west/frame_001.png",
+              "Astronaut/animations/Running/north-west/frame_002.png",
+              "Astronaut/animations/Running/north-west/frame_003.png",
+              "Astronaut/animations/Running/north-west/frame_004.png",
+              "Astronaut/animations/Running/north-west/frame_005.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Running/north-east/frame_000.png",
+              "Astronaut/animations/Running/north-east/frame_001.png",
+              "Astronaut/animations/Running/north-east/frame_002.png",
+              "Astronaut/animations/Running/north-east/frame_003.png",
+              "Astronaut/animations/Running/north-east/frame_004.png",
+              "Astronaut/animations/Running/north-east/frame_005.png"
+            ],
+            "west": [
+              "Astronaut/animations/Running/west/frame_000.png",
+              "Astronaut/animations/Running/west/frame_001.png",
+              "Astronaut/animations/Running/west/frame_002.png",
+              "Astronaut/animations/Running/west/frame_003.png",
+              "Astronaut/animations/Running/west/frame_004.png",
+              "Astronaut/animations/Running/west/frame_005.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Running/south-east/frame_000.png",
+              "Astronaut/animations/Running/south-east/frame_001.png",
+              "Astronaut/animations/Running/south-east/frame_002.png",
+              "Astronaut/animations/Running/south-east/frame_003.png",
+              "Astronaut/animations/Running/south-east/frame_004.png",
+              "Astronaut/animations/Running/south-east/frame_005.png"
+            ],
+            "north": [
+              "Astronaut/animations/Running/north/frame_000.png",
+              "Astronaut/animations/Running/north/frame_001.png",
+              "Astronaut/animations/Running/north/frame_002.png",
+              "Astronaut/animations/Running/north/frame_003.png",
+              "Astronaut/animations/Running/north/frame_004.png",
+              "Astronaut/animations/Running/north/frame_005.png"
+            ],
+            "east": [
+              "Astronaut/animations/Running/east/frame_000.png",
+              "Astronaut/animations/Running/east/frame_001.png",
+              "Astronaut/animations/Running/east/frame_002.png",
+              "Astronaut/animations/Running/east/frame_003.png",
+              "Astronaut/animations/Running/east/frame_004.png",
+              "Astronaut/animations/Running/east/frame_005.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Running/south-west/frame_000.png",
+              "Astronaut/animations/Running/south-west/frame_001.png",
+              "Astronaut/animations/Running/south-west/frame_002.png",
+              "Astronaut/animations/Running/south-west/frame_003.png",
+              "Astronaut/animations/Running/south-west/frame_004.png",
+              "Astronaut/animations/Running/south-west/frame_005.png"
+            ]
+          },
+          "Jumping": {
+            "north-west": [
+              "Astronaut/animations/Jumping/north-west/frame_000.png",
+              "Astronaut/animations/Jumping/north-west/frame_001.png",
+              "Astronaut/animations/Jumping/north-west/frame_002.png",
+              "Astronaut/animations/Jumping/north-west/frame_003.png",
+              "Astronaut/animations/Jumping/north-west/frame_004.png",
+              "Astronaut/animations/Jumping/north-west/frame_005.png",
+              "Astronaut/animations/Jumping/north-west/frame_006.png",
+              "Astronaut/animations/Jumping/north-west/frame_007.png"
+            ],
+            "west": [
+              "Astronaut/animations/Jumping/west/frame_000.png",
+              "Astronaut/animations/Jumping/west/frame_001.png",
+              "Astronaut/animations/Jumping/west/frame_002.png",
+              "Astronaut/animations/Jumping/west/frame_003.png",
+              "Astronaut/animations/Jumping/west/frame_004.png",
+              "Astronaut/animations/Jumping/west/frame_005.png",
+              "Astronaut/animations/Jumping/west/frame_006.png",
+              "Astronaut/animations/Jumping/west/frame_007.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Jumping/north-east/frame_000.png",
+              "Astronaut/animations/Jumping/north-east/frame_001.png",
+              "Astronaut/animations/Jumping/north-east/frame_002.png",
+              "Astronaut/animations/Jumping/north-east/frame_003.png",
+              "Astronaut/animations/Jumping/north-east/frame_004.png",
+              "Astronaut/animations/Jumping/north-east/frame_005.png",
+              "Astronaut/animations/Jumping/north-east/frame_006.png",
+              "Astronaut/animations/Jumping/north-east/frame_007.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Jumping/south-west/frame_000.png",
+              "Astronaut/animations/Jumping/south-west/frame_001.png",
+              "Astronaut/animations/Jumping/south-west/frame_002.png",
+              "Astronaut/animations/Jumping/south-west/frame_003.png",
+              "Astronaut/animations/Jumping/south-west/frame_004.png",
+              "Astronaut/animations/Jumping/south-west/frame_005.png",
+              "Astronaut/animations/Jumping/south-west/frame_006.png",
+              "Astronaut/animations/Jumping/south-west/frame_007.png"
+            ],
+            "south": [
+              "Astronaut/animations/Jumping/south/frame_000.png",
+              "Astronaut/animations/Jumping/south/frame_001.png",
+              "Astronaut/animations/Jumping/south/frame_002.png",
+              "Astronaut/animations/Jumping/south/frame_003.png",
+              "Astronaut/animations/Jumping/south/frame_004.png",
+              "Astronaut/animations/Jumping/south/frame_005.png",
+              "Astronaut/animations/Jumping/south/frame_006.png",
+              "Astronaut/animations/Jumping/south/frame_007.png"
+            ],
+            "north": [
+              "Astronaut/animations/Jumping/north/frame_000.png",
+              "Astronaut/animations/Jumping/north/frame_001.png",
+              "Astronaut/animations/Jumping/north/frame_002.png",
+              "Astronaut/animations/Jumping/north/frame_003.png",
+              "Astronaut/animations/Jumping/north/frame_004.png",
+              "Astronaut/animations/Jumping/north/frame_005.png",
+              "Astronaut/animations/Jumping/north/frame_006.png",
+              "Astronaut/animations/Jumping/north/frame_007.png"
+            ],
+            "east": [
+              "Astronaut/animations/Jumping/east/frame_000.png",
+              "Astronaut/animations/Jumping/east/frame_001.png",
+              "Astronaut/animations/Jumping/east/frame_002.png",
+              "Astronaut/animations/Jumping/east/frame_003.png",
+              "Astronaut/animations/Jumping/east/frame_004.png",
+              "Astronaut/animations/Jumping/east/frame_005.png",
+              "Astronaut/animations/Jumping/east/frame_006.png",
+              "Astronaut/animations/Jumping/east/frame_007.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Jumping/south-east/frame_000.png",
+              "Astronaut/animations/Jumping/south-east/frame_001.png",
+              "Astronaut/animations/Jumping/south-east/frame_002.png",
+              "Astronaut/animations/Jumping/south-east/frame_003.png",
+              "Astronaut/animations/Jumping/south-east/frame_004.png",
+              "Astronaut/animations/Jumping/south-east/frame_005.png",
+              "Astronaut/animations/Jumping/south-east/frame_006.png",
+              "Astronaut/animations/Jumping/south-east/frame_007.png"
+            ]
+          },
+          "Punch": {
+            "west": [
+              "Astronaut/animations/Punch/west/frame_000.png",
+              "Astronaut/animations/Punch/west/frame_001.png",
+              "Astronaut/animations/Punch/west/frame_002.png",
+              "Astronaut/animations/Punch/west/frame_003.png",
+              "Astronaut/animations/Punch/west/frame_004.png",
+              "Astronaut/animations/Punch/west/frame_005.png"
+            ],
+            "north": [
+              "Astronaut/animations/Punch/north/frame_000.png",
+              "Astronaut/animations/Punch/north/frame_001.png",
+              "Astronaut/animations/Punch/north/frame_002.png",
+              "Astronaut/animations/Punch/north/frame_003.png",
+              "Astronaut/animations/Punch/north/frame_004.png",
+              "Astronaut/animations/Punch/north/frame_005.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Punch/north-west/frame_000.png",
+              "Astronaut/animations/Punch/north-west/frame_001.png",
+              "Astronaut/animations/Punch/north-west/frame_002.png",
+              "Astronaut/animations/Punch/north-west/frame_003.png",
+              "Astronaut/animations/Punch/north-west/frame_004.png",
+              "Astronaut/animations/Punch/north-west/frame_005.png"
+            ],
+            "east": [
+              "Astronaut/animations/Punch/east/frame_000.png",
+              "Astronaut/animations/Punch/east/frame_001.png",
+              "Astronaut/animations/Punch/east/frame_002.png",
+              "Astronaut/animations/Punch/east/frame_003.png",
+              "Astronaut/animations/Punch/east/frame_004.png",
+              "Astronaut/animations/Punch/east/frame_005.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Punch/north-east/frame_000.png",
+              "Astronaut/animations/Punch/north-east/frame_001.png",
+              "Astronaut/animations/Punch/north-east/frame_002.png",
+              "Astronaut/animations/Punch/north-east/frame_003.png",
+              "Astronaut/animations/Punch/north-east/frame_004.png",
+              "Astronaut/animations/Punch/north-east/frame_005.png"
+            ],
+            "south": [
+              "Astronaut/animations/Punch/south/frame_000.png",
+              "Astronaut/animations/Punch/south/frame_001.png",
+              "Astronaut/animations/Punch/south/frame_002.png",
+              "Astronaut/animations/Punch/south/frame_003.png",
+              "Astronaut/animations/Punch/south/frame_004.png",
+              "Astronaut/animations/Punch/south/frame_005.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Punch/south-east/frame_000.png",
+              "Astronaut/animations/Punch/south-east/frame_001.png",
+              "Astronaut/animations/Punch/south-east/frame_002.png",
+              "Astronaut/animations/Punch/south-east/frame_003.png",
+              "Astronaut/animations/Punch/south-east/frame_004.png",
+              "Astronaut/animations/Punch/south-east/frame_005.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Punch/south-west/frame_000.png",
+              "Astronaut/animations/Punch/south-west/frame_001.png",
+              "Astronaut/animations/Punch/south-west/frame_002.png",
+              "Astronaut/animations/Punch/south-west/frame_003.png",
+              "Astronaut/animations/Punch/south-west/frame_004.png",
+              "Astronaut/animations/Punch/south-west/frame_005.png"
+            ]
+          },
+          "Floating": {
+            "east": [
+              "Astronaut/animations/Floating/east/frame_000.png",
+              "Astronaut/animations/Floating/east/frame_001.png",
+              "Astronaut/animations/Floating/east/frame_002.png",
+              "Astronaut/animations/Floating/east/frame_003.png",
+              "Astronaut/animations/Floating/east/frame_004.png",
+              "Astronaut/animations/Floating/east/frame_005.png",
+              "Astronaut/animations/Floating/east/frame_006.png",
+              "Astronaut/animations/Floating/east/frame_007.png",
+              "Astronaut/animations/Floating/east/frame_008.png",
+              "Astronaut/animations/Floating/east/frame_009.png",
+              "Astronaut/animations/Floating/east/frame_010.png"
+            ],
+            "south": [
+              "Astronaut/animations/Floating/south/frame_000.png",
+              "Astronaut/animations/Floating/south/frame_001.png",
+              "Astronaut/animations/Floating/south/frame_002.png",
+              "Astronaut/animations/Floating/south/frame_003.png",
+              "Astronaut/animations/Floating/south/frame_004.png",
+              "Astronaut/animations/Floating/south/frame_005.png",
+              "Astronaut/animations/Floating/south/frame_006.png",
+              "Astronaut/animations/Floating/south/frame_007.png",
+              "Astronaut/animations/Floating/south/frame_008.png",
+              "Astronaut/animations/Floating/south/frame_009.png",
+              "Astronaut/animations/Floating/south/frame_010.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Floating/north-west/frame_000.png",
+              "Astronaut/animations/Floating/north-west/frame_001.png",
+              "Astronaut/animations/Floating/north-west/frame_002.png",
+              "Astronaut/animations/Floating/north-west/frame_003.png",
+              "Astronaut/animations/Floating/north-west/frame_004.png",
+              "Astronaut/animations/Floating/north-west/frame_005.png",
+              "Astronaut/animations/Floating/north-west/frame_006.png",
+              "Astronaut/animations/Floating/north-west/frame_007.png",
+              "Astronaut/animations/Floating/north-west/frame_008.png",
+              "Astronaut/animations/Floating/north-west/frame_009.png",
+              "Astronaut/animations/Floating/north-west/frame_010.png"
+            ],
+            "west": [
+              "Astronaut/animations/Floating/west/frame_000.png",
+              "Astronaut/animations/Floating/west/frame_001.png",
+              "Astronaut/animations/Floating/west/frame_002.png",
+              "Astronaut/animations/Floating/west/frame_003.png",
+              "Astronaut/animations/Floating/west/frame_004.png",
+              "Astronaut/animations/Floating/west/frame_005.png",
+              "Astronaut/animations/Floating/west/frame_006.png",
+              "Astronaut/animations/Floating/west/frame_007.png",
+              "Astronaut/animations/Floating/west/frame_008.png",
+              "Astronaut/animations/Floating/west/frame_009.png",
+              "Astronaut/animations/Floating/west/frame_010.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Floating/north-east/frame_000.png",
+              "Astronaut/animations/Floating/north-east/frame_001.png",
+              "Astronaut/animations/Floating/north-east/frame_002.png",
+              "Astronaut/animations/Floating/north-east/frame_003.png",
+              "Astronaut/animations/Floating/north-east/frame_004.png",
+              "Astronaut/animations/Floating/north-east/frame_005.png",
+              "Astronaut/animations/Floating/north-east/frame_006.png",
+              "Astronaut/animations/Floating/north-east/frame_007.png",
+              "Astronaut/animations/Floating/north-east/frame_008.png",
+              "Astronaut/animations/Floating/north-east/frame_009.png",
+              "Astronaut/animations/Floating/north-east/frame_010.png"
+            ],
+            "north": [
+              "Astronaut/animations/Floating/north/frame_000.png",
+              "Astronaut/animations/Floating/north/frame_001.png",
+              "Astronaut/animations/Floating/north/frame_002.png",
+              "Astronaut/animations/Floating/north/frame_003.png",
+              "Astronaut/animations/Floating/north/frame_004.png",
+              "Astronaut/animations/Floating/north/frame_005.png",
+              "Astronaut/animations/Floating/north/frame_006.png",
+              "Astronaut/animations/Floating/north/frame_007.png",
+              "Astronaut/animations/Floating/north/frame_008.png",
+              "Astronaut/animations/Floating/north/frame_009.png",
+              "Astronaut/animations/Floating/north/frame_010.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Floating/south-west/frame_000.png",
+              "Astronaut/animations/Floating/south-west/frame_001.png",
+              "Astronaut/animations/Floating/south-west/frame_002.png",
+              "Astronaut/animations/Floating/south-west/frame_003.png",
+              "Astronaut/animations/Floating/south-west/frame_004.png",
+              "Astronaut/animations/Floating/south-west/frame_005.png",
+              "Astronaut/animations/Floating/south-west/frame_006.png",
+              "Astronaut/animations/Floating/south-west/frame_007.png",
+              "Astronaut/animations/Floating/south-west/frame_008.png",
+              "Astronaut/animations/Floating/south-west/frame_009.png",
+              "Astronaut/animations/Floating/south-west/frame_010.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Floating/south-east/frame_000.png",
+              "Astronaut/animations/Floating/south-east/frame_001.png",
+              "Astronaut/animations/Floating/south-east/frame_002.png",
+              "Astronaut/animations/Floating/south-east/frame_003.png",
+              "Astronaut/animations/Floating/south-east/frame_004.png",
+              "Astronaut/animations/Floating/south-east/frame_005.png",
+              "Astronaut/animations/Floating/south-east/frame_006.png",
+              "Astronaut/animations/Floating/south-east/frame_007.png",
+              "Astronaut/animations/Floating/south-east/frame_008.png",
+              "Astronaut/animations/Floating/south-east/frame_009.png",
+              "Astronaut/animations/Floating/south-east/frame_010.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south-west": [
+              "Astronaut/animations/Breathing_Idle/south-west/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/south-west/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/south-west/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/south-west/frame_003.png"
+            ],
+            "east": [
+              "Astronaut/animations/Breathing_Idle/east/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/east/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/east/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/east/frame_003.png"
+            ],
+            "west": [
+              "Astronaut/animations/Breathing_Idle/west/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/west/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/west/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/west/frame_003.png"
+            ],
+            "north": [
+              "Astronaut/animations/Breathing_Idle/north/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/north/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/north/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/north/frame_003.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Breathing_Idle/north-west/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/north-west/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/north-west/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/north-west/frame_003.png"
+            ],
+            "south": [
+              "Astronaut/animations/Breathing_Idle/south/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/south/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/south/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/south/frame_003.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Breathing_Idle/north-east/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/north-east/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/north-east/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/north-east/frame_003.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Breathing_Idle/south-east/frame_000.png",
+              "Astronaut/animations/Breathing_Idle/south-east/frame_001.png",
+              "Astronaut/animations/Breathing_Idle/south-east/frame_002.png",
+              "Astronaut/animations/Breathing_Idle/south-east/frame_003.png"
+            ]
+          },
+          "Death_Animation": {
+            "south": [
+              "Astronaut/animations/Death_Animation/south/frame_000.png",
+              "Astronaut/animations/Death_Animation/south/frame_001.png",
+              "Astronaut/animations/Death_Animation/south/frame_002.png",
+              "Astronaut/animations/Death_Animation/south/frame_003.png",
+              "Astronaut/animations/Death_Animation/south/frame_004.png",
+              "Astronaut/animations/Death_Animation/south/frame_005.png",
+              "Astronaut/animations/Death_Animation/south/frame_006.png",
+              "Astronaut/animations/Death_Animation/south/frame_007.png",
+              "Astronaut/animations/Death_Animation/south/frame_008.png",
+              "Astronaut/animations/Death_Animation/south/frame_009.png",
+              "Astronaut/animations/Death_Animation/south/frame_010.png"
+            ],
+            "north": [
+              "Astronaut/animations/Death_Animation/north/frame_000.png",
+              "Astronaut/animations/Death_Animation/north/frame_001.png",
+              "Astronaut/animations/Death_Animation/north/frame_002.png",
+              "Astronaut/animations/Death_Animation/north/frame_003.png",
+              "Astronaut/animations/Death_Animation/north/frame_004.png",
+              "Astronaut/animations/Death_Animation/north/frame_005.png",
+              "Astronaut/animations/Death_Animation/north/frame_006.png",
+              "Astronaut/animations/Death_Animation/north/frame_007.png",
+              "Astronaut/animations/Death_Animation/north/frame_008.png",
+              "Astronaut/animations/Death_Animation/north/frame_009.png",
+              "Astronaut/animations/Death_Animation/north/frame_010.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Death_Animation/north-east/frame_000.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_001.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_002.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_003.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_004.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_005.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_006.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_007.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_008.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_009.png",
+              "Astronaut/animations/Death_Animation/north-east/frame_010.png"
+            ],
+            "west": [
+              "Astronaut/animations/Death_Animation/west/frame_000.png",
+              "Astronaut/animations/Death_Animation/west/frame_001.png",
+              "Astronaut/animations/Death_Animation/west/frame_002.png",
+              "Astronaut/animations/Death_Animation/west/frame_003.png",
+              "Astronaut/animations/Death_Animation/west/frame_004.png",
+              "Astronaut/animations/Death_Animation/west/frame_005.png",
+              "Astronaut/animations/Death_Animation/west/frame_006.png",
+              "Astronaut/animations/Death_Animation/west/frame_007.png",
+              "Astronaut/animations/Death_Animation/west/frame_008.png",
+              "Astronaut/animations/Death_Animation/west/frame_009.png",
+              "Astronaut/animations/Death_Animation/west/frame_010.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Death_Animation/south-east/frame_000.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_001.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_002.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_003.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_004.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_005.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_006.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_007.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_008.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_009.png",
+              "Astronaut/animations/Death_Animation/south-east/frame_010.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Death_Animation/south-west/frame_000.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_001.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_002.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_003.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_004.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_005.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_006.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_007.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_008.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_009.png",
+              "Astronaut/animations/Death_Animation/south-west/frame_010.png"
+            ],
+            "east": [
+              "Astronaut/animations/Death_Animation/east/frame_000.png",
+              "Astronaut/animations/Death_Animation/east/frame_001.png",
+              "Astronaut/animations/Death_Animation/east/frame_002.png",
+              "Astronaut/animations/Death_Animation/east/frame_003.png",
+              "Astronaut/animations/Death_Animation/east/frame_004.png",
+              "Astronaut/animations/Death_Animation/east/frame_005.png",
+              "Astronaut/animations/Death_Animation/east/frame_006.png",
+              "Astronaut/animations/Death_Animation/east/frame_007.png",
+              "Astronaut/animations/Death_Animation/east/frame_008.png",
+              "Astronaut/animations/Death_Animation/east/frame_009.png",
+              "Astronaut/animations/Death_Animation/east/frame_010.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Death_Animation/north-west/frame_000.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_001.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_002.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_003.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_004.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_005.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_006.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_007.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_008.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_009.png",
+              "Astronaut/animations/Death_Animation/north-west/frame_010.png"
+            ]
+          },
+          "Push_Pull": {
+            "north-east": [
+              "Astronaut/animations/Push_Pull/north-east/frame_000.png",
+              "Astronaut/animations/Push_Pull/north-east/frame_001.png",
+              "Astronaut/animations/Push_Pull/north-east/frame_002.png",
+              "Astronaut/animations/Push_Pull/north-east/frame_003.png",
+              "Astronaut/animations/Push_Pull/north-east/frame_004.png",
+              "Astronaut/animations/Push_Pull/north-east/frame_005.png"
+            ],
+            "north": [
+              "Astronaut/animations/Push_Pull/north/frame_000.png",
+              "Astronaut/animations/Push_Pull/north/frame_001.png",
+              "Astronaut/animations/Push_Pull/north/frame_002.png",
+              "Astronaut/animations/Push_Pull/north/frame_003.png",
+              "Astronaut/animations/Push_Pull/north/frame_004.png",
+              "Astronaut/animations/Push_Pull/north/frame_005.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Push_Pull/south-west/frame_000.png",
+              "Astronaut/animations/Push_Pull/south-west/frame_001.png",
+              "Astronaut/animations/Push_Pull/south-west/frame_002.png",
+              "Astronaut/animations/Push_Pull/south-west/frame_003.png",
+              "Astronaut/animations/Push_Pull/south-west/frame_004.png",
+              "Astronaut/animations/Push_Pull/south-west/frame_005.png"
+            ],
+            "south": [
+              "Astronaut/animations/Push_Pull/south/frame_000.png",
+              "Astronaut/animations/Push_Pull/south/frame_001.png",
+              "Astronaut/animations/Push_Pull/south/frame_002.png",
+              "Astronaut/animations/Push_Pull/south/frame_003.png",
+              "Astronaut/animations/Push_Pull/south/frame_004.png",
+              "Astronaut/animations/Push_Pull/south/frame_005.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Push_Pull/south-east/frame_000.png",
+              "Astronaut/animations/Push_Pull/south-east/frame_001.png",
+              "Astronaut/animations/Push_Pull/south-east/frame_002.png",
+              "Astronaut/animations/Push_Pull/south-east/frame_003.png",
+              "Astronaut/animations/Push_Pull/south-east/frame_004.png",
+              "Astronaut/animations/Push_Pull/south-east/frame_005.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Push_Pull/north-west/frame_000.png",
+              "Astronaut/animations/Push_Pull/north-west/frame_001.png",
+              "Astronaut/animations/Push_Pull/north-west/frame_002.png",
+              "Astronaut/animations/Push_Pull/north-west/frame_003.png",
+              "Astronaut/animations/Push_Pull/north-west/frame_004.png",
+              "Astronaut/animations/Push_Pull/north-west/frame_005.png"
+            ],
+            "west": [
+              "Astronaut/animations/Push_Pull/west/frame_000.png",
+              "Astronaut/animations/Push_Pull/west/frame_001.png",
+              "Astronaut/animations/Push_Pull/west/frame_002.png",
+              "Astronaut/animations/Push_Pull/west/frame_003.png",
+              "Astronaut/animations/Push_Pull/west/frame_004.png",
+              "Astronaut/animations/Push_Pull/west/frame_005.png"
+            ],
+            "east": [
+              "Astronaut/animations/Push_Pull/east/frame_000.png",
+              "Astronaut/animations/Push_Pull/east/frame_001.png",
+              "Astronaut/animations/Push_Pull/east/frame_002.png",
+              "Astronaut/animations/Push_Pull/east/frame_003.png",
+              "Astronaut/animations/Push_Pull/east/frame_004.png",
+              "Astronaut/animations/Push_Pull/east/frame_005.png"
+            ]
+          },
+          "Shooting": {
+            "south": [
+              "Astronaut/animations/Shooting/south/frame_000.png",
+              "Astronaut/animations/Shooting/south/frame_001.png",
+              "Astronaut/animations/Shooting/south/frame_002.png",
+              "Astronaut/animations/Shooting/south/frame_003.png",
+              "Astronaut/animations/Shooting/south/frame_004.png",
+              "Astronaut/animations/Shooting/south/frame_005.png",
+              "Astronaut/animations/Shooting/south/frame_006.png",
+              "Astronaut/animations/Shooting/south/frame_007.png",
+              "Astronaut/animations/Shooting/south/frame_008.png",
+              "Astronaut/animations/Shooting/south/frame_009.png",
+              "Astronaut/animations/Shooting/south/frame_010.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Shooting/north-east/frame_000.png",
+              "Astronaut/animations/Shooting/north-east/frame_001.png",
+              "Astronaut/animations/Shooting/north-east/frame_002.png",
+              "Astronaut/animations/Shooting/north-east/frame_003.png",
+              "Astronaut/animations/Shooting/north-east/frame_004.png",
+              "Astronaut/animations/Shooting/north-east/frame_005.png",
+              "Astronaut/animations/Shooting/north-east/frame_006.png",
+              "Astronaut/animations/Shooting/north-east/frame_007.png",
+              "Astronaut/animations/Shooting/north-east/frame_008.png",
+              "Astronaut/animations/Shooting/north-east/frame_009.png",
+              "Astronaut/animations/Shooting/north-east/frame_010.png"
+            ],
+            "west": [
+              "Astronaut/animations/Shooting/west/frame_000.png",
+              "Astronaut/animations/Shooting/west/frame_001.png",
+              "Astronaut/animations/Shooting/west/frame_002.png",
+              "Astronaut/animations/Shooting/west/frame_003.png",
+              "Astronaut/animations/Shooting/west/frame_004.png",
+              "Astronaut/animations/Shooting/west/frame_005.png",
+              "Astronaut/animations/Shooting/west/frame_006.png",
+              "Astronaut/animations/Shooting/west/frame_007.png",
+              "Astronaut/animations/Shooting/west/frame_008.png",
+              "Astronaut/animations/Shooting/west/frame_009.png",
+              "Astronaut/animations/Shooting/west/frame_010.png"
+            ],
+            "north": [
+              "Astronaut/animations/Shooting/north/frame_000.png",
+              "Astronaut/animations/Shooting/north/frame_001.png",
+              "Astronaut/animations/Shooting/north/frame_002.png",
+              "Astronaut/animations/Shooting/north/frame_003.png",
+              "Astronaut/animations/Shooting/north/frame_004.png",
+              "Astronaut/animations/Shooting/north/frame_005.png",
+              "Astronaut/animations/Shooting/north/frame_006.png",
+              "Astronaut/animations/Shooting/north/frame_007.png",
+              "Astronaut/animations/Shooting/north/frame_008.png",
+              "Astronaut/animations/Shooting/north/frame_009.png",
+              "Astronaut/animations/Shooting/north/frame_010.png"
+            ],
+            "north-west": [
+              "Astronaut/animations/Shooting/north-west/frame_000.png",
+              "Astronaut/animations/Shooting/north-west/frame_001.png",
+              "Astronaut/animations/Shooting/north-west/frame_002.png",
+              "Astronaut/animations/Shooting/north-west/frame_003.png",
+              "Astronaut/animations/Shooting/north-west/frame_004.png",
+              "Astronaut/animations/Shooting/north-west/frame_005.png",
+              "Astronaut/animations/Shooting/north-west/frame_006.png",
+              "Astronaut/animations/Shooting/north-west/frame_007.png",
+              "Astronaut/animations/Shooting/north-west/frame_008.png",
+              "Astronaut/animations/Shooting/north-west/frame_009.png",
+              "Astronaut/animations/Shooting/north-west/frame_010.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Shooting/south-east/frame_000.png",
+              "Astronaut/animations/Shooting/south-east/frame_001.png",
+              "Astronaut/animations/Shooting/south-east/frame_002.png",
+              "Astronaut/animations/Shooting/south-east/frame_003.png",
+              "Astronaut/animations/Shooting/south-east/frame_004.png",
+              "Astronaut/animations/Shooting/south-east/frame_005.png",
+              "Astronaut/animations/Shooting/south-east/frame_006.png",
+              "Astronaut/animations/Shooting/south-east/frame_007.png",
+              "Astronaut/animations/Shooting/south-east/frame_008.png",
+              "Astronaut/animations/Shooting/south-east/frame_009.png",
+              "Astronaut/animations/Shooting/south-east/frame_010.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Shooting/south-west/frame_000.png",
+              "Astronaut/animations/Shooting/south-west/frame_001.png",
+              "Astronaut/animations/Shooting/south-west/frame_002.png",
+              "Astronaut/animations/Shooting/south-west/frame_003.png",
+              "Astronaut/animations/Shooting/south-west/frame_004.png",
+              "Astronaut/animations/Shooting/south-west/frame_005.png",
+              "Astronaut/animations/Shooting/south-west/frame_006.png",
+              "Astronaut/animations/Shooting/south-west/frame_007.png",
+              "Astronaut/animations/Shooting/south-west/frame_008.png",
+              "Astronaut/animations/Shooting/south-west/frame_009.png",
+              "Astronaut/animations/Shooting/south-west/frame_010.png"
+            ],
+            "east": [
+              "Astronaut/animations/Shooting/east/frame_000.png",
+              "Astronaut/animations/Shooting/east/frame_001.png",
+              "Astronaut/animations/Shooting/east/frame_002.png",
+              "Astronaut/animations/Shooting/east/frame_003.png",
+              "Astronaut/animations/Shooting/east/frame_004.png",
+              "Astronaut/animations/Shooting/east/frame_005.png",
+              "Astronaut/animations/Shooting/east/frame_006.png",
+              "Astronaut/animations/Shooting/east/frame_007.png",
+              "Astronaut/animations/Shooting/east/frame_008.png",
+              "Astronaut/animations/Shooting/east/frame_009.png",
+              "Astronaut/animations/Shooting/east/frame_010.png"
+            ]
+          },
+          "Hit_Knocked_Back": {
+            "north-west": [
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-west/frame_006.png"
+            ],
+            "north-east": [
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/north-east/frame_006.png"
+            ],
+            "south-east": [
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-east/frame_006.png"
+            ],
+            "south-west": [
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/south-west/frame_006.png"
+            ],
+            "north": [
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/north/frame_006.png"
+            ],
+            "west": [
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/west/frame_006.png"
+            ],
+            "east": [
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/east/frame_006.png"
+            ],
+            "south": [
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_000.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_001.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_002.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_003.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_004.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_005.png",
+              "Astronaut/animations/Hit_Knocked_Back/south/frame_006.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-17T13:02:20.068679"
+}
