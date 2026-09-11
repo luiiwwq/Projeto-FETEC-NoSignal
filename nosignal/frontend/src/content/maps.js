@@ -43,10 +43,12 @@ const castlePillarRight = { id: 'castle-pillar-right', x: 3712, y: 547, w: 85, h
 const castleTowerRight = { id: 'castle-tower-right', x: 3822, y: 547, w: 84, h: 382, kind: 'castle-wall' };
 
 // Thin collision strip across the door opening — prevents the player from
-// visually walking through the closed door leaves. Positioned just above
-// the interaction trigger (Passo 2) so the player sees the "[E] ENTRAR"
-// prompt before physically hitting this barrier.
-const castleDoorBlock = { id: 'castle-door-block', x: 3584, y: 794, w: 131, h: 14, kind: 'castle-wall' };
+// visually walking through the closed door leaves. Its bottom edge (the one
+// facing the player approaching from below) is pushed a little further down,
+// inside the top of the interaction trigger, so the player stops a bit before
+// the door: blocked at centerY = 830 + halfH, i.e. ~22px below the old stop
+// point, while the "[E] ENTRAR" prompt is still visible.
+const castleDoorBlock = { id: 'castle-door-block', x: 3584, y: 816, w: 131, h: 14, kind: 'castle-wall' };
 
 const surfaceRocks = [
     { x: 280, y: 1360, w: 84, h: 84, kind: 'rock' },
@@ -119,9 +121,10 @@ export const marsSurfaceMap = {
             // height (y808), centered on the door opening (x3580..3720). Overlap
             // only (rectsOverlap). The bottom (y848) stays well above the
             // castle-return spawn (960) so the prompt does NOT appear on spawn.
-            // The castle-door-block collision sits at y794..808, just above this
-            // trigger, giving ~40px of margin for the player to stand inside the
-            // interaction zone without hitting the door barrier.
+            // The castle-door-block collision sits at y816..830, inside the top
+            // of this trigger, so the player is stopped a bit further from the
+            // door leaves while still overlapping the zone (~18px of standing
+            // room below the barrier) with the prompt visible.
             area: { x: 3580, y: 808, w: 140, h: 40 },
         },
     ],
