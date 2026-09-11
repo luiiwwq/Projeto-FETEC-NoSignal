@@ -28,18 +28,18 @@ const caveWallLeft = { x: 1450, y: 1160, w: 130, h: 250, kind: 'cave-wall' };
 const caveWallRight = { x: 1660, y: 1160, w: 130, h: 250, kind: 'cave-wall' };
 
 // Distant castle — visual facade comes from castle-sprite.png (see MapRenderer).
-// SOLID collision = 4 structural AABBs (outer towers full height + inner pillars
-// from the tower top down to the door lintel y800) + 1 thin strip across the
+// SOLID collision = 4 structural AABBs (outer towers + inner pillars, all at
+// full height from tower top y547 to base y929) + 1 thin strip across the
 // door opening (castle-door-block) that stops the player from visually walking
 // through the closed door leaves. Footprint computed from the sprite alpha
 // bounds (x3386..3919, top y547, base y929, scale 0.15, anchor 3650/940). The
-// stretch in front of the door (lintel → base, x3593..3706) is intentionally
+// stretch in front of the door (lintel → base, x3587..3712) is intentionally
 // FREE — it is the access corridor from the stairs to the interaction trigger.
 // Each structural AABB width was thinned ~12% (centered) so the player gets
 // closer to the visual structure before colliding.
 const castleTowerLeft = { id: 'castle-tower-left', x: 3398, y: 547, w: 80, h: 382, kind: 'castle-wall' };
-const castlePillarLeft = { id: 'castle-pillar-left', x: 3502, y: 547, w: 85, h: 253, kind: 'castle-wall' };
-const castlePillarRight = { id: 'castle-pillar-right', x: 3712, y: 547, w: 85, h: 253, kind: 'castle-wall' };
+const castlePillarLeft = { id: 'castle-pillar-left', x: 3502, y: 547, w: 85, h: 382, kind: 'castle-wall' };
+const castlePillarRight = { id: 'castle-pillar-right', x: 3712, y: 547, w: 85, h: 382, kind: 'castle-wall' };
 const castleTowerRight = { id: 'castle-tower-right', x: 3822, y: 547, w: 84, h: 382, kind: 'castle-wall' };
 
 // Thin collision strip across the door opening — prevents the player from
