@@ -55,26 +55,44 @@
     100% { opacity: 0.25; }
 }
 
-/* Camada 3: Logotipo Independente com Transparência Alpha (Desktop: Próximo ao New Game) */
-.title-screen__brand {
+/* Camada 3 e 4: Painel Fixo da Marca e Menu Principal (Sempre ancorados e proporcionais) */
+.title-screen__nav-panel {
     position: absolute;
-    top: 11.5%;
-    left: 3.9%;
-    width: 21.8%;
-    min-width: 290px;
-    max-width: 335px;
+    top: 50%;
+    left: clamp(24px, 4.5vw, 60px);
+    transform: translateY(-50%);
+    width: clamp(320px, 32vw, 480px);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+/* Camada 3: Logotipo Independente com Transparência Alpha */
+.title-screen__brand {
+    width: 100%;
     z-index: 5;
     pointer-events: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .title-screen__logo {
     width: 100%;
+    max-width: 100%;
     height: auto;
     display: block;
     object-fit: contain;
+    object-position: center bottom;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     image-rendering: -webkit-optimize-contrast;
+    filter: drop-shadow(0 0 20px rgba(227, 154, 62, 0.6));
 }
 
 /* Camada 4: Conteúdo Interativo (Menu Principal) */
@@ -85,24 +103,19 @@
     z-index: 10;
 }
 
-/* Área do Menu Principal (Sobreposição ao Lado Esquerdo Abaixo do Logo) */
+/* Área do Menu Principal (Alinhada perfeitamente com a barra da logo) */
 .title-screen__menu {
-    position: absolute;
-    top: 38.0%;
-    left: 3.9%;
-    width: 21.8%;
-    min-width: 290px;
-    max-width: 335px;
+    width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 /* Botões HTML Reais em Pixel Art Placa Sci-Fi */
 .menu-btn {
     position: relative;
     width: 100%;
-    height: 45px;
+    height: 44px;
     background: linear-gradient(180deg, #993a1d 0%, #682417 100%);
     border: 2px solid #230a0d;
     outline: none;
@@ -214,66 +227,24 @@
     to { opacity: 0; }
 }
 
-/* Adaptativo Dedicado para TABLETS (601px até 1100px): Logo BEM próxima do botão New Game como no Desktop */
-@media (min-width: 601px) and (max-width: 1100px) {
-    .title-screen__brand {
-        position: absolute;
-        top: calc(38.0% - 150px);
-        left: 4.0%;
-        width: 24%;
-        min-width: 230px;
-        max-width: 275px;
+/* Adaptativo para Telas de Celular (Responsividade Mobile <= 600px em portrait) */
+@media (max-width: 600px) and (orientation: portrait) {
+    .title-screen__nav-panel {
+        top: 45%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 85%;
+        max-width: 290px;
+        align-items: center;
+        gap: 14px;
     }
 
-    .title-screen__menu {
-        position: absolute;
-        top: 38.0%;
-        left: 4.0%;
-        width: 24%;
-        min-width: 230px;
-        max-width: 275px;
-        gap: 4px;
+    .title-screen__logo {
+        object-position: center;
     }
 
     .menu-btn {
         height: 42px;
-        font-size: 11px;
-        padding-left: 14px;
-    }
-
-    .title-screen__footer {
-        bottom: 10px;
-        left: 4.0%;
-        font-size: 7.5px;
-    }
-}
-
-/* Adaptativo para Telas de Celular (Responsividade Mobile <= 600px em portrait) */
-@media (max-width: 600px) and (orientation: portrait) {
-    .title-screen__brand {
-        top: 6%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 70%;
-        max-width: 280px;
-        min-width: unset;
-        display: flex;
-        justify-content: center;
-    }
-
-    .title-screen__menu {
-        position: absolute;
-        top: 48%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 72%;
-        min-width: 250px;
-        max-width: 290px;
-        gap: 5px;
-    }
-
-    .menu-btn {
-        height: 44px;
         font-size: 11px;
         text-align: center;
         padding-left: 0;

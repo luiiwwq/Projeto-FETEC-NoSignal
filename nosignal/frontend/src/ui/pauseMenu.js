@@ -27,10 +27,15 @@ export function openPauseMenu(container, engine) {
     engineRef = engine;
     mainMenuArmed = false;
 
+    // Preferir anexar dentro do viewport do jogo ou no container raiz
+    const mountTarget = container.querySelector('.game-viewport') || container;
+
     if (!menuElement) {
         menuElement = _buildDOM();
-        container.appendChild(menuElement);
+        mountTarget.appendChild(menuElement);
         _bindEvents();
+    } else if (menuElement.parentElement !== mountTarget) {
+        mountTarget.appendChild(menuElement);
     }
 
     menuElement.hidden = false;

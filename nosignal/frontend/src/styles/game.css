@@ -309,7 +309,7 @@
 .pause-panel {
     position: relative;
     width: 380px;
-    max-width: 92%;
+    max-width: calc(100vw - 32px);
     background: #12030a;
     border: 2px solid #e07228;
     box-shadow:
@@ -325,6 +325,7 @@
         100% 100%,
         0px 100%
     );
+    user-select: none;
 }
 
 @keyframes pauseSlideIn {

@@ -13,32 +13,32 @@ export function renderTitleScreen(container) {
             <!-- Camada 2: Overlay com Animação Discreta de Estrelas -->
             <div class="starfield-overlay" aria-hidden="true"></div>
 
-            <!-- Camada 3: Logotipo Independente com Transparência -->
-            <header class="title-screen__brand">
-                <img 
-                    class="title-screen__logo" 
-                    src="./src/assets/references/no-signal-logo.png" 
-                    srcset="./src/assets/references/no-signal-logo.png 1x, ./src/assets/references/no-signal-logo-master-2x.png 2x" 
-                    alt="No Signal Logo" 
-                />
-            </header>
-
-            <!-- Camada 4: Conteúdo Interativo (Menu HTML Real e Controles) -->
+            <!-- Camada 3 e 4: Painel Fixo da Marca e Menu Principal -->
             <main class="title-screen__content">
-                <nav class="title-screen__menu" aria-label="Menu Principal">
-                    <button type="button" id="btn-start" class="menu-btn is-selected" tabindex="0">
-                        NEW GAME
-                    </button>
-                    <button type="button" id="btn-load" class="menu-btn" tabindex="0">
-                        LOAD GAME
-                    </button>
-                    <button type="button" id="btn-options" class="menu-btn" tabindex="0">
-                        OPTIONS
-                    </button>
-                    <button type="button" id="btn-credits" class="menu-btn" tabindex="0">
-                        CREDITS
-                    </button>
-                </nav>
+                <div class="title-screen__nav-panel">
+                    <header class="title-screen__brand">
+                        <img 
+                            class="title-screen__logo" 
+                            src="./src/assets/references/no-signal-logo-trimmed.png" 
+                            alt="No Signal Logo" 
+                        />
+                    </header>
+
+                    <nav class="title-screen__menu" aria-label="Menu Principal">
+                        <button type="button" id="btn-start" class="menu-btn is-selected" tabindex="0">
+                            NEW GAME
+                        </button>
+                        <button type="button" id="btn-load" class="menu-btn" tabindex="0">
+                            LOAD GAME
+                        </button>
+                        <button type="button" id="btn-options" class="menu-btn" tabindex="0">
+                            OPTIONS
+                        </button>
+                        <button type="button" id="btn-credits" class="menu-btn" tabindex="0">
+                            CREDITS
+                        </button>
+                    </nav>
+                </div>
 
                 <footer class="title-screen__footer">
                     <span>v1.0.0 — Sinais de Comunicação Ausentes</span>
