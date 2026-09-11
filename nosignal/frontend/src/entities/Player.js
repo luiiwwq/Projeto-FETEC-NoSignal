@@ -63,6 +63,12 @@ export class Player {
         this.jumpHeight = 0;
         this.jumpVelocity = 0;
 
+        // Collision profile (injected by the GameEngine per map)
+        this.colliderHalfW = 20;
+        this.colliderHalfH = 22;
+        this.collisionResolver = null;
+        this.worldBounds = null;
+
         // Animation definitions and frame counts
         this.animConfig = {
             [PlayerState.IDLE]: { name: 'Breathing_Idle', frames: 4, speed: 0.16, loop: true },
@@ -133,6 +139,23 @@ export class Player {
         }
     }
 
+    setCollisionResolver(resolver) {
+        this.collisionResolver = resolver;
+    }
+
+    setWorldBounds(bounds) {
+        this.worldBounds = bounds;
+    }
+
+    setPosition(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.recoilX = 0;
+        this.recoilY = 0;
+    }
+
     handleInput(input, camera, bulletManager) {
         if (this.state === PlayerState.DEAD) return;
 
@@ -178,11 +201,11 @@ export class Player {
 
         // If not in a high-priority action state, update walking/idle
         const isActionActive = (this.state === PlayerState.SHOOTING ||
-                                this.state === PlayerState.PUNCHING ||
-                                this.state === PlayerState.JUMPING ||
-                                this.state === PlayerState.HURT ||
-                                this.state === PlayerState.FLOATING ||
-                                this.state === PlayerState.PUSH_PULL);
+            this.state === PlayerState.PUNCHING ||
+            this.state === PlayerState.JUMPING ||
+            this.state === PlayerState.HURT ||
+            this.state === PlayerState.FLOATING ||
+            this.state === PlayerState.PUSH_PULL);
 
         if (!isActionActive) {
             if (moveX !== 0 || moveY !== 0) {
@@ -280,14 +303,23 @@ export class Player {
         this.recoilX *= Math.max(0, 1 - dt * 10);
         this.recoilY *= Math.max(0, 1 - dt * 10);
 
-        // Position update with velocity and recoil
+        // Position update with velocity and recoil, resolved through
+        // the injected collision resolver (walls + world bounds)
         if (this.state !== PlayerState.DEAD) {
-            this.x += (this.vx + this.recoilX) * dt;
-            this.y += (this.vy + this.recoilY) * dt;
+            const dx = (this.vx + this.recoilX) * dt;
+            const dy = (this.vy + this.recoilY) * dt;
 
-            // Clamp to world boundaries
-            this.x = Math.max(-1550, Math.min(1550, this.x));
-            this.y = Math.max(-1550, Math.min(1550, this.y));
+            if (this.collisionResolver) {
+                const resolved = this.collisionResolver(this.x, this.y, dx, dy);
+                this.x = resolved.x;
+                this.y = resolved.y;
+            } else if (this.worldBounds) {
+                this.x = Math.max(this.worldBounds.minX + this.colliderHalfW, Math.min(this.worldBounds.maxX - this.colliderHalfW, this.x + dx));
+                this.y = Math.max(this.worldBounds.minY + this.colliderHalfH, Math.min(this.worldBounds.maxY - this.colliderHalfH, this.y + dy));
+            } else {
+                this.x += dx;
+                this.y += dy;
+            }
         }
 
         // Jump physics arc

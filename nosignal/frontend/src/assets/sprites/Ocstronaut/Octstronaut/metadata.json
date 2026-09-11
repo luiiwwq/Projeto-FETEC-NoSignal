@@ -1,0 +1,368 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "afad9423-d43e-4ca4-ac2f-cc525016fb46",
+        "name": "Octstronaut",
+        "prompt": "Make a Octopus astronaut sprite. Futuristic space pirate look with gun holsters on hips. Like the kind that Samus Aran might fight in her games. Be careful not to infringe or rip off copy right! Like a future space adventurer, but dangerous! (Must wear astronaut helmet! Helmet is see-through to see the Octopus face! Include a tentacle or two also in helmet)",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "side",
+        "created_at": "2026-07-23T02:34:44.696943+00:00"
+      },
+      "folder": "Octstronaut",
+      "frames": {
+        "rotations": {
+          "south": "Octstronaut/rotations/south.png",
+          "south-east": "Octstronaut/rotations/south-east.png",
+          "east": "Octstronaut/rotations/east.png",
+          "north-east": "Octstronaut/rotations/north-east.png",
+          "north": "Octstronaut/rotations/north.png",
+          "north-west": "Octstronaut/rotations/north-west.png",
+          "west": "Octstronaut/rotations/west.png",
+          "south-west": "Octstronaut/rotations/south-west.png"
+        },
+        "animations": {
+          "Two-Footed_Jump_getting_high_off_the_ground": {
+            "south": [
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_000.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_001.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_002.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_003.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_004.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_005.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/south/frame_006.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_000.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_001.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_002.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_003.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_004.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_005.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/east/frame_006.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_000.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_001.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_002.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_003.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_004.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_005.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/west/frame_006.png"
+            ],
+            "north": [
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_000.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_001.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_002.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_003.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_004.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_005.png",
+              "Octstronaut/animations/Two-Footed_Jump_getting_high_off_the_ground/north/frame_006.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "north": [
+              "Octstronaut/animations/Breathing_Idle/north/frame_000.png",
+              "Octstronaut/animations/Breathing_Idle/north/frame_001.png",
+              "Octstronaut/animations/Breathing_Idle/north/frame_002.png",
+              "Octstronaut/animations/Breathing_Idle/north/frame_003.png"
+            ],
+            "south": [
+              "Octstronaut/animations/Breathing_Idle/south/frame_000.png",
+              "Octstronaut/animations/Breathing_Idle/south/frame_001.png",
+              "Octstronaut/animations/Breathing_Idle/south/frame_002.png",
+              "Octstronaut/animations/Breathing_Idle/south/frame_003.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Breathing_Idle/east/frame_000.png",
+              "Octstronaut/animations/Breathing_Idle/east/frame_001.png",
+              "Octstronaut/animations/Breathing_Idle/east/frame_002.png",
+              "Octstronaut/animations/Breathing_Idle/east/frame_003.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Breathing_Idle/west/frame_000.png",
+              "Octstronaut/animations/Breathing_Idle/west/frame_001.png",
+              "Octstronaut/animations/Breathing_Idle/west/frame_002.png",
+              "Octstronaut/animations/Breathing_Idle/west/frame_003.png"
+            ]
+          },
+          "Taking_Damage": {
+            "south": [
+              "Octstronaut/animations/Taking_Damage/south/frame_000.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_001.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_002.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_003.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_004.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_005.png",
+              "Octstronaut/animations/Taking_Damage/south/frame_006.png"
+            ],
+            "north": [
+              "Octstronaut/animations/Taking_Damage/north/frame_000.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_001.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_002.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_003.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_004.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_005.png",
+              "Octstronaut/animations/Taking_Damage/north/frame_006.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Taking_Damage/east/frame_000.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_001.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_002.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_003.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_004.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_005.png",
+              "Octstronaut/animations/Taking_Damage/east/frame_006.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Taking_Damage/west/frame_000.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_001.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_002.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_003.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_004.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_005.png",
+              "Octstronaut/animations/Taking_Damage/west/frame_006.png"
+            ]
+          },
+          "Shooting": {
+            "north": [
+              "Octstronaut/animations/Shooting/north/frame_000.png",
+              "Octstronaut/animations/Shooting/north/frame_001.png",
+              "Octstronaut/animations/Shooting/north/frame_002.png",
+              "Octstronaut/animations/Shooting/north/frame_003.png",
+              "Octstronaut/animations/Shooting/north/frame_004.png",
+              "Octstronaut/animations/Shooting/north/frame_005.png",
+              "Octstronaut/animations/Shooting/north/frame_006.png",
+              "Octstronaut/animations/Shooting/north/frame_007.png",
+              "Octstronaut/animations/Shooting/north/frame_008.png",
+              "Octstronaut/animations/Shooting/north/frame_009.png",
+              "Octstronaut/animations/Shooting/north/frame_010.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Shooting/east/frame_000.png",
+              "Octstronaut/animations/Shooting/east/frame_001.png",
+              "Octstronaut/animations/Shooting/east/frame_002.png",
+              "Octstronaut/animations/Shooting/east/frame_003.png",
+              "Octstronaut/animations/Shooting/east/frame_004.png",
+              "Octstronaut/animations/Shooting/east/frame_005.png",
+              "Octstronaut/animations/Shooting/east/frame_006.png",
+              "Octstronaut/animations/Shooting/east/frame_007.png",
+              "Octstronaut/animations/Shooting/east/frame_008.png",
+              "Octstronaut/animations/Shooting/east/frame_009.png",
+              "Octstronaut/animations/Shooting/east/frame_010.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Shooting/west/frame_000.png",
+              "Octstronaut/animations/Shooting/west/frame_001.png",
+              "Octstronaut/animations/Shooting/west/frame_002.png",
+              "Octstronaut/animations/Shooting/west/frame_003.png",
+              "Octstronaut/animations/Shooting/west/frame_004.png",
+              "Octstronaut/animations/Shooting/west/frame_005.png",
+              "Octstronaut/animations/Shooting/west/frame_006.png",
+              "Octstronaut/animations/Shooting/west/frame_007.png",
+              "Octstronaut/animations/Shooting/west/frame_008.png",
+              "Octstronaut/animations/Shooting/west/frame_009.png",
+              "Octstronaut/animations/Shooting/west/frame_010.png"
+            ],
+            "south": [
+              "Octstronaut/animations/Shooting/south/frame_000.png",
+              "Octstronaut/animations/Shooting/south/frame_001.png",
+              "Octstronaut/animations/Shooting/south/frame_002.png",
+              "Octstronaut/animations/Shooting/south/frame_003.png",
+              "Octstronaut/animations/Shooting/south/frame_004.png",
+              "Octstronaut/animations/Shooting/south/frame_005.png",
+              "Octstronaut/animations/Shooting/south/frame_006.png",
+              "Octstronaut/animations/Shooting/south/frame_007.png",
+              "Octstronaut/animations/Shooting/south/frame_008.png",
+              "Octstronaut/animations/Shooting/south/frame_009.png",
+              "Octstronaut/animations/Shooting/south/frame_010.png"
+            ]
+          },
+          "Running": {
+            "north": [
+              "Octstronaut/animations/Running/north/frame_000.png",
+              "Octstronaut/animations/Running/north/frame_001.png",
+              "Octstronaut/animations/Running/north/frame_002.png",
+              "Octstronaut/animations/Running/north/frame_003.png",
+              "Octstronaut/animations/Running/north/frame_004.png",
+              "Octstronaut/animations/Running/north/frame_005.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Running/west/frame_000.png",
+              "Octstronaut/animations/Running/west/frame_001.png",
+              "Octstronaut/animations/Running/west/frame_002.png",
+              "Octstronaut/animations/Running/west/frame_003.png",
+              "Octstronaut/animations/Running/west/frame_004.png",
+              "Octstronaut/animations/Running/west/frame_005.png"
+            ],
+            "south": [
+              "Octstronaut/animations/Running/south/frame_000.png",
+              "Octstronaut/animations/Running/south/frame_001.png",
+              "Octstronaut/animations/Running/south/frame_002.png",
+              "Octstronaut/animations/Running/south/frame_003.png",
+              "Octstronaut/animations/Running/south/frame_004.png",
+              "Octstronaut/animations/Running/south/frame_005.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Running/east/frame_000.png",
+              "Octstronaut/animations/Running/east/frame_001.png",
+              "Octstronaut/animations/Running/east/frame_002.png",
+              "Octstronaut/animations/Running/east/frame_003.png",
+              "Octstronaut/animations/Running/east/frame_004.png",
+              "Octstronaut/animations/Running/east/frame_005.png"
+            ]
+          },
+          "Punch": {
+            "south": [
+              "Octstronaut/animations/Punch/south/frame_000.png",
+              "Octstronaut/animations/Punch/south/frame_001.png",
+              "Octstronaut/animations/Punch/south/frame_002.png",
+              "Octstronaut/animations/Punch/south/frame_003.png",
+              "Octstronaut/animations/Punch/south/frame_004.png",
+              "Octstronaut/animations/Punch/south/frame_005.png"
+            ],
+            "north": [
+              "Octstronaut/animations/Punch/north/frame_000.png",
+              "Octstronaut/animations/Punch/north/frame_001.png",
+              "Octstronaut/animations/Punch/north/frame_002.png",
+              "Octstronaut/animations/Punch/north/frame_003.png",
+              "Octstronaut/animations/Punch/north/frame_004.png",
+              "Octstronaut/animations/Punch/north/frame_005.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Punch/west/frame_000.png",
+              "Octstronaut/animations/Punch/west/frame_001.png",
+              "Octstronaut/animations/Punch/west/frame_002.png",
+              "Octstronaut/animations/Punch/west/frame_003.png",
+              "Octstronaut/animations/Punch/west/frame_004.png",
+              "Octstronaut/animations/Punch/west/frame_005.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Punch/east/frame_000.png",
+              "Octstronaut/animations/Punch/east/frame_001.png",
+              "Octstronaut/animations/Punch/east/frame_002.png",
+              "Octstronaut/animations/Punch/east/frame_003.png",
+              "Octstronaut/animations/Punch/east/frame_004.png",
+              "Octstronaut/animations/Punch/east/frame_005.png"
+            ]
+          },
+          "Floating": {
+            "north": [
+              "Octstronaut/animations/Floating/north/frame_000.png",
+              "Octstronaut/animations/Floating/north/frame_001.png",
+              "Octstronaut/animations/Floating/north/frame_002.png",
+              "Octstronaut/animations/Floating/north/frame_003.png",
+              "Octstronaut/animations/Floating/north/frame_004.png",
+              "Octstronaut/animations/Floating/north/frame_005.png",
+              "Octstronaut/animations/Floating/north/frame_006.png",
+              "Octstronaut/animations/Floating/north/frame_007.png",
+              "Octstronaut/animations/Floating/north/frame_008.png",
+              "Octstronaut/animations/Floating/north/frame_009.png",
+              "Octstronaut/animations/Floating/north/frame_010.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Floating/west/frame_000.png",
+              "Octstronaut/animations/Floating/west/frame_001.png",
+              "Octstronaut/animations/Floating/west/frame_002.png",
+              "Octstronaut/animations/Floating/west/frame_003.png",
+              "Octstronaut/animations/Floating/west/frame_004.png",
+              "Octstronaut/animations/Floating/west/frame_005.png",
+              "Octstronaut/animations/Floating/west/frame_006.png",
+              "Octstronaut/animations/Floating/west/frame_007.png",
+              "Octstronaut/animations/Floating/west/frame_008.png",
+              "Octstronaut/animations/Floating/west/frame_009.png",
+              "Octstronaut/animations/Floating/west/frame_010.png"
+            ],
+            "south": [
+              "Octstronaut/animations/Floating/south/frame_000.png",
+              "Octstronaut/animations/Floating/south/frame_001.png",
+              "Octstronaut/animations/Floating/south/frame_002.png",
+              "Octstronaut/animations/Floating/south/frame_003.png",
+              "Octstronaut/animations/Floating/south/frame_004.png",
+              "Octstronaut/animations/Floating/south/frame_005.png",
+              "Octstronaut/animations/Floating/south/frame_006.png",
+              "Octstronaut/animations/Floating/south/frame_007.png",
+              "Octstronaut/animations/Floating/south/frame_008.png",
+              "Octstronaut/animations/Floating/south/frame_009.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Floating/east/frame_000.png",
+              "Octstronaut/animations/Floating/east/frame_001.png",
+              "Octstronaut/animations/Floating/east/frame_002.png",
+              "Octstronaut/animations/Floating/east/frame_003.png",
+              "Octstronaut/animations/Floating/east/frame_004.png",
+              "Octstronaut/animations/Floating/east/frame_005.png",
+              "Octstronaut/animations/Floating/east/frame_006.png",
+              "Octstronaut/animations/Floating/east/frame_007.png",
+              "Octstronaut/animations/Floating/east/frame_008.png",
+              "Octstronaut/animations/Floating/east/frame_009.png",
+              "Octstronaut/animations/Floating/east/frame_010.png"
+            ]
+          },
+          "Death": {
+            "north": [
+              "Octstronaut/animations/Death/north/frame_000.png",
+              "Octstronaut/animations/Death/north/frame_001.png",
+              "Octstronaut/animations/Death/north/frame_002.png",
+              "Octstronaut/animations/Death/north/frame_003.png",
+              "Octstronaut/animations/Death/north/frame_004.png",
+              "Octstronaut/animations/Death/north/frame_005.png",
+              "Octstronaut/animations/Death/north/frame_006.png",
+              "Octstronaut/animations/Death/north/frame_007.png",
+              "Octstronaut/animations/Death/north/frame_008.png",
+              "Octstronaut/animations/Death/north/frame_009.png",
+              "Octstronaut/animations/Death/north/frame_010.png"
+            ],
+            "west": [
+              "Octstronaut/animations/Death/west/frame_000.png",
+              "Octstronaut/animations/Death/west/frame_001.png",
+              "Octstronaut/animations/Death/west/frame_002.png",
+              "Octstronaut/animations/Death/west/frame_003.png",
+              "Octstronaut/animations/Death/west/frame_004.png",
+              "Octstronaut/animations/Death/west/frame_005.png",
+              "Octstronaut/animations/Death/west/frame_006.png",
+              "Octstronaut/animations/Death/west/frame_007.png",
+              "Octstronaut/animations/Death/west/frame_008.png",
+              "Octstronaut/animations/Death/west/frame_009.png",
+              "Octstronaut/animations/Death/west/frame_010.png"
+            ],
+            "east": [
+              "Octstronaut/animations/Death/east/frame_000.png",
+              "Octstronaut/animations/Death/east/frame_001.png",
+              "Octstronaut/animations/Death/east/frame_002.png",
+              "Octstronaut/animations/Death/east/frame_003.png",
+              "Octstronaut/animations/Death/east/frame_004.png",
+              "Octstronaut/animations/Death/east/frame_005.png",
+              "Octstronaut/animations/Death/east/frame_006.png",
+              "Octstronaut/animations/Death/east/frame_007.png",
+              "Octstronaut/animations/Death/east/frame_008.png",
+              "Octstronaut/animations/Death/east/frame_009.png",
+              "Octstronaut/animations/Death/east/frame_010.png"
+            ],
+            "south": [
+              "Octstronaut/animations/Death/south/frame_000.png",
+              "Octstronaut/animations/Death/south/frame_001.png",
+              "Octstronaut/animations/Death/south/frame_002.png",
+              "Octstronaut/animations/Death/south/frame_003.png",
+              "Octstronaut/animations/Death/south/frame_004.png",
+              "Octstronaut/animations/Death/south/frame_005.png",
+              "Octstronaut/animations/Death/south/frame_006.png",
+              "Octstronaut/animations/Death/south/frame_007.png",
+              "Octstronaut/animations/Death/south/frame_008.png",
+              "Octstronaut/animations/Death/south/frame_009.png",
+              "Octstronaut/animations/Death/south/frame_010.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-29T17:03:14.776032"
+}

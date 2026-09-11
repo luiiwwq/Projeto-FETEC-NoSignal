@@ -15,7 +15,7 @@ export class AssetLoader {
 
     async loadMetadata() {
         if (this.metadata) return this.metadata;
-        const response = await fetch('./src/assets/sprites/metadata.json');
+        const response = await fetch('./src/assets/sprites/Astronaut/metadata.json');
         if (!response.ok) {
             throw new Error(`Failed to load sprite metadata: ${response.statusText}`);
         }
@@ -32,7 +32,7 @@ export class AssetLoader {
         await this.loadMetadata();
 
         const state = this.metadata.states[0];
-        const basePath = './src/assets/sprites/';
+        const basePath = './src/assets/sprites/Astronaut/';
         const queue = [];
 
         // 1. Static Rotations

@@ -8,7 +8,18 @@ import { Camera } from './Camera.js';
 import { MapRenderer } from './MapRenderer.js';
 import { Player, PlayerState } from '../entities/Player.js';
 import { gameState } from '../state/gameState.js';
+import { MAPS, MAP_IDS } from '../content/maps.js';
+import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
+
+const MAP_LABELS = {
+    [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE MARTE',
+    [MAP_IDS.MARS_CAVE]: 'CAVERNA DE MARTE',
+    [MAP_IDS.CASTLE_HALL]: 'SALAO PRINCIPAL',
+    [MAP_IDS.CASTLE_SIDE_ROOM]: 'SALA LATERAL',
+    [MAP_IDS.CASTLE_LOWER_AREA]: 'AREA INFERIOR',
+    [MAP_IDS.CASTLE_BOSS_ARENA]: 'ARENA DO BOSS',
+};
 
 export class GameEngine {
     constructor(container) {
@@ -25,10 +36,17 @@ export class GameEngine {
 
         // Subsystems
         this.camera = new Camera(this.width, this.height);
-        this.mapRenderer = new MapRenderer(3200, 3200, 64);
+        this.mapRenderer = new MapRenderer();
         this.player = null;
         this.bullets = [];
         this.particles = [];
+
+        // Map state
+        this.currentMapId = MAP_IDS.MARS_SURFACE;
+        this.currentMap = MAPS[this.currentMapId];
+        this.mapTransitionCooldown = 0;
+        this.interactableExit = null;
+        this.promptText = '';
 
         // Input state
         this.input = {
@@ -82,10 +100,11 @@ export class GameEngine {
         // Initialize Player with state name
         const astronautName = gameState.playerName || 'ARES-1';
         this.player = new Player(0, 0, astronautName);
-        this.camera.setBounds(-1600, -1600, 1600, 1600);
-        this.camera.follow(0, 0, true);
         gameState.activeEngine = this;
         gameState.currentScene = 'GAMEPLAY';
+
+        // Load the starting map (Martian surface)
+        this._loadMap(MAP_IDS.MARS_SURFACE, 'mars-start', true);
 
         // Bind events
         window.addEventListener('keydown', this._onKeyDown);
@@ -118,6 +137,46 @@ export class GameEngine {
         window.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener('mouseup', this._onMouseUp);
+    }
+
+    _loadMap(mapId, spawnId) {
+        const map = MAPS[mapId];
+        if (!map) return;
+
+        this.currentMapId = mapId;
+        this.currentMap = map;
+        this.mapRenderer.setMap(map);
+
+        const spawn = map.spawnPoints[spawnId] && map.spawnPoints[spawnId].x !== undefined
+            ? map.spawnPoints[spawnId]
+            : map.spawn;
+
+        this.player.setPosition(spawn.x, spawn.y);
+        this.player.setCollisionResolver(
+            (px, py, dx, dy) => resolveSlide(
+                px, py,
+                this.player.colliderHalfW,
+                this.player.colliderHalfH,
+                dx, dy,
+                map.obstacles,
+                { minX: 0, minY: 0, maxX: map.width, maxY: map.height }
+            )
+        );
+        this.player.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+
+        this.camera.setBounds(0, 0, map.width, map.height);
+        this.camera.follow(this.player.x, this.player.y, true);
+
+        this.bullets.length = 0;
+        this.particles.length = 0;
+        this.mapTransitionCooldown = 0.4;
+        this.interactableExit = null;
+
+        gameState.currentMap = mapId;
+    }
+
+    changeMap(targetMapId, spawnId) {
+        this._loadMap(targetMapId, spawnId);
     }
 
     _handleResize() {
@@ -167,6 +226,13 @@ export class GameEngine {
         // While paused, gameplay/debug actions must not execute
         if (this.paused) return;
 
+        // Map transition interaction ([E] on a doorway/portal)
+        if (e.code === 'KeyE' && this.interactableExit && this.mapTransitionCooldown <= 0) {
+            const exit = this.interactableExit;
+            this.changeMap(exit.targetMap, exit.targetSpawn);
+            return;
+        }
+
         // Test hotkeys for quick state testing
         if (e.code === 'KeyH') {
             this.player.takeDamage(25);
@@ -186,7 +252,9 @@ export class GameEngine {
                 this.player.setState(PlayerState.PUSH_PULL, true);
             }
         } else if (e.code === 'KeyR') {
-            this.player.respawn(0, 0);
+            const spawn = this.currentMap.spawn;
+            this.player.respawn(spawn.x, spawn.y);
+            this.camera.follow(spawn.x, spawn.y, true);
         }
     }
 
@@ -270,6 +338,27 @@ export class GameEngine {
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
 
+        // Map transition interaction detection
+        this.mapTransitionCooldown = Math.max(0, this.mapTransitionCooldown - dt);
+        this.interactableExit = null;
+        this.promptText = '';
+        const playerRect = {
+            x: this.player.x - this.player.colliderHalfW,
+            y: this.player.y - this.player.colliderHalfH,
+            w: this.player.colliderHalfW * 2,
+            h: this.player.colliderHalfH * 2,
+        };
+        for (const exit of this.currentMap.exits || []) {
+            const triggered = exit.area
+                ? rectsOverlap(playerRect, exit.area)
+                : pointInCircle(this.player.x, this.player.y, exit);
+            if (triggered) {
+                this.interactableExit = exit;
+                this.promptText = exit.label;
+                break;
+            }
+        }
+
         // Update Camera
         this.camera.follow(this.player.x, this.player.y);
         this.camera.update();
@@ -284,6 +373,16 @@ export class GameEngine {
             if (!bullet.isAlive) {
                 this._spawnHitSparks(bullet.x, bullet.y);
                 this.bullets.splice(i, 1);
+                continue;
+            }
+            // Bullets stop against solid obstacles (walls, rocks, towers)
+            const bRect = { x: bullet.x - 4, y: bullet.y - 4, w: 8, h: 8 };
+            for (const o of this.currentMap.obstacles) {
+                if (rectsOverlap(o, bRect)) {
+                    this._spawnHitSparks(bullet.x, bullet.y);
+                    this.bullets.splice(i, 1);
+                    break;
+                }
             }
         }
 
@@ -338,6 +437,38 @@ export class GameEngine {
         if (this.player.state === PlayerState.DEAD) {
             this._renderDeathOverlay(ctx);
         }
+
+        // 9. Render Map Transition Prompt ([E]) when near a doorway
+        if (this.interactableExit && this.mapTransitionCooldown <= 0) {
+            this._renderExitPrompt(ctx, this.interactableExit);
+        }
+    }
+
+    _renderExitPrompt(ctx, exit) {
+        // When the exit defines a rectangular trigger area, anchor the prompt
+        // text at the center of that area (shifted slightly down) so it appears
+        // right over the interaction zone — closer to the actual door. Exits
+        // without an area keep the legacy position (centered above the exit).
+        const promptX = exit.area ? exit.area.x + exit.area.w / 2 : exit.x;
+        const promptY = exit.area ? exit.area.y + exit.area.h / 2 + 10 : exit.y - 70;
+        const screen = this.camera.worldToScreen(promptX, promptY);
+        const label = exit.label || 'ENTRAR';
+
+        ctx.save();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        const text = `[E] ${label}`;
+        const textW = ctx.measureText(text).width;
+
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.85)';
+        ctx.fillRect(screen.x - textW / 2 - 8, screen.y - 8, textW + 16, 16);
+        ctx.strokeStyle = '#e07228';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(screen.x - textW / 2 - 8, screen.y - 8, textW + 16, 16);
+
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(text, screen.x, screen.y + 3);
+        ctx.restore();
     }
 
     _renderHUD(ctx) {
@@ -346,8 +477,8 @@ export class GameEngine {
         // TOP-LEFT: Astronaut Vital Telemetry Panel
         const hudX = 24;
         const hudY = 24;
-        const panelW = 380;
-        const panelH = 88;
+        const panelW = 340;
+        const panelH = 126;
 
         // Frame backing
         ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
@@ -365,13 +496,18 @@ export class GameEngine {
         ctx.font = '10px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'left';
-        ctx.fillText(`OPERADOR: ${this.player.name}`, hudX + 16, hudY + 24);
+        ctx.fillText(`OPERADOR: ${this.player.name}`, hudX + 16, hudY + 26);
 
-        // HP Bar Background
+        // VITALIDADE Label (above the bar)
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#e07228';
+        ctx.fillText('VITALIDADE', hudX + 16, hudY + 46);
+
+        // HP Bar
         const barX = hudX + 16;
-        const barY = hudY + 38;
-        const barW = 175;
-        const barH = 16;
+        const barY = hudY + 56;
+        const barW = 200;
+        const barH = 18;
 
         ctx.fillStyle = '#1f0d0b';
         ctx.fillRect(barX, barY, barW, barH);
@@ -388,15 +524,15 @@ export class GameEngine {
         }
 
         // HP Text — positioned to the right of bar, vertically centered
-        ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
-        ctx.fillText(`${Math.round(this.player.hp)} / ${this.player.maxHp} VITA`, barX + barW + 10, barY + 12);
+        ctx.fillText(`${Math.round(this.player.hp)} / ${this.player.maxHp}`, barX + barW + 12, barY + 13);
 
         // Telemetry Subtext
-        ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#c5975b';
+        const areaText = `AREA: ${MAP_LABELS[this.currentMapId] || this.currentMapId.toUpperCase()}`;
         const stateText = `ESTADO: ${this.player.state} | DIR: ${this.player.direction.toUpperCase()}`;
-        ctx.fillText(stateText, hudX + 16, hudY + 74);
+        ctx.fillText(areaText, hudX + 16, hudY + 98);
+        ctx.fillText(stateText, hudX + 16, hudY + 116);
 
         // TOP-RIGHT: Coordinates & Telemetry
         const trX = this.width - 240;

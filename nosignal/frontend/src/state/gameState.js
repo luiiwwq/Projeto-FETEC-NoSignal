@@ -9,6 +9,7 @@ export const gameState = {
     playerHp: 100,
     maxPlayerHp: 100,
     activeEngine: null,
+    currentMap: 'mars-surface',
 
     reset() {
         this.playerHp = 100;
