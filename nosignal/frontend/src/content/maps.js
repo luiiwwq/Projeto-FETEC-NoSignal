@@ -23,9 +23,36 @@ const TILE = 64;
  * Big open world. Spawn area on the west, cave rock
  * formation in the middle-north, castle far east.    */
 
-// Cave entrance rock formation (two solid lobes, opening between them)
-const caveWallLeft = { x: 1450, y: 1160, w: 130, h: 250, kind: 'cave-wall' };
-const caveWallRight = { x: 1660, y: 1160, w: 130, h: 250, kind: 'cave-wall' };
+// Cave entrance rock formation — the visual facade comes entirely from the
+// monolithic cavern_entrance.png sprite (see MapRenderer; anchor world
+// (1620,1410) originX 0.5 originY 1.0 scale 0.167 → drawn rect x1425..1815,
+// y1105..1410). The AABBs below track the SOLID rock silhouette of the sprite
+// as 5 zones (left→right), derived from its pixel analysis, WITHOUT invading
+// the free central corridor x1567..1667 (same width as the cave-entrance
+// trigger):
+//   - cave-rock-outer-left : isolated pinnacle far-left (sprite x96..257, y898..1497)
+//   - cave-pillar-left     : tall internal left wall flanking the mouth (touches corridor at 1566)
+//   - cave-arch-top        : arch/dome frame ABOVE the opening (y1108..1200, ceiling over corridor)
+//   - cave-wall-right      : wide right inner wall (starts at 1668, slips corridor)
+//   - cave-props-right     : bottom-right corner over the solar panel + terminal props
+const caveRockOuterLeft = { x: 1445, y: 1267, w: 23, h: 86, kind: 'cave-wall' };
+const cavePillarLeft = { x: 1468, y: 1147, w: 98, h: 213, kind: 'cave-wall' };
+const caveArchTop = { x: 1527, y: 1108, w: 198, h: 92, kind: 'cave-wall' };
+const caveWallRight = { x: 1668, y: 1150, w: 37, h: 230, kind: 'cave-wall' };
+const cavePropsRight = { x: 1705, y: 1150, w: 45, h: 210, kind: 'cave-wall' };
+// Movement-limit collision for the cave entrance mouth (keeps the character on
+// the floor, out of the ceiling and off the side electronics):
+// - cave-entrance-lip : frontal wall under the arch. Bottom edge y1303 + player
+//   half-height 22 => player.y (center) can't drop below 1325 for x 1570..1620.
+// - cave-solar-panel  : the electronics / solar-panel slab on the right side.
+//   Bottom edge y1303 frees the passage rect x1628..1648 / y1325..1342
+//   (player center y >= 1325 => box top >= 1303, no panel overlap).
+const caveEntranceLip = { x: 1570, y: 1108, w: 50, h: 195, kind: 'cave-wall' };
+// cave-rock-right : vertical wall on the rock outcrop east of the props. Left
+// edge exactly x1781; spans the sprite silhouette (y1279..1347) with margin to
+// block crossing at the measured point (1781, 1337) while leaving the floor free.
+const caveRockRight = { x: 1781, y: 1260, w: 30, h: 100, kind: 'cave-wall' };
+const caveSolarPanel = { x: 1648, y: 1290, w: 37, h: 13, kind: 'cave-wall' };
 
 // Distant castle — visual facade comes from castle-sprite.png (see MapRenderer).
 // SOLID collision covering the facade:
@@ -86,14 +113,25 @@ export const marsSurfaceMap = {
     spawn: { x: 420, y: 700 },
     spawnPoints: {
         'mars-start': { x: 420, y: 700 },
-        'cave-return': { x: 1615, y: 1340 },
+        'cave-return': { x: 1615, y: 1500 },
         'castle-return': { x: 3660, y: 960 },
     },
+    // Free-movement bands: the rectangle is excavated from every obstacle that
+    // crosses it (expanded by the player's half-size so the whole body passes
+    // while the center is inside), leaving a collision-free floor corridor.
+    // Here: cave floor corridor x1425..1831 / y1354..1382.
+    freeMoveZones: [{ x: 1425, y: 1354, w: 406, h: 28 }],
     obstacles: [
         ...surfaceRocks,
         ...surfaceBorderRocks,
-        caveWallLeft,
+        caveRockOuterLeft,
+        cavePillarLeft,
+        caveArchTop,
         caveWallRight,
+        cavePropsRight,
+        caveEntranceLip,
+        caveSolarPanel,
+        caveRockRight,
         castleRubbleLeft,
         castleTowerLeft,
         castlePillarLeft,
@@ -109,9 +147,13 @@ export const marsSurfaceMap = {
             label: 'ENTRAR NA CAVERNA',
             targetMap: MAP_IDS.MARS_CAVE,
             targetSpawn: 'cave-entry',
-            x: 1615,
-            y: 1185,
-            radius: 62,
+            // Rectangular trigger aligned with the dark cave-mouth opening of
+            // cavern_entrance.png (world x1567..1667 from the corridor, y1200..1380).
+            // Overlap only (rectsOverlap), no radial detection. Its bottom (1380)
+            // stays ~120px above the cave-return spawn (y1500) so the prompt does
+            // NOT appear right after coming back from the cave — same rule applied
+            // to the castle-gate trigger.
+            area: { x: 1567, y: 1200, w: 100, h: 180 },
         },
         {
             id: 'castle-gate',
@@ -135,7 +177,7 @@ export const marsSurfaceMap = {
     structures: [
         {
             type: 'rock-form',
-            walls: [caveWallLeft, caveWallRight],
+            walls: [caveRockOuterLeft, cavePillarLeft, caveArchTop, caveWallRight, cavePropsRight],
         },
     ],
 };

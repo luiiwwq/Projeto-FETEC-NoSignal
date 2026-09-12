@@ -21,6 +21,36 @@ const MAP_LABELS = {
     [MAP_IDS.CASTLE_BOSS_ARENA]: 'ARENA DO BOSS',
 };
 
+// Excavate each freeMoveZone out of an obstacle, splitting it into the
+// remaining pieces, so the band becomes a real collision-free corridor
+// instead of a collision bypass (no penetration -> no resolveSlide teleport).
+function subtractZoneFromObstacles(list, zx, zy, zw, zh) {
+    const out = [];
+    for (const o of list) {
+        const ix = Math.max(o.x, zx);
+        const iw = Math.min(o.x + o.w, zx + zw) - ix;
+        const iy = Math.max(o.y, zy);
+        const ih = Math.min(o.y + o.h, zy + zh) - iy;
+        if (iw <= 0 || ih <= 0) {
+            out.push(o);
+            continue;
+        }
+        if (o.y < iy) out.push({ x: o.x, y: o.y, w: o.w, h: iy - o.y });
+        if (o.y + o.h > iy + ih) out.push({ x: o.x, y: iy + ih, w: o.w, h: o.y + o.h - (iy + ih) });
+        if (o.x < ix) out.push({ x: o.x, y: iy, w: ix - o.x, h: ih });
+        if (o.x + o.w > ix + iw) out.push({ x: ix + iw, y: iy, w: o.x + o.w - (ix + iw), h: ih });
+    }
+    return out;
+}
+
+function buildCollisionObstacles(map, halfW, halfH) {
+    let list = map.obstacles;
+    for (const z of map.freeMoveZones || []) {
+        list = subtractZoneFromObstacles(list, z.x, z.y - halfH, z.w, z.h + halfH * 2);
+    }
+    return list;
+}
+
 export class GameEngine {
     constructor(container) {
         this.container = container;
@@ -158,7 +188,7 @@ export class GameEngine {
                 this.player.colliderHalfW,
                 this.player.colliderHalfH,
                 dx, dy,
-                map.obstacles,
+                buildCollisionObstacles(map, this.player.colliderHalfW, this.player.colliderHalfH),
                 { minX: 0, minY: 0, maxX: map.width, maxY: map.height }
             )
         );

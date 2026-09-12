@@ -36,6 +36,15 @@ const P = SURFACE_PALETTE;
 const CASTLE_SPRITE_PATH = './src/assets/sprites/Castle/castle-sprite.png';
 const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 940, originX: 0.5, originY: 1.0, scale: 0.15 };
 
+// Cave entrance sprite (single monolithic rock with a dark mouth in its
+// centre). Anchored bottom-center on the same ground line the cave-wall
+// obstacles use (y=1410), centred on the formation (~x1620). scale ~1/6 maps
+// the art's central mouth (sprite ~x850..1450, y580..1140) to a ~100px-wide
+// opening at world x1567..1667 — matching the free corridor kept between
+// cavePillarLeft and caveWallRight.
+const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png';
+const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale: 0.167 };
+
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
     const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
@@ -68,6 +77,9 @@ export class MapRenderer {
         this.castleSprite = null;
         this._castleSpriteRequested = false;
         this._castleSpriteWarned = false;
+        this.caveEntranceSprite = null;
+        this._caveEntranceSpriteRequested = false;
+        this._caveEntranceSpriteWarned = false;
     }
 
     setMap(map) {
@@ -94,6 +106,7 @@ export class MapRenderer {
         }
 
         this.loadCastleSprite();
+        this.loadCaveEntranceSprite();
     }
 
     /**
@@ -118,6 +131,61 @@ export class MapRenderer {
             }
         };
         img.src = CASTLE_SPRITE_PATH;
+    }
+
+    /**
+     * Loads the cave entrance sprite exactly once (same guard pattern as the
+     * castle). Renders fall back to the procedural _drawCaveFormation until the
+     * image finishes loading (or warn once if the file is missing). Never
+     * reloaded per frame or per map swap.
+     */
+    loadCaveEntranceSprite() {
+        if (this.caveEntranceSprite || this._caveEntranceSpriteRequested) return;
+        this._caveEntranceSpriteRequested = true;
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.caveEntranceSprite = img;
+        };
+        img.onerror = () => {
+            if (!this._caveEntranceSpriteWarned) {
+                this._caveEntranceSpriteWarned = true;
+                console.warn(
+                    `[MapRenderer] ${CAVE_SPRITE_PATH} não carregou — usando fallback procedural para a entrada da caverna.`
+                );
+            }
+        };
+        img.src = CAVE_SPRITE_PATH;
+    }
+
+    // True only after the cave sprite has actually finished decoding, so we
+    // never draw a frame before onload fires (or while the file is missing).
+    _caveEntranceReady() {
+        return (
+            !!this.caveEntranceSprite &&
+            this.caveEntranceSprite.complete &&
+            this.caveEntranceSprite.naturalWidth !== 0
+        );
+    }
+
+    // Screen-space rect of the cave entrance sprite on the current frame
+    // (world object). Uses the full canvas extent, margins included.
+    _caveEntranceSpriteRect(offset) {
+        const a = CAVE_SPRITE_ANCHOR;
+        let cw = 2334;
+        let ch = 1824;
+        if (this.caveEntranceSprite && this.caveEntranceSprite.naturalWidth > 0) {
+            cw = this.caveEntranceSprite.naturalWidth;
+            ch = this.caveEntranceSprite.naturalHeight;
+        }
+        cw = Math.round(cw * a.scale);
+        ch = Math.round(ch * a.scale);
+        return {
+            x: Math.round(a.x + offset.x - cw * a.originX),
+            y: Math.round(a.y + offset.y - ch * a.originY),
+            w: cw,
+            h: ch,
+        };
     }
 
     // Screen-space rect of the castle facade on the current frame (world object).
@@ -284,6 +352,15 @@ export class MapRenderer {
             }
         }
 
+        // Cave entrance sprite (scenery layer, world-anchored, culled by its
+        // full drawn extent so it isn't cut early at the screen edges).
+        if (this._caveEntranceReady()) {
+            const r = this._caveEntranceSpriteRect(offset);
+            if (r.x < viewW && r.x + r.w > 0 && r.y < viewH && r.y + r.h > 0) {
+                ctx.drawImage(this.caveEntranceSprite, r.x, r.y, r.w, r.h);
+            }
+        }
+
         for (const o of this.map.obstacles) {
             const sx = Math.round(o.x + offset.x);
             const sy = Math.round(o.y + offset.y);
@@ -292,6 +369,10 @@ export class MapRenderer {
             if (o.kind === 'rock') {
                 this._drawSurfaceRock(ctx, sx, sy, o, seed);
             } else if (o.kind === 'cave-wall') {
+                // The cave entrance sprite replaces the procedural formation;
+                // only draw _drawCaveFormation as a fallback while the sprite
+                // is unavailable (missing/offline).
+                if (this._caveEntranceReady()) continue;
                 this._drawCaveFormation(ctx, sx, sy, o, seed);
             } else if (o.kind === 'castle-wall') {
                 if (this.castleSprite) continue; // facade sprite covers the castle
