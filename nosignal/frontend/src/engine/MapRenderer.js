@@ -42,8 +42,17 @@ const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 940, originX: 0.5, originY: 1.0, scal
 // the art's central mouth (sprite ~x850..1450, y580..1140) to a ~100px-wide
 // opening at world x1567..1667 — matching the free corridor kept between
 // cavePillarLeft and caveWallRight.
-const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png';
+const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png?v=2';
 const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale: 0.167 };
+
+// Ground texture (tileable JPEG), loaded once and used as a CanvasPattern in
+// _drawSurfaceGroundCell when available; otherwise procedural ground fallback.
+const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.jpeg';
+const MAP_SURFACE_PATTERN_SCALE = 0.5; // pattern.setTransform scale (texture cell = 512px)
+// The photo texture (~84 avg luminance with the current art) is brightened +
+// saturated ONCE when it is baked into the offscreen canvas (the procedural
+// ground it replaces was ~100); never applied per frame.
+const SURFACE_PATTERN_FILTER = 'brightness(1.15) saturate(1.1)';
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -64,6 +73,15 @@ function clamp01(v) {
     return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+// Linear RGB mix between two '#rrggbb' hex colors. Returns an `rgb(...)`
+// string so canvas accepts it directly. Used by _duneTone to replace the hard
+// banded thresholds with a smooth continuous ground color field.
+function mixHex(hexA, hexB, t) {
+    const a = [parseInt(hexA.slice(1, 3), 16), parseInt(hexA.slice(3, 5), 16), parseInt(hexA.slice(5, 7), 16)];
+    const b = [parseInt(hexB.slice(1, 3), 16), parseInt(hexB.slice(3, 5), 16), parseInt(hexB.slice(5, 7), 16)];
+    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)}, ${Math.round(a[1] + (b[1] - a[1]) * t)}, ${Math.round(a[2] + (b[2] - a[2]) * t)})`;
+}
+
 export class MapRenderer {
     constructor() {
         this.mapId = null;
@@ -80,6 +98,10 @@ export class MapRenderer {
         this.caveEntranceSprite = null;
         this._caveEntranceSpriteRequested = false;
         this._caveEntranceSpriteWarned = false;
+        this.mapSurfaceTexture = null;
+        this._mapSurfacePattern = null;
+        this._mapSurfaceRequested = false;
+        this._mapSurfaceWarned = false;
     }
 
     setMap(map) {
@@ -107,6 +129,7 @@ export class MapRenderer {
 
         this.loadCastleSprite();
         this.loadCaveEntranceSprite();
+        this.loadMapSurfaceTexture();
     }
 
     /**
@@ -156,6 +179,52 @@ export class MapRenderer {
             }
         };
         img.src = CAVE_SPRITE_PATH;
+    }
+
+    // Ground texture (tileable JPEG). Loaded once; creates and caches a
+    // CanvasPattern lazily from the first 2D context that draws a ground cell.
+    loadMapSurfaceTexture() {
+        if (this.mapSurfaceTexture || this._mapSurfaceRequested) return;
+        this._mapSurfaceRequested = true;
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.mapSurfaceTexture = img;
+        };
+        img.onerror = () => {
+            if (!this._mapSurfaceWarned) {
+                this._mapSurfaceWarned = true;
+                console.warn(
+                    `[MapRenderer] ${MAP_SURFACE_TEXTURE_PATH} não carregou — usando chão procedural.`
+                );
+            }
+        };
+        img.src = MAP_SURFACE_TEXTURE_PATH;
+    }
+
+    _ensureMapSurfacePattern(ctx) {
+        if (this._mapSurfacePattern || !this.mapSurfaceTexture) return this._mapSurfacePattern;
+        try {
+            // Bake the brightened texture ONCE: apply the color filter to an
+            // offscreen canvas a single time and pattern from that, so no
+            // per-frame ctx.filter is ever needed in the ground loop.
+            const cw = Math.max(1, Math.floor(this.mapSurfaceTexture.naturalWidth || 1));
+            const ch = Math.max(1, Math.floor(this.mapSurfaceTexture.naturalHeight || 1));
+            const bake = document.createElement('canvas');
+            bake.width = cw;
+            bake.height = ch;
+            const bctx = bake.getContext('2d');
+            bctx.filter = SURFACE_PATTERN_FILTER;
+            bctx.drawImage(this.mapSurfaceTexture, 0, 0, cw, ch);
+            const pattern = ctx.createPattern(bake, 'repeat');
+            if (pattern) {
+                pattern.setTransform(new DOMMatrix().scale(MAP_SURFACE_PATTERN_SCALE));
+                this._mapSurfacePattern = pattern;
+            }
+        } catch (e) {
+            this._mapSurfacePattern = null;
+        }
+        return this._mapSurfacePattern;
     }
 
     // True only after the cave sprite has actually finished decoding, so we
@@ -219,7 +288,6 @@ export class MapRenderer {
 
     _macroAt(lc, lr) {
         const h = hash2(lc, lr);
-        if (h > 0.94) return 'crater';
         if (h > 0.86) return 'iron';
         return 'dune';
     }
@@ -230,9 +298,21 @@ export class MapRenderer {
         const fx = wx / LOGICAL_TILE - lc;
         const fy = wy / LOGICAL_TILE - lr;
         const f = clamp01(bilinearHash(lc, lr, fx, fy));
-        if (f > 0.68) return { kind: 'dark', base: P.groundDark, variant: P.groundDarkVariant };
-        if (f > 0.40) return { kind: 'orange', base: P.groundOrange, variant: P.groundOrangeVariant };
-        return { kind: 'red', base: P.groundRed, variant: P.groundRedVariant };
+        // Continuous mix instead of hard thresholds: red→orange over 0–0.5 and
+        // orange→dark over 0.5–1, so neighboring tiles never have a visible
+        // straight seam between two flat colors.
+        let base, variant;
+        if (f < 0.5) {
+            const t = f * 2;
+            base = mixHex(P.groundRed, P.groundOrange, t);
+            variant = mixHex(P.groundRedVariant, P.groundOrangeVariant, t);
+        } else {
+            const t = (f - 0.5) * 2;
+            base = mixHex(P.groundOrange, P.groundDark, t);
+            variant = mixHex(P.groundOrangeVariant, P.groundDarkVariant, t);
+        }
+        const kind = f >= 0.68 ? 'dark' : f >= 0.40 ? 'orange' : 'red';
+        return { kind, base, variant };
     }
 
     _surfaceGroundStyle(wx, wy) {
@@ -249,13 +329,18 @@ export class MapRenderer {
         }
         const macro = this._macroAt(Math.floor(wx / LOGICAL_TILE), Math.floor(wy / LOGICAL_TILE));
         let base;
-        if (macro === 'crater') base = P.crater;
-        else if (macro === 'iron') base = P.iron;
+        if (macro === 'iron') base = P.iron;
         else base = this._duneTone(wx, wy).base;
         return { base, speckle, crack: h > 0.985 && h <= 0.995 };
     }
 
     _drawSurfaceGroundCell(ctx, sx, sy, wx, wy) {
+        const pattern = this._ensureMapSurfacePattern(ctx);
+        if (pattern && !this._isPlatformZone(wx, wy)) {
+            // Ground texture already painted by the single world-anchored fill in
+            // _renderSurface; nothing extra to draw for this cell.
+            return;
+        }
         const g = this._surfaceGroundStyle(wx, wy);
         ctx.fillStyle = g.base;
         ctx.fillRect(sx, sy, RENDER_TILE, RENDER_TILE);
@@ -289,19 +374,7 @@ export class MapRenderer {
         }
 
         const macro = this._macroAt(lc, lr);
-        if (macro === 'crater') {
-            ctx.fillStyle = P.craterDeep;
-            ctx.beginPath();
-            ctx.arc(cx + s / 2, cy + s / 2, s * 0.35, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = P.craterRim;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(30, 10, 5, 0.3)';
-            ctx.beginPath();
-            ctx.arc(cx + s / 2 - 6, cy + s / 2 - 6, s * 0.16, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (macro === 'iron') {
+        if (macro === 'iron') {
             ctx.fillStyle = P.ironDark;
             ctx.beginPath();
             ctx.moveTo(cx + 12, cy + 48);
@@ -424,13 +497,62 @@ export class MapRenderer {
         ctx.fill();
     }
 
+    // Same control-point generation as _polygonPath, but connected with smooth
+    // quadratic curves through edge midpoints (control = vertex). Produces a
+    // rounded "weathered stone" silhouette that still stays inside
+    // [x, x+w] × [y, y+h] (a quadratic Bézier lies inside the triangle of its
+    // three points, so it never understates the collision box). Cave/castle
+    // keep using the original _polygonPath, untouched.
+    _roundedPolygonPath(ctx, x, y, w, h, seed, inset, div = 2) {
+        const rnd = (i) => hash2(seed, i);
+        const pts = [];
+        const steps = Math.max(1, div);
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            pts.push([x + t * w + (rnd(i) - 0.5) * inset * 0.4, y + rnd(10 + i) * inset]);
+        }
+        for (let i = 1; i < steps; i++) {
+            const t = i / steps;
+            pts.push([x + w - rnd(20 + i) * inset, y + t * h]);
+        }
+        for (let i = steps; i >= 0; i--) {
+            const t = i / steps;
+            pts.push([x + t * w + (rnd(30 + i) - 0.5) * inset * 0.4, y + h - rnd(40 + i) * inset]);
+        }
+        for (let i = steps - 1; i > 0; i--) {
+            const t = i / steps;
+            pts.push([x + rnd(50 + i) * inset, y + t * h]);
+        }
+
+        ctx.beginPath();
+        const n = pts.length;
+        const mid = (i0, i1) => [(pts[i0][0] + pts[i1][0]) / 2, (pts[i0][1] + pts[i1][1]) / 2];
+        let m = mid(0, 1);
+        ctx.moveTo(m[0], m[1]);
+        for (let i = 1; i <= n; i++) {
+            const next = (i + 1) % n;
+            const ctrl = pts[i % n];
+            const end = mid(i % n, next);
+            ctx.quadraticCurveTo(ctrl[0], ctrl[1], end[0], end[1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+    }
+
     _drawSurfaceRock(ctx, x, y, o, seed) {
         const w = o.w;
         const h = o.h;
+        // Contact shadow: a wide, flat dark ellipse hugging the base, drawn
+        // before the rock so it reads as resting on the ground.
+        ctx.fillStyle = 'rgba(20, 8, 4, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, y + h - 2, w * 0.55, Math.max(3, h * 0.14), 0, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = P.rock;
-        this._polygonPath(ctx, x, y, w, h, seed, 7, 2);
+        this._roundedPolygonPath(ctx, x, y, w, h, seed, 7, 2);
         ctx.fillStyle = P.rockDark;
-        this._polygonPath(ctx, x + 3, y + 3, w - 8, h - 8, seed + 7, 5, 2);
+        this._roundedPolygonPath(ctx, x + 3, y + 3, w - 8, h - 8, seed + 7, 5, 2);
         ctx.fillStyle = P.rockLight;
         const hl = hash2(seed, 99);
         ctx.fillRect(x + 4 + Math.floor(hl * 6), y + 3, 6, 2);
@@ -677,7 +799,26 @@ export class MapRenderer {
         const minTR = Math.max(0, Math.floor(-offset.y / RENDER_TILE));
         const maxTR = Math.min(renderRows - 1, Math.ceil((viewH - offset.y) / RENDER_TILE));
 
-        // LAYER 1 — ground micro-tiles.
+        // LAYER 1 — ground micro-tiles. The photo pattern is baked brightened ONCE
+        // in _ensureMapSurfacePattern, so there is no per-frame ctx.filter.
+        // The pattern fill is kept world-anchored (single rect aligned to the
+        // world grid) so the texture scrolls WITH the world instead of sliding
+        // with the camera while the player walks.
+        const groundPattern = this._ensureMapSurfacePattern(ctx);
+        if (groundPattern) {
+            // World-anchored pattern fill: translate pattern by camera offset
+            // so texture is pinned to world (0,0) and stays completely fixed
+            // in place when the player moves and camera scrolls.
+            if (typeof DOMMatrix !== 'undefined') {
+                groundPattern.setTransform(
+                    new DOMMatrix()
+                        .translate(Math.round(offset.x), Math.round(offset.y))
+                        .scale(MAP_SURFACE_PATTERN_SCALE)
+                );
+            }
+            ctx.fillStyle = groundPattern;
+            ctx.fillRect(Math.round(offset.x), Math.round(offset.y), Math.round(this.map.width), Math.round(this.map.height));
+        }
         for (let r = minTR; r <= maxTR; r++) {
             for (let c = minTC; c <= maxTC; c++) {
                 const wx = renderTileToWorld(c);
@@ -689,7 +830,7 @@ export class MapRenderer {
         }
 
         // LAYER 1b — macro terrain features on the LOGICAL_TILE grid
-        // (craters, iron clusters, dunes, platform bolts).
+        // (iron clusters, dunes, platform bolts).
         const minLC = Math.max(0, Math.floor(-offset.x / LOGICAL_TILE));
         const maxLC = Math.min(this.cols - 1, Math.ceil((viewW - offset.x) / LOGICAL_TILE));
         const minLR = Math.max(0, Math.floor(-offset.y / LOGICAL_TILE));

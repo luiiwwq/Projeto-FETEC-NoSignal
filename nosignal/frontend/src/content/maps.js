@@ -78,23 +78,6 @@ const castleRubbleRight = { id: 'castle-rubble-right', x: 3850, y: 835, w: 70, h
 // point, while the "[E] ENTRAR" prompt is still visible.
 const castleDoorBlock = { id: 'castle-door-block', x: 3584, y: 816, w: 131, h: 14, kind: 'castle-wall' };
 
-const surfaceRocks = [
-    { x: 280, y: 1360, w: 84, h: 84, kind: 'rock' },
-    { x: 760, y: 1180, w: 64, h: 64, kind: 'rock' },
-    { x: 900, y: 560, w: 96, h: 96, kind: 'rock' },
-    { x: 1180, y: 1540, w: 72, h: 72, kind: 'rock' },
-    { x: 1300, y: 420, w: 88, h: 88, kind: 'rock' },
-    { x: 1980, y: 840, w: 104, h: 104, kind: 'rock' },
-    { x: 2240, y: 1500, w: 80, h: 80, kind: 'rock' },
-    { x: 2520, y: 540, w: 92, h: 92, kind: 'rock' },
-    { x: 2760, y: 1180, w: 110, h: 110, kind: 'rock' },
-    { x: 3000, y: 1850, w: 76, h: 76, kind: 'rock' },
-    { x: 3320, y: 400, w: 86, h: 86, kind: 'rock' },
-    { x: 3920, y: 1280, w: 98, h: 98, kind: 'rock' },
-    { x: 4240, y: 640, w: 84, h: 84, kind: 'rock' },
-    { x: 4520, y: 2100, w: 102, h: 102, kind: 'rock' },
-];
-
 // Border rocks framing the world edges (visual + collision)
 const surfaceBorderRocks = [
     { x: 0, y: 0, w: 4800, h: 60, kind: 'edge-rock' },
@@ -122,7 +105,6 @@ export const marsSurfaceMap = {
     // Here: cave floor corridor x1425..1831 / y1354..1382.
     freeMoveZones: [{ x: 1425, y: 1354, w: 406, h: 28 }],
     obstacles: [
-        ...surfaceRocks,
         ...surfaceBorderRocks,
         caveRockOuterLeft,
         cavePillarLeft,

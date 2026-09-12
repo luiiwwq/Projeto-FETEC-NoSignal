@@ -357,8 +357,14 @@ export class GameEngine {
             return;
         }
 
-        this.update(dt);
-        this.render();
+        try {
+            this.update(dt);
+            this.render();
+        } catch (err) {
+            // A single bad frame must never freeze the game for good: log the
+            // error and keep the loop alive instead of dropping the rAF.
+            console.error('[GameEngine] erro no frame:', err);
+        }
 
         this.animationFrameId = requestAnimationFrame(this._gameLoop.bind(this));
     }
