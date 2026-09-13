@@ -109,18 +109,22 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 14px;
 }
 
-/* Botões HTML Reais em Pixel Art Placa Sci-Fi */
+/* Botões HTML Reais em Pixel Art Placa Sci-Fi
+   Agora transparentes (fundo vazio, sem preenchimento retangular) como os
+   botões da tela da caverna — mantém a identidade laranja existente:
+   borda e texto usam a mesma cor (#A6511F), realçando em --mars-light
+   no hover/seleção. */
 .menu-btn {
     position: relative;
     width: 100%;
     height: 44px;
-    background: linear-gradient(180deg, #993a1d 0%, #682417 100%);
-    border: 2px solid #230a0d;
+    background: transparent;
+    border: 2px solid #A6511F;
     outline: none;
-    color: var(--text-cream);
+    color: #A6511F;
     font-family: var(--font-pixel);
     font-size: 13px;
     letter-spacing: 1px;
@@ -128,11 +132,7 @@
     padding-left: 16px;
     cursor: pointer;
     text-shadow: 2px 2px 0px #1a0507;
-    box-shadow: 
-        inset 1px 1px 0px rgba(255, 255, 255, 0.18),
-        inset -2px -2px 0px rgba(0, 0, 0, 0.5),
-        0px 2px 0px #150507;
-    transition: background 0.1s ease, transform 0.05s ease, box-shadow 0.1s ease;
+    transition: color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease, transform 0.05s ease;
     clip-path: polygon(
         0px 0px, 
         calc(100% - 8px) 0px, 
@@ -154,21 +154,20 @@
     pointer-events: none;
 }
 
-/* Estado de Hover, Focus e Selecionado */
+/* Estado de Hover, Focus e Selecionado.
+   O destaque vem de :hover (só enquanto o mouse está em cima) ou da classe
+   .is-selected gerenciada por JS (navegação por teclado / foco) — sem
+   :focus-visible para o destaque não "grudar" após interação com o mouse. */
 .menu-btn:hover,
-.menu-btn:focus-visible,
 .menu-btn.is-selected {
-    background: linear-gradient(180deg, #c75624 0%, #8c3218 100%);
-    color: #fff2d6;
+    background: transparent;
+    color: var(--mars-light);
+    border-color: var(--mars-light);
     text-shadow: 2px 2px 0px #1a0507, 0 0 4px rgba(237, 135, 51, 0.6);
-    box-shadow: 
-        inset 1px 1px 0px rgba(255, 255, 255, 0.35),
-        inset -2px -2px 0px rgba(0, 0, 0, 0.6),
-        0 0 10px rgba(216, 90, 34, 0.4);
+    box-shadow: 0 0 10px rgba(216, 90, 34, 0.4);
 }
 
 .menu-btn:hover::before,
-.menu-btn:focus-visible::before,
 .menu-btn.is-selected::before {
     background: #ed8733;
 }
@@ -176,10 +175,8 @@
 /* Estado de Clique (Active) */
 .menu-btn:active {
     transform: translateY(2px);
-    background: linear-gradient(180deg, #682617 0%, #4a190f 100%);
-    box-shadow: 
-        inset 2px 2px 0px rgba(0, 0, 0, 0.6),
-        0px 1px 0px #150507;
+    background: transparent;
+    box-shadow: 0px 1px 0px #150507;
 }
 
 /* Foco Visível Personalizado Pixel-Art */

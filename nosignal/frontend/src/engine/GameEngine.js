@@ -11,6 +11,7 @@ import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
+import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
 
 const MAP_LABELS = {
     [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE MARTE',
@@ -163,6 +164,7 @@ export class GameEngine {
             cancelAnimationFrame(this.animationFrameId);
         }
         destroyPauseMenu();
+        closeCaveChoiceScreen();
         window.removeEventListener('keydown', this._onKeyDown);
         window.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('resize', this._onResize);
@@ -240,6 +242,13 @@ export class GameEngine {
         // ESC toggles the pause menu
         if (e.code === 'Escape') {
             e.preventDefault();
+            // Cave choice screen intercepts its own ESC while focused, but this
+            // branch is a safety net (e.g. focus outside the overlay).
+            if (isCaveChoiceOpen()) {
+                closeCaveChoiceScreen();
+                this.paused = false;
+                return;
+            }
             if (isPauseMenuOpen()) {
                 closePauseMenu();
                 this.paused = false;
@@ -259,6 +268,13 @@ export class GameEngine {
         // Map transition interaction ([E] on a doorway/portal)
         if (e.code === 'KeyE' && this.interactableExit && this.mapTransitionCooldown <= 0) {
             const exit = this.interactableExit;
+            // The cave entrance opens the cave CHOICE screen instead of
+            // transitioning directly; the map change happens only after the
+            // player picks "Núcleo de Marte" or "Catacumbas Marcianas".
+            if (exit.id === 'cave-entrance') {
+                openCaveChoiceScreen(this.container, this, exit);
+                return;
+            }
             this.changeMap(exit.targetMap, exit.targetSpawn);
             return;
         }
@@ -341,7 +357,7 @@ export class GameEngine {
         if (!this.isRunning) return;
 
         // If the pause menu was closed by clicking the backdrop, resume.
-        if (this.paused && !isPauseMenuOpen()) {
+        if (this.paused && !isPauseMenuOpen() && !isCaveChoiceOpen()) {
             this.paused = false;
         }
 

@@ -6,6 +6,7 @@
 
 import { assetLoader } from '../engine/AssetLoader.js';
 import { GameEngine } from '../engine/GameEngine.js';
+import { gameState } from '../state/gameState.js';
 
 export function renderLoadingScreen(container) {
     container.innerHTML = `
@@ -62,7 +63,7 @@ export function renderLoadingScreen(container) {
         if (fillElement) fillElement.style.width = `${pct}%`;
         if (counterElement) counterElement.innerText = `${loaded} / ${total} MÓDULOS`;
         if (percentElement) percentElement.innerText = `${pct}%`;
-    }).then(() => {
+    }, gameState.selectedCharacter).then(() => {
         clearInterval(phraseInterval);
         if (statusElement) statusElement.innerText = 'POUSO AUTORIZADO! INICIANDO SIMULAÇÃO...';
         if (fillElement) fillElement.style.width = '100%';

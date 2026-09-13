@@ -213,6 +213,111 @@
     text-align: center;
 }
 
+/* Character Select Panel */
+.char-select-panel {
+    max-width: 880px;
+}
+
+.char-select-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
+}
+
+.char-card {
+    flex: 1 1 220px;
+    max-width: 250px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 12px;
+    background-color: #0c0507;
+    border: 2px solid #582114;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.05s ease;
+}
+
+/* Reuses the global mars grid pattern inside every character card.
+   Kept at the same opacity as the screen-wide overlay so it stays subtle;
+   content is lifted above it to preserve readability. */
+.char-card .mars-grid-overlay {
+    z-index: 0;
+}
+
+.char-card__preview,
+.char-card__name,
+.char-card__tagline,
+.char-card__desc {
+    position: relative;
+    z-index: 1;
+}
+
+.char-card__preview {
+    width: 100%;
+    height: 132px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    background: radial-gradient(circle at center, rgba(224, 114, 40, 0.10), rgba(8, 4, 6, 0.40) 72%);
+}
+
+.char-card__name {
+    font-size: 10px;
+    color: #f6c885;
+    letter-spacing: 1px;
+}
+
+.char-card__tagline {
+    font-size: 8px;
+    color: #ed8733;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.char-card__desc {
+    font-size: 7px;
+    line-height: 1.7;
+    color: #c5975b;
+    text-align: center;
+}
+
+.char-card.is-hover {
+    border-color: #8f3419;
+}
+
+.char-card.is-selected {
+    border-color: #e07228;
+    box-shadow: 0 0 14px rgba(224, 114, 40, 0.45);
+}
+
+.char-card.is-selected .char-card__name {
+    color: #ed8733;
+}
+
+.char-card:active {
+    transform: translateY(2px);
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+    .char-select-grid {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .char-card {
+        flex: none;
+        width: 90%;
+        max-width: 260px;
+    }
+}
+
 /* Loading Screen Panel */
 .loading-panel {
     width: 90%;
@@ -533,5 +638,160 @@
     .game-viewport {
         width: 100vw;
         height: 100vh;
+    }
+}
+
+/* ─── Cave Choice Overlay ────────────────────────────────── */
+/* Tela de escolha de caminho da caverna (aberta pelo [E] na entrada).
+   Fundo: cavern_choice.jpeg (cover); fallback retângulo sólido enquanto a
+   arte não existir. Hotspots posicionados sobre os buracos da imagem
+   (coordenadas em JS, ui/caveChoiceScreen.js -> HOTSPOTS). */
+.cave-choice-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 260;
+    background: rgba(5, 5, 11, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: caveChoiceIn 0.2s ease forwards;
+    user-select: none;
+}
+
+.cave-choice-overlay[hidden] {
+    display: none;
+}
+
+@keyframes caveChoiceIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Camada do fundo (imagem ou placeholder) preenchendo o overlay */
+.cave-choice-bg {
+    position: absolute;
+    inset: 0;
+    /* Fallback sólido (placeholder) enquanto cavern_choice.jpeg não existe.
+       A classe .has-bg (aplicada por JS via loadCavernChoiceBackground)
+       mantém o background-image definido inline; o fundo escuro abaixo só
+       aparece quando a imagem não está disponível. */
+    background-color: #14060d;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    box-shadow: inset 0 0 80px rgba(226, 114, 40, 0.18);
+}
+
+/* Título no topo */
+.cave-choice-header {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    text-align: center;
+    padding: 0 24px;
+}
+
+.cave-choice-title {
+    font-family: var(--font-pixel);
+    font-size: 20px;
+    color: #f6c885;
+    letter-spacing: 3px;
+    /* Mesma cor/sombra dos botões (labels) */
+    text-shadow: 2px 2px 0 #1c080b, 0 0 10px rgba(224, 114, 40, 0.8);
+}
+
+.cave-choice-sub {
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: #f6c885;
+    letter-spacing: 1.5px;
+    /* Mesma cor/sombra dos botões (labels) */
+    text-shadow: 2px 2px 0 #1c080b, 0 0 10px rgba(224, 114, 40, 0.8);
+}
+
+/* Hotspots clicáveis/selecionáveis sobre os buracos da imagem.
+   O botão encolhe ao tamanho do texto (shrink-to-fit) e é centralizado no
+   ponto (cx, cy) definido em JS via transform translate(-50%,-50%) — a área
+   de clique fica apenas onde está o texto, sem retângulo grande. */
+.cave-choice-hotspot {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    outline: none;
+    transform: translate(-50%, -50%);
+}
+
+.cave-choice-hotspot:active {
+    transform: translate(-50%, calc(-50% + 2px));
+}
+
+/* Efeito de hover/foco aplicado só ao botão pequeno (label).
+   O destaque vem de :hover (enquanto o mouse está em cima) ou da classe
+   .is-selected gerenciada por JS (navegação por teclado) — sem
+   :focus-visible para o destaque não "grudar" após interação com o mouse. */
+.cave-choice-hotspot:hover .cave-choice-hotspot__label,
+.cave-choice-hotspot.is-selected .cave-choice-hotspot__label {
+    background: rgba(224, 114, 40, 0.35);
+    border-color: #f6c885;
+    box-shadow: 0 0 14px rgba(224, 114, 40, 0.5);
+}
+
+.cave-choice-hotspot__label {
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    color: #f6c885;
+    letter-spacing: 1.5px;
+    text-shadow: 2px 2px 0 #1c080b, 0 0 10px rgba(224, 114, 40, 0.8);
+    padding: 6px 10px;
+    background: rgba(5, 5, 11, 0.45);
+    border: 1px solid rgba(224, 114, 40, 0.4);
+    line-height: 1.4;
+    text-align: center;
+}
+
+/* Rodapé com dicas de controle */
+.cave-choice-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 38px;
+    background: rgba(5, 5, 11, 0.85);
+    border-top: 1px solid #4d1d15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.cave-choice-footer span {
+    font-family: var(--font-pixel);
+    font-size: 8px;
+    color: #f6c885;
+    letter-spacing: 1px;
+}
+
+@media (max-width: 600px) {
+    .cave-choice-title {
+        font-size: 14px;
+    }
+    .cave-choice-sub {
+        font-size: 8px;
+    }
+    .cave-choice-hotspot__label {
+        font-size: 7px;
+    }
+    .cave-choice-footer span {
+        font-size: 6px;
     }
 }

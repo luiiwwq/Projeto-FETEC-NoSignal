@@ -56,6 +56,7 @@ export function renderTitleScreen(container) {
  * evitando acúmulo de listeners duplicados ao re-renderizar a tela inicial.
  */
 let titleKeyHandler = null;
+let keyboardNav = false;
 
 function setupKeyboardNavigation() {
     const buttons = Array.from(document.querySelectorAll('.title-screen__menu .menu-btn'));
@@ -69,21 +70,33 @@ function setupKeyboardNavigation() {
         btn.focus();
     };
 
-    // Atualiza seleção visual ao passar o mouse
+    // Atualiza seleção visual ao passar o mouse / navegar com o teclado.
+    // CORREÇÃO (hover preso): com o mouse o destaque só existe enquanto o
+    // ponteiro está sobre o botão (mouseenter/mouseleave); com navegação por
+    // teclado (keyboardNav=true) o destaque permanece no botão focado.
     buttons.forEach((btn) => {
         btn.addEventListener('mouseenter', () => {
             updateSelection(btn, buttons);
         });
 
+        btn.addEventListener('mouseleave', () => {
+            if (!keyboardNav) btn.classList.remove('is-selected');
+        });
+
         btn.addEventListener('focus', () => {
-            buttons.forEach((b) => {
-                if (b === btn) b.classList.add('is-selected');
-                else b.classList.remove('is-selected');
-            });
+            if (!keyboardNav) return;
+            updateSelection(btn, buttons);
+        });
+
+        btn.addEventListener('blur', () => {
+            if (!keyboardNav) btn.classList.remove('is-selected');
         });
     });
 
     if (titleKeyHandler) return;
+
+    // Qualquer clique do mouse desativa a "modalidade teclado"
+    document.addEventListener('mousedown', () => { keyboardNav = false; });
 
     titleKeyHandler = (e) => {
         const wrapper = document.querySelector('.title-screen-wrapper');
@@ -95,10 +108,12 @@ function setupKeyboardNavigation() {
 
         if (e.key === 'ArrowDown' || e.key === 'Down') {
             e.preventDefault();
+            keyboardNav = true;
             const next = currentButtons[(currentIndex + 1) % currentButtons.length];
             updateSelection(next, currentButtons);
         } else if (e.key === 'ArrowUp' || e.key === 'Up') {
             e.preventDefault();
+            keyboardNav = true;
             const prev = currentButtons[(currentIndex - 1 + currentButtons.length) % currentButtons.length];
             updateSelection(prev, currentButtons);
         }

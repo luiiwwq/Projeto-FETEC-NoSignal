@@ -4,7 +4,7 @@
  */
 
 import { gameState } from '../state/gameState.js';
-import { renderLoadingScreen } from './loadingScreen.js';
+import { renderCharacterSelectScreen } from './characterSelectScreen.js';
 import { renderTitleScreen } from './titleScreen.js';
 import { initMainMenu } from './screens.js';
 
@@ -85,8 +85,8 @@ export function renderNameScreen(container) {
             });
         } catch (_) {}
 
-        // Transition to Loading Screen
-        renderLoadingScreen(container);
+        // Transition to Crew Selection (character select) screen
+        renderCharacterSelectScreen(container);
     };
 
     btnConfirm?.addEventListener('click', handleConfirm);

@@ -4,35 +4,54 @@
  * Guarantees crisp pixel art rendering without smoothing.
  */
 
+import { getCharacter } from '../content/characters.js';
+
 export class AssetLoader {
     constructor() {
         this.images = new Map();
         this.metadata = null;
+        this.metadataCharacterId = null;
+        this.loadedCharacterId = null;
         this.totalAssets = 0;
         this.loadedAssets = 0;
         this.isLoaded = false;
     }
 
-    async loadMetadata() {
-        if (this.metadata) return this.metadata;
-        const response = await fetch('./src/assets/sprites/Astronaut/metadata.json');
+    async loadMetadata(characterId = null) {
+        const profile = getCharacter(characterId);
+        if (this.metadata && this.metadataCharacterId === profile.id) return this.metadata;
+
+        const response = await fetch(profile.metadataPath);
         if (!response.ok) {
             throw new Error(`Failed to load sprite metadata: ${response.statusText}`);
         }
         this.metadata = await response.json();
+        this.metadataCharacterId = profile.id;
         return this.metadata;
     }
 
-    async preloadAll(onProgress = null) {
-        if (this.isLoaded) {
+    async preloadAll(onProgress = null, characterId = null) {
+        const profile = getCharacter(characterId);
+
+        if (this.isLoaded && this.loadedCharacterId === profile.id) {
             if (onProgress) onProgress(1.0, this.loadedAssets, this.totalAssets);
             return this;
         }
 
-        await this.loadMetadata();
+        // Switching characters invalidates the previously loaded sprite cache
+        if (this.loadedCharacterId !== profile.id) {
+            this.images.clear();
+            this.metadata = null;
+            this.metadataCharacterId = null;
+            this.totalAssets = 0;
+            this.loadedAssets = 0;
+            this.isLoaded = false;
+        }
+
+        await this.loadMetadata(profile.id);
 
         const state = this.metadata.states[0];
-        const basePath = './src/assets/sprites/Astronaut/';
+        const basePath = profile.assetBasePath;
         const queue = [];
 
         // 1. Static Rotations
@@ -73,6 +92,7 @@ export class AssetLoader {
         }
 
         this.isLoaded = true;
+        this.loadedCharacterId = profile.id;
         return this;
     }
 

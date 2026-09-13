@@ -7,6 +7,15 @@
 
 import { assetLoader } from '../engine/AssetLoader.js';
 import { Bullet } from './Bullet.js';
+import { getCharacter } from '../content/characters.js';
+import { gameState } from '../state/gameState.js';
+
+const DIAGONAL_FALLBACK = {
+    'south-east': ['south', 'east'],
+    'south-west': ['south', 'west'],
+    'north-east': ['north', 'east'],
+    'north-west': ['north', 'west']
+};
 
 export const PlayerState = {
     IDLE: 'IDLE',
@@ -28,9 +37,18 @@ export class Player {
         this.vx = 0;
         this.vy = 0;
 
+        // Character profile (native size, animation map, weapon profile)
+        this.character = getCharacter(gameState.selectedCharacter);
+        this.animMap = this.character.animations;
+        this.weapon = this.character.weapon;
+
+        // Cached direction resolution for clips that lack diagonal frames
+        // (e.g., Ocstronaut metadata only ships the 4 cardinal directions)
+        this._dirCache = new Map();
+
         // Visual & scale parameters
-        this.nativeSize = 64;   // Native sprite 64x64
-        this.scale = 2;         // 2x upscale -> 128x128
+        this.nativeSize = this.character.nativeSize; // Native sprite frame size (per character)
+        this.scale = 2;         // 2x upscale
         this.renderSize = this.nativeSize * this.scale;
 
         // State Machine
@@ -70,17 +88,46 @@ export class Player {
         this.worldBounds = null;
 
         // Animation definitions and frame counts
+        // The clip `name` comes from the character animation translation table;
+        // `frames` acts as fallback when the loaded metadata is unavailable.
         this.animConfig = {
-            [PlayerState.IDLE]: { name: 'Breathing_Idle', frames: 4, speed: 0.16, loop: true },
-            [PlayerState.RUNNING]: { name: 'Running', frames: 6, speed: 0.10, loop: true },
-            [PlayerState.SHOOTING]: { name: 'Shooting', frames: 11, speed: 0.05, loop: false },
-            [PlayerState.PUNCHING]: { name: 'Punch', frames: 6, speed: 0.065, loop: false },
-            [PlayerState.JUMPING]: { name: 'Jumping', frames: 8, speed: 0.08, loop: false },
-            [PlayerState.HURT]: { name: 'Hit_Knocked_Back', frames: 7, speed: 0.07, loop: false },
-            [PlayerState.DEAD]: { name: 'Death_Animation', frames: 11, speed: 0.09, loop: false },
-            [PlayerState.FLOATING]: { name: 'Floating', frames: 11, speed: 0.12, loop: true },
-            [PlayerState.PUSH_PULL]: { name: 'Push_Pull', frames: 6, speed: 0.11, loop: true }
+            [PlayerState.IDLE]: { name: this._animName(PlayerState.IDLE), frames: 4, speed: 0.16, loop: true },
+            [PlayerState.RUNNING]: { name: this._animName(PlayerState.RUNNING), frames: 6, speed: 0.10, loop: true },
+            [PlayerState.SHOOTING]: { name: this._animName(PlayerState.SHOOTING), frames: 11, speed: 0.05, loop: false },
+            [PlayerState.PUNCHING]: { name: this._animName(PlayerState.PUNCHING), frames: 6, speed: 0.065, loop: false },
+            [PlayerState.JUMPING]: { name: this._animName(PlayerState.JUMPING), frames: 8, speed: 0.08, loop: false },
+            [PlayerState.HURT]: { name: this._animName(PlayerState.HURT), frames: 7, speed: 0.07, loop: false },
+            [PlayerState.DEAD]: { name: this._animName(PlayerState.DEAD), frames: 11, speed: 0.09, loop: false },
+            [PlayerState.FLOATING]: { name: this._animName(PlayerState.FLOATING), frames: 11, speed: 0.12, loop: true },
+            [PlayerState.PUSH_PULL]: { name: this._animName(PlayerState.PUSH_PULL), frames: 6, speed: 0.11, loop: true }
         };
+    }
+
+    _animName(state) {
+        return this.animMap[state] || 'Breathing_Idle';
+    }
+
+    _resolveSpriteDir(clipName, direction) {
+        const cacheKey = `${clipName}|${direction}`;
+        const cached = this._dirCache.get(cacheKey);
+        if (cached) return cached;
+
+        let resolved = direction;
+        const candidates = DIAGONAL_FALLBACK[direction];
+        if (candidates && assetLoader.getFrameCount(clipName, direction) === 0) {
+            resolved = candidates.find((d) => assetLoader.getFrameCount(clipName, d) > 0) || candidates[0];
+        }
+
+        this._dirCache.set(cacheKey, resolved);
+        return resolved;
+    }
+
+    _animFrameCount(state) {
+        const clipName = this._animName(state);
+        const dir = this._resolveSpriteDir(clipName, this.direction);
+        const realCount = assetLoader.getFrameCount(clipName, dir);
+        if (realCount > 0) return realCount;
+        return this.animConfig[state]?.frames || 1;
     }
 
     setState(newState, force = false) {
@@ -218,7 +265,8 @@ export class Player {
     }
 
     shoot(aimAngle, bulletManager) {
-        this.shootCooldown = 0.22; // Cadence
+        const weapon = this.weapon || {};
+        this.shootCooldown = weapon.cooldown ?? 0.22; // Cadence
         this.updateDirectionFromAngle(aimAngle);
         this.setState(PlayerState.SHOOTING, true);
 
@@ -226,12 +274,23 @@ export class Player {
         this.recoilX = -Math.cos(aimAngle) * 45;
         this.recoilY = -Math.sin(aimAngle) * 45;
 
-        // Spawn bullet projectile
+        // Spawn bullet projectile(s)
         if (bulletManager) {
             const spawnDist = 24;
             const spawnX = this.x + Math.cos(aimAngle) * spawnDist;
             const spawnY = this.y + Math.sin(aimAngle) * spawnDist - 8; // near chest height
-            bulletManager.addBullet(new Bullet(spawnX, spawnY, aimAngle));
+
+            if (weapon.type === 'shotgun') {
+                const pellets = weapon.pellets || 5;
+                const spread = weapon.spread || 0;
+                const step = pellets > 1 ? spread / (pellets - 1) : 0;
+                for (let i = 0; i < pellets; i++) {
+                    const offsetAngle = aimAngle - spread / 2 + step * i;
+                    bulletManager.addBullet(new Bullet(spawnX, spawnY, offsetAngle, weapon.speed, weapon));
+                }
+            } else {
+                bulletManager.addBullet(new Bullet(spawnX, spawnY, aimAngle, weapon.speed, weapon));
+            }
         }
     }
 
@@ -340,6 +399,8 @@ export class Player {
         const config = this.animConfig[this.state];
         if (!config) return;
 
+        const frameCount = this._animFrameCount(this.state);
+
         // Sprinting speeds up running animation
         let speed = config.speed;
         if (this.state === PlayerState.RUNNING && this.isSprinting) {
@@ -351,14 +412,14 @@ export class Player {
             this.animTime -= speed;
             this.currentFrame++;
 
-            if (this.currentFrame >= config.frames) {
+            if (this.currentFrame >= frameCount) {
                 if (config.loop) {
                     this.currentFrame = 0;
                 } else {
                     // One-shot animation completed
                     if (this.state === PlayerState.DEAD) {
                         // Hold on the final frame of death
-                        this.currentFrame = config.frames - 1;
+                        this.currentFrame = frameCount - 1;
                     } else {
                         // Return to IDLE or RUNNING
                         const isMoving = Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1;
@@ -375,7 +436,9 @@ export class Player {
         if (!config) return;
 
         // Fetch sprite frame from AssetLoader
-        const frameImg = assetLoader.getFrame(config.name, this.direction, this.currentFrame);
+        const clipName = this._animName(this.state);
+        const spriteDir = this._resolveSpriteDir(clipName, this.direction);
+        const frameImg = assetLoader.getFrame(clipName, spriteDir, this.currentFrame);
 
         // Visual flash during invulnerability i-frames
         if (this.invulnerableTimer > 0 && Math.floor(this.invulnerableTimer * 20) % 2 === 0) {
@@ -398,8 +461,7 @@ export class Player {
             ctx.restore();
         }
 
-        // Render astronaut sprite
-        // Sprites are 64x64, drawn at 2x (128x128)
+        // Render player sprite at nativeSize x scale
         // Character is centered horizontally, feet grounded
         const renderW = this.renderSize;
         const renderH = this.renderSize;
