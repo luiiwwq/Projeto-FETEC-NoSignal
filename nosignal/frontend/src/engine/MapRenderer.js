@@ -42,7 +42,7 @@ const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 940, originX: 0.5, originY: 1.0, scal
 // the art's central mouth (sprite ~x850..1450, y580..1140) to a ~100px-wide
 // opening at world x1567..1667 — matching the free corridor kept between
 // cavePillarLeft and caveWallRight.
-const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png?v=2';
+const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png?v=3';
 const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale: 0.167 };
 
 // Ground texture (tileable JPEG), loaded once and used as a CanvasPattern in
@@ -241,7 +241,7 @@ export class MapRenderer {
     // (world object). Uses the full canvas extent, margins included.
     _caveEntranceSpriteRect(offset) {
         const a = CAVE_SPRITE_ANCHOR;
-        let cw = 2334;
+        let cw = 2335;
         let ch = 1824;
         if (this.caveEntranceSprite && this.caveEntranceSprite.naturalWidth > 0) {
             cw = this.caveEntranceSprite.naturalWidth;
