@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>debug catacombs v3 (microtiles)</title>
+<style>
+    html, body { margin: 0; padding: 0; background: #000; }
+    canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+    import { marsCatacombsMap } from './src/content/maps.js';
+    import { MapRenderer } from './src/engine/MapRenderer.js';
+
+    const params = new URLSearchParams(location.search);
+    const mode = params.get('mode') || 'full';
+
+    // world region -> viewport + offset
+    const preset = {
+        full:   { x: 0,     y: 0,     w: 2816, h: 1408 },
+        entry:  { x: 0,     y: 576,   w: 1024, h: 640  },
+        arena:  { x: 896,   y: 320,   w: 1152, h: 896  },
+        finale: { x: 2112,  y: 320,   w: 704,  h: 896  },
+    };
+    const region = preset[mode] || preset.full;
+
+    const canvas = document.getElementById('c');
+    canvas.width = region.w;
+    canvas.height = region.h;
+
+    const renderer = new MapRenderer();
+    renderer.setMap(marsCatacombsMap);
+    renderer.loadUndeadGroundTexture();
+    renderer.time = 0;
+
+    const camera = {
+        viewportWidth: region.w,
+        viewportHeight: region.h,
+        getRenderOffset: () => ({ x: -region.x, y: -region.y }),
+    };
+
+    function draw() {
+        renderer.time = performance.now() / 1000;
+        const ctx = canvas.getContext('2d');
+        renderer.render(ctx, camera);
+    }
+
+    draw();
+    setTimeout(draw, 2600);
+    setTimeout(draw, 5200);
+</script>
+</body>
+</html>

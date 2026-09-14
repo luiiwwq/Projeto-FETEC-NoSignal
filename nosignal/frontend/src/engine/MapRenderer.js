@@ -80,22 +80,46 @@ const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core', 'mars-catacombs']);
 // drives what is drawn here.
 const CATACOMBS_ID = 'mars-catacombs';
 
-// Bright floor tiles (lum 52-80) and shaded floor tiles (lum 38-52, slightly
-// darker, used directly under the north walls).
+// ── Catacombs microtile composition ──
+// Every 64px logical cell is painted as a 4×4 grid of 16px microtiles (source
+// crops from PNG/Ground_rocks.png: 496×592, 31×37 tiles of 16px). Pools are
+// verified crops by luminance: light floor 53-80, shade 38-52, contact shadow
+// <30 printed right at each wall base, rock mass 25-42 with slightly lighter
+// "edge faces" 46-60 where a wall meets walkable floor, sparse floor "detail"
+// speckles 26-39, and the bright glow 124-157 for the destination pool.
+const CATACOMBS_MS = 16;
+const CATACOMBS_MICRO_PER_CELL = LOGICAL_TILE / CATACOMBS_MS; // 4
 const CATACOMBS_FLOOR_LIGHT = [
-    [128, 0], [192, 0], [256, 0], [384, 0], [128, 80], [384, 80],
+    [80, 0], [128, 0], [192, 0], [256, 0], [96, 0], [160, 0], [224, 0], [288, 0], [384, 0],
+    [128, 80], [192, 80], [384, 80],
 ];
 const CATACOMBS_FLOOR_SHADE = [
-    [320, 176], [64, 240], [192, 240], [128, 256], [256, 256], [0, 336],
+    [336, 16], [352, 16], [368, 16], [400, 16], [416, 16], [16, 48], [224, 48], [288, 48],
 ];
-// Solid dark rock tiles (lum 25-42) for the enclosing wall mass.
-const CATACOMBS_FLOOR_ROCK = [
-    [0, 400], [96, 400], [192, 400], [288, 400], [384, 400], [480, 400],
-    [48, 432], [144, 400], [0, 240], [192, 240], [384, 256], [240, 400],
+const CATACOMBS_FLOOR_DARK = [
+    [80, 16], [128, 16], [208, 16], [256, 16],
 ];
-// Brightest glowing tile (row 23 col 6, lum 157) for the destination pool.
-const CATACOMBS_GLOW_CROP = [96, 368];
+const CATACOMBS_ROCK = [
+    [0, 240], [48, 240], [64, 240], [96, 240], [144, 240], [176, 240], [224, 240], [272, 240],
+    [32, 256], [112, 256], [208, 256], [0, 400], [96, 400], [288, 400], [384, 400], [48, 432],
+];
+const CATACOMBS_ROCK_EDGE = [
+    [80, 80], [112, 80], [144, 80], [240, 80], [352, 80], [416, 80],
+];
+const CATACOMBS_GLOW = [
+    [64, 368], [80, 368], [96, 368],
+];
+const CATACOMBS_DETAIL = [
+    [80, 32], [128, 32], [176, 32], [192, 32], [208, 32], [256, 32],
+];
 const CATACOMBS_WALKABLE = new Set(['.', 'G']);
+// Some Ground_rocks crops carry transparent pixels (the glow overlay especially).
+// Every pool is baked ONCE into an opaque atlas composited over a base tone so
+// the base CanvasPattern never bleeds through the terrain: rock masses get the
+// deep rock brown, the destination pool gets a hot ember base (which the
+// translucent glow crops then tint), keeping a vivid glowing basin.
+const CATACOMBS_BASE_ROCK = [32, 12, 9];
+const CATACOMBS_BASE_EMBER = [200, 96, 52];
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -156,6 +180,10 @@ export class MapRenderer {
         // loading or after a failed load.
         this._spriteCache = new Map();
         this._undeadWarned = new Set();
+        // Baked opaque microtile atlases (one canvas per pool) — see
+        // _catacombsAtlas: transparent source pixels are composited over a base
+        // tone once, so the repeating floor pattern never shows through.
+        this._catAtlases = new Map();
     }
 
     setMap(map) {
@@ -395,12 +423,47 @@ export class MapRenderer {
         return s - Math.floor(s);
     }
 
-    // Catacombs terrain: real 16px Ground_rocks tiles composed from the same
-    // walkability mask that produces the collisions (maps.js catacombsLayout).
-    // `.` floor (seeded from two pools — slightly darker right under north
-    // walls), `G` glowing floor for the destination pool, `#` solid rock.
-    // While the ground image is still loading/failed this simply does nothing
-    // (the base pattern/legacy floor beneath already covers the view).
+    // Bakes a pool of 16px source crops into one opaque 16px-tall atlas canvas,
+    // composited over a solid base tone. Cached per (base + tiles) combo so it
+    // happens exactly once. Returns { canvas, tiles: [[x,0], …] } where the
+    // tile coordinates already point inside the baked atlas.
+    _catacombsAtlas(tiles, base) {
+        const key = (base ? base.join('-') : '0') + '|' + tiles.map((t) => t.join('-')).join('|');
+        if (this._catAtlases.has(key)) return this._catAtlases.get(key);
+        const w = tiles.length * CATACOMBS_MS;
+        const bake = document.createElement('canvas');
+        bake.width = w;
+        bake.height = CATACOMBS_MS;
+        const b = bake.getContext('2d');
+        if (base) {
+            b.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+            b.fillRect(0, 0, w, CATACOMBS_MS);
+        }
+        tiles.forEach((t, i) =>
+            b.drawImage(
+                this.undeadGroundTexture,
+                t[0], t[1], CATACOMBS_MS, CATACOMBS_MS,
+                i * CATACOMBS_MS, 0, CATACOMBS_MS, CATACOMBS_MS
+            )
+        );
+        const at = { canvas: bake, tiles: tiles.map((t, i) => [i * CATACOMBS_MS, 0]) };
+        this._catAtlases.set(key, at);
+        return at;
+    }
+
+    // Catacombs terrain: painted as a 4×4 grid of 16px Ground_rocks microtiles
+    // per 64px logical cell, driven by the SAME walkability mask that produces
+    // the collisions (maps.js catacombsLayout). Composition rules read the 8
+    // macro neighbors of every cell:
+    //   • floor cells get ragged shade bands (1..2 microcells, hashed per micro
+    //     position so no straight seam) under each rock neighbor, a darkest
+    //     contact tile at the exact wall base, DARK inner corners where two
+    //     walls meet, and sparse detail speckles away from walls;
+    //   • rock cells get a slightly lighter "edge face" band (ragged 1..2)
+    //     wherever they touch a floor, plain mass away from faces;
+    //   • `G` cells draw the bright glow pool.
+    // While the ground image is loading/failed this does nothing (the base
+    // pattern/legacy floor beneath already covers the whole view).
     _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
         if (this.mapId !== CATACOMBS_ID) return;
         const img = this.undeadGroundTexture;
@@ -408,6 +471,8 @@ export class MapRenderer {
         const mask = this.map.terrainMask;
         if (!mask || mask.length === 0) return;
         const cell = LOGICAL_TILE;
+        const m = CATACOMBS_MS;
+        const p = CATACOMBS_MICRO_PER_CELL;
         const cols = mask[0].length;
         const rows = mask.length;
         const minCol = Math.max(0, Math.floor(-offset.x / cell));
@@ -415,24 +480,76 @@ export class MapRenderer {
         const minRow = Math.max(0, Math.floor(-offset.y / cell));
         const maxRow = Math.min(rows - 1, Math.ceil((viewH - offset.y) / cell));
 
+        const hash = (x, y) => this._undeadHash(x, y);
+        // Pools are baked to one opaque atlas each (single canvas per pool);
+        // the repeating base pattern never shows through the composition.
+        const A = {
+            light: this._catacombsAtlas(CATACOMBS_FLOOR_LIGHT, CATACOMBS_BASE_ROCK),
+            shade: this._catacombsAtlas(CATACOMBS_FLOOR_SHADE, CATACOMBS_BASE_ROCK),
+            dark: this._catacombsAtlas(CATACOMBS_FLOOR_DARK, CATACOMBS_BASE_ROCK),
+            rock: this._catacombsAtlas(CATACOMBS_ROCK, CATACOMBS_BASE_ROCK),
+            edge: this._catacombsAtlas(CATACOMBS_ROCK_EDGE, CATACOMBS_BASE_ROCK),
+            glow: this._catacombsAtlas(CATACOMBS_GLOW, CATACOMBS_BASE_EMBER),
+            detail: this._catacombsAtlas(CATACOMBS_DETAIL, CATACOMBS_BASE_ROCK),
+        };
+        const drawAt = (atlas, k, px, py) => {
+            const t = atlas.tiles[Math.floor(k * atlas.tiles.length)];
+            ctx.drawImage(atlas.canvas, t[0], t[1], m, m, px, py, m, m);
+        };
+
         for (let r = minRow; r <= maxRow; r++) {
             const rowMask = mask[r];
             for (let c = minCol; c <= maxCol; c++) {
                 const ch = rowMask[c];
-                const dx = Math.round(c * cell + offset.x);
-                const dy = Math.round(r * cell + offset.y);
-                if (ch === '#') {
-                    const tile = CATACOMBS_FLOOR_ROCK[
-                        Math.floor(this._undeadHash(c * 3 + 1, r * 5 + 1) * CATACOMBS_FLOOR_ROCK.length)
-                    ];
-                    ctx.drawImage(img, tile[0], tile[1], 16, 16, dx, dy, cell, cell);
-                } else if (ch === 'G') {
-                    ctx.drawImage(img, CATACOMBS_GLOW_CROP[0], CATACOMBS_GLOW_CROP[1], 16, 16, dx, dy, cell, cell);
-                } else {
-                    const underWall = r > 0 && !CATACOMBS_WALKABLE.has(mask[r - 1][c]);
-                    const pool = underWall ? CATACOMBS_FLOOR_SHADE : CATACOMBS_FLOOR_LIGHT;
-                    const tile = pool[Math.floor(this._undeadHash(c + 1, r + 7) * pool.length)];
-                    ctx.drawImage(img, tile[0], tile[1], 16, 16, dx, dy, cell, cell);
+                const baseX = Math.round(c * cell + offset.x);
+                const baseY = Math.round(r * cell + offset.y);
+                const nRock = r > 0 && !CATACOMBS_WALKABLE.has(mask[r - 1][c]);
+                const sRock = r < rows - 1 && !CATACOMBS_WALKABLE.has(mask[r + 1][c]);
+                const wRock = c > 0 && !CATACOMBS_WALKABLE.has(rowMask[c - 1]);
+                const eRock = c < cols - 1 && !CATACOMBS_WALKABLE.has(rowMask[c + 1]);
+                const nFloor = r > 0 && CATACOMBS_WALKABLE.has(mask[r - 1][c]);
+                const sFloor = r < rows - 1 && CATACOMBS_WALKABLE.has(mask[r + 1][c]);
+                const wFloor = c > 0 && CATACOMBS_WALKABLE.has(rowMask[c - 1]);
+                const eFloor = c < cols - 1 && CATACOMBS_WALKABLE.has(rowMask[c + 1]);
+
+                for (let mr = 0; mr < p; mr++) {
+                    for (let mc = 0; mc < p; mc++) {
+                        const px = baseX + mc * m;
+                        const py = baseY + mr * m;
+                        const h = hash(c * 17 + mc * 5, r * 13 + mr * 7);
+                        if (ch === 'G') {
+                            // Destination pool: subtle ripple by sweeping the
+                            // glow-tile order with time (cohesive across the pool).
+                            drawAt(A.glow, (h + this.time * 0.5) % 1, px, py);
+                        } else if (ch === '.') {
+                            // Ragged shade-band depth toward each rock neighbor.
+                            const dN = nRock ? 1 + Math.floor(hash(c * 3 + mc, r * 2) * 2) : 0;
+                            const dS = sRock ? 1 + Math.floor(hash(c * 7 + mc, r * 4) * 2) : 0;
+                            const dW = wRock ? 1 + Math.floor(hash(c * 2, r * 3 + mr) * 2) : 0;
+                            const dE = eRock ? 1 + Math.floor(hash(c * 4, r * 5 + mr) * 2) : 0;
+                            const atWallBase =
+                                (nRock && mr === 0) ||
+                                (sRock && mr === p - 1) ||
+                                (wRock && mc === 0) ||
+                                (eRock && mc === p - 1);
+                            const innerCorner =
+                                (nRock && wRock && mr === 0 && mc === 0) ||
+                                (nRock && eRock && mr === 0 && mc === p - 1) ||
+                                (sRock && wRock && mr === p - 1 && mc === 0) ||
+                                (sRock && eRock && mr === p - 1 && mc === p - 1);
+                            const shaded = mr < dN || mr >= p - dS || mc < dW || mc >= p - dE;
+                            if (shaded) drawAt(innerCorner || atWallBase ? A.dark : A.shade, h, px, py);
+                            else drawAt(h < 0.06 ? A.detail : A.light, h, px, py);
+                        } else {
+                            // Ragged "face" band toward each floor neighbor.
+                            const eN = nFloor ? 1 + Math.floor(hash(c * 3 + mc, r * 2) * 2) : 0;
+                            const eS = sFloor ? 1 + Math.floor(hash(c * 7 + mc, r * 4) * 2) : 0;
+                            const eW = wFloor ? 1 + Math.floor(hash(c * 2, r * 3 + mr) * 2) : 0;
+                            const eE = eFloor ? 1 + Math.floor(hash(c * 4, r * 5 + mr) * 2) : 0;
+                            const isFace = mr < eN || mr >= p - eS || mc < eW || mc >= p - eE;
+                            drawAt(isFace ? A.edge : A.rock, h, px, py);
+                        }
+                    }
                 }
             }
         }
@@ -1011,11 +1128,16 @@ export class MapRenderer {
 
         // Catacombs: draw the mask-driven floor/rock terrain with real ground
         // crops on top of the base pattern (decorations/obstacles come later).
+        // Layer order: terrain → back decor → obstacles → structures → front
+        // decor → exits (the player is composited by the engine after this
+        // whole map pass, so it always stays on top).
         this._renderCatacombsTerrain(ctx, offset, viewW, viewH);
 
         this._drawLandingPad(ctx, offset);
+        this._drawDecorations(ctx, offset, 'back');
         this._drawObstacles(ctx, offset);
         this._drawStructures(ctx, offset);
+        this._drawDecorations(ctx, offset, 'front');
         this._drawExits(ctx, offset);
     }
 
@@ -1221,10 +1343,14 @@ export class MapRenderer {
             }
             this._drawBlock(ctx, sx, sy, o.w, o.h, o.kind);
         }
-        // Non-solid undead decorations live in map.decorations (kept out of
-        // map.obstacles so collisionSystem never blocks them) and are drawn
-        // right alongside the solid obstacles, same layer.
+    }
+
+    // Non-solid undead decorations (map.decorations) split into two paint
+    // phases: 'back' right after the terrain, 'front' after the structures.
+    // Props without a layer flag stay in the back phase (same as before).
+    _drawDecorations(ctx, offset, layer) {
         for (const d of this.map.decorations || []) {
+            if (layer === 'front' ? d.layer !== 'front' : d.layer === 'front') continue;
             if (d.kind === 'undead-decor-anim') {
                 this._drawUndeadAnim(ctx, d, offset);
                 continue;
