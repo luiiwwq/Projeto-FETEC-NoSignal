@@ -19,10 +19,12 @@
 
     // world region -> viewport + offset
     const preset = {
-        full:   { x: 0,     y: 0,     w: 2816, h: 1408 },
-        entry:  { x: 0,     y: 576,   w: 1024, h: 640  },
-        arena:  { x: 896,   y: 320,   w: 1152, h: 896  },
-        finale: { x: 2112,  y: 320,   w: 704,  h: 896  },
+        full:     { x: 0,     y: 0,     w: 2816, h: 1408 },
+        entry:    { x: 0,     y: 576,   w: 1024, h: 640  },
+        corridor: { x: 256,   y: 512,   w: 1024, h: 640  },
+        arena:    { x: 768,   y: 256,   w: 1152, h: 1024 },
+        gargalo:  { x: 1664,  y: 384,   w: 1024, h: 896  },
+        finale:   { x: 2112,  y: 320,   w: 704,  h: 896  },
     };
     const region = preset[mode] || preset.full;
 
@@ -45,6 +47,113 @@
         renderer.time = performance.now() / 1000;
         const ctx = canvas.getContext('2d');
         renderer.render(ctx, camera);
+
+        // Optional mask overlay (overlay=1): draws every walkable cell as a
+        // translucent cyan square, so holes / disconnected floor are visible.
+        if (params.get('overlay') === '1') {
+            const mask = marsCatacombsMap.terrainMask;
+            const cell = 64;
+            ctx.fillStyle = 'rgba(80, 214, 200, 0.45)';
+            for (let r = 0; r < mask.length; r++) {
+                for (let c = 0; c < mask[0].length; c++) {
+                    if (mask[r][c] === '.') {
+                        const px = Math.round(c * cell - region.x);
+                        const py = Math.round(r * cell - region.y);
+                        if (px + cell < 0 || px > region.w || py + cell < 0 || py > region.h) continue;
+                        ctx.fillRect(px, py, cell, cell);
+                    }
+                }
+            }
+        }
+
+        // analyze=1: render the WHOLE map into an offscreen canvas with the real
+        // renderer, then pixel-check every 64px cell (opacity, floor/rock
+        // classification, water-hue absence, G absence) and print the result.
+        if (params.get('analyze') === '1') {
+            runAnalysis();
+        }
+    }
+
+    function runAnalysis() {
+        // Wait (real time) until the shared renderer's Ground_rocks texture is
+        // loaded so the mask terrain is actually painted before the pixel check.
+        if (!renderer.undeadGroundTexture || renderer.undeadGroundTexture.naturalWidth === 0) {
+            setTimeout(runAnalysis, 120);
+            return;
+        }
+        const map = marsCatacombsMap;
+        const mask = map.terrainMask;
+        const ROWS = mask.length, COLS = mask[0].length;
+        const off = document.createElement('canvas');
+        off.width = map.width;
+        off.height = map.height;
+        const octx = off.getContext('2d');
+        renderer.time = 4.0;
+        const cam2 = { viewportWidth: map.width, viewportHeight: map.height, getRenderOffset: () => ({ x: 0, y: 0 }) };
+        renderer.render(octx, cam2);
+        const id = octx.getImageData(0, 0, off.width, off.height).data;
+        const px = (x, y) => {
+            const p = (y * off.width + x) * 4;
+            return [id[p], id[p + 1], id[p + 2], id[p + 3]];
+        };
+
+        const cell = 64;
+        const stats = { floor: { sum: 0, n: 0 }, rock: { sum: 0, n: 0 } };
+        const scan = [];
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const isFloor = mask[r][c] === '.';
+                let sum = 0, n = 0, trans = 0, cyanish = 0;
+                for (let dy = 6; dy < cell; dy += 6) {
+                    for (let dx = 6; dx < cell; dx += 6) {
+                        const [R, G, B, A] = px(c * cell + dx, r * cell + dy);
+                        if (A < 250) trans++;
+                        sum += R + G + B;
+                        n++;
+                        if (A > 200 && B > 120 && G > 90 && B > R * 1.35 && B > G * 0.9) cyanish++;
+                    }
+                }
+                const avg = sum / (n * 3);
+                const s = isFloor ? stats.floor : stats.rock;
+                s.sum += avg;
+                s.n += 1;
+                scan.push({ c, r, isFloor, avg, trans, cyanish: cyanish / n });
+            }
+        }
+        const meanOf = (s) => (s.n ? s.sum / s.n : -1);
+        const floorMean = meanOf(stats.floor);
+        const rockMean = meanOf(stats.rock);
+
+        const problems = [];
+        let waterHueCells = 0, gCells = 0;
+        for (const s of scan) {
+            if (mask[s.r][s.c] === 'G') gCells++;
+            const expected = s.isFloor ? floorMean : rockMean;
+            const drift = Math.abs(s.avg - expected) / (expected + 1);
+            if (s.trans > 0) problems.push({ c: s.c, r: s.r, trans: s.trans });
+            if (drift > 0.34) problems.push({ c: s.c, r: s.r, avg: s.avg.toFixed(0), exp: expected.toFixed(0) });
+            if (s.cyanish > 0.4) waterHueCells++;
+        }
+        const result = {
+            dims: [ROWS, COLS],
+            mapSize: [map.width, map.height],
+            G: gCells,
+            nonOpaqueCells: problems.filter(p => p.trans !== undefined).length,
+            classificationDrift: problems.filter(p => p.avg !== undefined).length,
+            waterHueCells: waterHueCells,
+            floorMean: floorMean.toFixed(1),
+            rockMean: rockMean.toFixed(1),
+            problems: problems.slice(0, 40)
+        };
+        console.log('CATANALYZE ' + JSON.stringify(result));
+        let el = document.getElementById('cat-analyze');
+        if (!el) {
+            el = document.createElement('pre');
+            el.id = 'cat-analyze';
+            el.style.cssText = 'position:fixed;top:0;left:0;z-index:99;color:#0f0;background:#000;font:10px monospace;max-height:100px;overflow:auto;white-space:pre-wrap;';
+            document.body.appendChild(el);
+        }
+        el.textContent = JSON.stringify(result);
     }
 
     draw();

@@ -85,8 +85,8 @@ const CATACOMBS_ID = 'mars-catacombs';
 // crops from PNG/Ground_rocks.png: 496×592, 31×37 tiles of 16px). Pools are
 // verified crops by luminance: light floor 53-80, shade 38-52, contact shadow
 // <30 printed right at each wall base, rock mass 25-42 with slightly lighter
-// "edge faces" 46-60 where a wall meets walkable floor, sparse floor "detail"
-// speckles 26-39, and the bright glow 124-157 for the destination pool.
+// "edge faces" 46-60 where a wall meets walkable floor, and sparse floor
+// "detail" speckles 26-39.
 const CATACOMBS_MS = 16;
 const CATACOMBS_MICRO_PER_CELL = LOGICAL_TILE / CATACOMBS_MS; // 4
 const CATACOMBS_FLOOR_LIGHT = [
@@ -106,20 +106,15 @@ const CATACOMBS_ROCK = [
 const CATACOMBS_ROCK_EDGE = [
     [80, 80], [112, 80], [144, 80], [240, 80], [352, 80], [416, 80],
 ];
-const CATACOMBS_GLOW = [
-    [64, 368], [80, 368], [96, 368],
-];
 const CATACOMBS_DETAIL = [
     [80, 32], [128, 32], [176, 32], [192, 32], [208, 32], [256, 32],
 ];
-const CATACOMBS_WALKABLE = new Set(['.', 'G']);
-// Some Ground_rocks crops carry transparent pixels (the glow overlay especially).
-// Every pool is baked ONCE into an opaque atlas composited over a base tone so
-// the base CanvasPattern never bleeds through the terrain: rock masses get the
-// deep rock brown, the destination pool gets a hot ember base (which the
-// translucent glow crops then tint), keeping a vivid glowing basin.
+const CATACOMBS_WALKABLE = new Set(['.']);
+// Some Ground_rocks crops carry transparent pixels. Every pool is baked ONCE
+// into an opaque atlas composited over a solid base tone so the repeating base
+// CanvasPattern never bleeds through the terrain — rock masses get the deep
+// rock brown, floor pools the same base — keeping every cell fully opaque.
 const CATACOMBS_BASE_ROCK = [32, 12, 9];
-const CATACOMBS_BASE_EMBER = [200, 96, 52];
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -460,8 +455,7 @@ export class MapRenderer {
     //     contact tile at the exact wall base, DARK inner corners where two
     //     walls meet, and sparse detail speckles away from walls;
     //   • rock cells get a slightly lighter "edge face" band (ragged 1..2)
-    //     wherever they touch a floor, plain mass away from faces;
-    //   • `G` cells draw the bright glow pool.
+    //     wherever they touch a floor, plain mass away from faces.
     // While the ground image is loading/failed this does nothing (the base
     // pattern/legacy floor beneath already covers the whole view).
     _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
@@ -489,7 +483,6 @@ export class MapRenderer {
             dark: this._catacombsAtlas(CATACOMBS_FLOOR_DARK, CATACOMBS_BASE_ROCK),
             rock: this._catacombsAtlas(CATACOMBS_ROCK, CATACOMBS_BASE_ROCK),
             edge: this._catacombsAtlas(CATACOMBS_ROCK_EDGE, CATACOMBS_BASE_ROCK),
-            glow: this._catacombsAtlas(CATACOMBS_GLOW, CATACOMBS_BASE_EMBER),
             detail: this._catacombsAtlas(CATACOMBS_DETAIL, CATACOMBS_BASE_ROCK),
         };
         const drawAt = (atlas, k, px, py) => {
@@ -517,11 +510,7 @@ export class MapRenderer {
                         const px = baseX + mc * m;
                         const py = baseY + mr * m;
                         const h = hash(c * 17 + mc * 5, r * 13 + mr * 7);
-                        if (ch === 'G') {
-                            // Destination pool: subtle ripple by sweeping the
-                            // glow-tile order with time (cohesive across the pool).
-                            drawAt(A.glow, (h + this.time * 0.5) % 1, px, py);
-                        } else if (ch === '.') {
+                        if (ch === '.') {
                             // Ragged shade-band depth toward each rock neighbor.
                             const dN = nRock ? 1 + Math.floor(hash(c * 3 + mc, r * 2) * 2) : 0;
                             const dS = sRock ? 1 + Math.floor(hash(c * 7 + mc, r * 4) * 2) : 0;

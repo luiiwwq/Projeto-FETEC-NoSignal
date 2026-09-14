@@ -230,91 +230,51 @@ const undeadSprite = (file) => `${UNDEAD_OBJECTS_DIR}${file}`;
 // Root PNG/ files (Ground_rocks floor, water animation frames, ...).
 const undeadPng = (file) => `UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/${file}`;
 
-/* ─────────────── Catacumbas: layout em grade ───────────────
- * Mask authored as per-column walkable bands (first floor row CAT_TOP_FLOOR[c]
- * to last floor row CAT_LAST_FLOOR[c]) plus a few carved wall niches and a 'G'
- * destination basin. `.` and `G` are walkable floor (G = glowing pool under the
- * destination); `#` is solid rock. Wall depths vary per column on purpose — no
- * straight frames — the arena is an organic clearing, and the right side is a
- * dense finale hall. Rendering, collisions and decorations all derive from this
- * same mask (one source of truth, deterministic every run). */
+/* ─────────────── Catacumbas: máscara de terreno ───────────────
+ * Ground truth do mapa: grade única 44×22 de células de 64px (2816×1408, 2:1).
+ * Símbolos exclusivos: `.` = chão caminhável, `#` = rocha sólida. Um único
+ * componente navegável liga boca oeste → corredor oeste → arena central →
+ * gargalo leste → salão final. As paredes externas são massas contínuas de
+ * `#` (norte e sul inteiros, leste selado); a única abertura na borda é o
+ * ponto de entrada/saída a oeste. Não há nichos, bolsões, aberturas falsas
+ * nem células de chão isoladas dentro da rocha. Renderização, colisões e
+ * decoração derivam desta mesma máscara (fonte única, determinística). */
 
 const chi = (x, y) => {
     const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
     return s - Math.floor(s);
 };
 
-// First walkable row per column (44 cols = 2816px). Entry (0-5), west corridor
-// (6-15), arena west mouth (16-17, re-entrant), arena clearing (18-28), arena
-// east mouth (29), throat (30-33), step (34), finale hall (35-43).
-const CAT_TOP_FLOOR = [
-    10, 10, 10, 10, 10, 10, // 0-5  entry band
-    9, 9, 9, 9, 9, //       6-10  west corridor
-    8, 8, 8, 8, 8, //       11-15 corridor incline
-    10, 7, //               16-17 arena west mouth (pillar)
-    6, 6, 5, 6, 6, 5, 6, 5, 6, 6, 6, // 18-28 arena clearing (varied ceiling recesses)
-    7, //                   29 arena east mouth
-    10, 10, 10, 10, //      30-33 throat (min 256px wide)
-    8, //                   34 throat→finale step
-    7, 7, 7, 7, 7, 7, 7, // 35-41 finale hall
-    8, 8, //                42-43 finale east nook
+// 22 linhas × 44 colunas. Regiões (aprox.): boca oeste c0-1 r10-14; entrada
+// c2-5 r9-14; corredor oeste c6-15 (r7-16); arena c15-30 (interior livre
+// c17-28 r8-15); gargalo leste c30-33 (r9-15); salão final c34-42 (r6-17).
+export const catacombsLayout = [
+    '############################################', // 00 topo
+    '############################################', // 01
+    '############################################', // 02
+    '############################################', // 03
+    '############################################', // 04
+    '##################.........#################', // 05 teto da arena
+    '################.............#########..####', // 06
+    '###############...............######......##', // 07
+    '###########....................####........#', // 08
+    '##.........................................#', // 09 corredor
+    '...........................................#', // 10 entrada/corredor
+    '...........................................#', // 11
+    '...........................................#', // 12
+    '...........................................#', // 13
+    '...........................................#', // 14
+    '######.....................................#', // 15
+    '#############..................###.........#', // 16 fim da arena
+    '#################...........########......##', // 17
+    '############################################', // 18 base
+    '############################################', // 19
+    '############################################', // 20
+    '############################################', // 21 base
 ];
-// Last walkable row per column.
-const CAT_LAST_FLOOR = [
-    14, 14, 14, 14, 14, 14, // entry
-    14, 14, 14, 14, 14, //   corridor
-    15, 15, 15, 16, 14, //   corridor approach (step up)
-    15, 16, //              arena west mouth
-    16, 16, 17, 17, 16, 16, 17, 17, 16, 16, 16, // arena clearing (varied → uneven bottom)
-    16, //                  arena east mouth
-    14, 14, 14, 14, //      throat
-    15, //                  step
-    16, 17, 17, 16, 17, 17, 16, // finale hall (varied bottom)
-    16, 16, //              finale nook
-];
-// Extra reachable pockets carved into the walls (irregular silhouette).
-const CAT_NICHES = [
-    [18, 5], [19, 5], // arena ceiling pockets
-    [38, 6], [39, 6], // finale ceiling pockets
-    [11, 7], [12, 7], // corridor ceiling pocket
-    [30, 9], [31, 9], // false opening above the throat
-    [0, 15], // entry floor pocket
-    [15, 15], // approach step pocket
-    [43, 7], // upper-right nook
-    [21, 18], [25, 18], // arena floor pockets
-    [33, 15], // throat step pocket down
-];
-// Glowing destination basin under the finale portal (4 wide × 5 tall cells).
-const CAT_GLOW_CELLS = [
-    [39, 11], [40, 11], [41, 11], [42, 11], [39, 12], [40, 12], [41, 12], [42, 12],
-    [39, 13], [40, 13], [41, 13], [42, 13], [39, 14], [40, 14], [41, 14], [42, 14],
-    [39, 15], [40, 15], [41, 15], [42, 15],
-];
-
-function buildCatacombsLayout() {
-    const glow = new Set(CAT_GLOW_CELLS.map(([c, r]) => `${c},${r}`));
-    const niches = new Set(CAT_NICHES.map(([c, r]) => `${c},${r}`));
-    const rows = [];
-    for (let r = 0; r < 22; r++) {
-        let row = '';
-        for (let c = 0; c < 44; c++) {
-            const isFloor = (r >= CAT_TOP_FLOOR[c] && r <= CAT_LAST_FLOOR[c]) || niches.has(`${c},${r}`);
-            if (!isFloor) {
-                row += '#';
-            } else if (glow.has(`${c},${r}`)) {
-                row += 'G';
-            } else {
-                row += '.';
-            }
-        }
-        rows.push(row);
-    }
-    return rows;
-}
-export const catacombsLayout = buildCatacombsLayout();
 
 // Walkable cells (everything that is not solid rock).
-const CATACOMBS_WALKABLE = new Set(['.', 'G']);
+const CATACOMBS_WALKABLE = new Set(['.']);
 
 // Merged solid AABBs (one per contiguous rock run per row, 64px tall) — feeds
 // collisionSystem unchanged (kind 'undead-rock', no sprite: collision only).
@@ -340,10 +300,11 @@ export function catacombsRockRects(layout, tile) {
 
 // Seeded decor for the catacombs — region-based composition groups read off the
 // same mask: wall clusters (2..5 props walking the boundary), grave/bone bands
-// along the long horizontal walls, thorn pockets inside carved niches, curated
-// ruins at the transitions and skull piles around the finale. Every prop is
-// tagged with a layer ('back' drawn right after the terrain, 'front' after the
-// structures) and is kept off the reserved arena clearing + spawn plaza.
+// along the long horizontal walls, curated ruins at the transitions and skull
+// piles around the finale. Props spawn ONLY on rock cells at the wall mass.
+// Every prop is tagged with a layer ('back' drawn right after the terrain,
+// 'front' after the structures) and is kept off the reserved arena clearing +
+// spawn plaza.
 const CAT_CO_ROCKS = [
     'Rock_shadow1_1.png', 'Rock_shadow1_2.png', 'Rock_shadow1_3.png', 'Rock_shadow1_4.png', 'Rock_shadow1_5.png',
     'Rock_shadow2_1.png', 'Rock_shadow2_2.png', 'Rock_shadow2_3.png', 'Rock_shadow2_4.png', 'Rock_shadow2_5.png',
@@ -363,7 +324,6 @@ const CAT_CO_CRYSTALS = ['Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crys
 const CAT_CO_RUINS = [
     'Ruin_shadow1_2.png', 'Ruin_shadow1_4.png', 'Ruin_shadow1_5.png', 'Ruin_shadow2_1.png', 'Ruin_shadow3_2.png',
 ];
-const CAT_CO_THORNS = ['Thorn_plant_shadow1_3.png', 'Thorn_plant_shadow2_2.png', 'Thorn_plant_shadow3_4.png'];
 const CAT_CO_PLANTS = ['Plant_shadow1_1.png', 'Plant_shadow1_4.png', 'Plant_shadow3_2.png'];
 
 // Combat arena zone: rough box around the whole clearing (incl. mouth bulges).
@@ -447,17 +407,9 @@ export function catacombsDecor(layout, tile) {
         add(x, y, poolPick(pool, chi(c * 3, r * 5)), 'front', tile + 24);
     }
 
-    // ── 3) Thorn pockets INSIDE the carved wall niches.
-    for (const [c, r] of CAT_NICHES) {
-        if (!floorAt(r, c)) continue;
-        if (c <= 8 && r >= 10) continue; // keep the entry plaza calm
-        if (chi(c * 3, r * 5) < 0.6) continue;
-        add(c * tile + tile * 0.1, r * tile + tile * 0.4, poolPick(CAT_CO_THORNS, chi(c, r)), 'front', tile - 16);
-    }
-
-    // ── 4) Curated ruin transitions + skull piles around the finale door.
+    // ── 3) Curated ruin transitions + skull piles around the finale door.
     const ruinSpots = [
-        [15, 7, 'Ruin_shadow1_4.png'], // north of the re-entrant pillar
+        [15, 6, 'Ruin_shadow1_4.png'], // lintel of the arena west mouth
         [30, 5, 'Ruin_shadow2_3.png'], // above the throat
         [9, 6, 'Ruin_shadow1_2.png'], // corridor lintel
         [33, 4, 'Ruin_shadow3_2.png'], // hall top approach
@@ -469,23 +421,23 @@ export function catacombsDecor(layout, tile) {
         add(c * tile + tile * 0.1, r * tile, s, 'front', tile * 1.5);
     }
     const skullSpots = [
-        [39, 2], [42, 3], [43, 18],
+        [39, 2], [42, 3], [33, 3],
     ];
     for (const [c, r] of skullSpots) {
         if (!rockAt(r, c)) continue;
         add(c * tile + tile * 0.3, r * tile + tile * 0.2, poolPick(CAT_CO_SKULLS, chi(c, r)), 'front', tile);
     }
 
-    // ── 5) Crystal accents on rock near the glow basin and the arena bulges.
+    // ── 4) Crystal accents on rock near the finale door and the arena bulges.
     const crystalSpots = [
-        [40, 5], [42, 5], [43, 18], [18, 4], [29, 18], [30, 6],
+        [40, 5], [42, 5], [42, 18], [18, 4], [29, 18], [30, 6],
     ];
     for (const [c, r] of crystalSpots) {
         if (!rockAt(r, c)) continue;
         add(c * tile + tile * 0.3, r * tile, poolPick(CAT_CO_CRYSTALS, chi(c, r)), 'front', tile * 0.8);
     }
 
-    // ── 6) Lich spirits (decor only, no AI), deep inside rock off the route.
+    // ── 5) Lich spirits (decor only, no AI), deep inside rock off the route.
     const lichSpots = [[9, 3], [34, 3]];
     for (let i = 0; i < lichSpots.length; i++) {
         const [c, r] = lichSpots[i];
@@ -624,21 +576,20 @@ export const marsCatacombsMap = {
     ],
     structures: [],
     // Seeded wall-hugging decor (bones/graves/skulls/rock chips/crystals) +
-    // curated "destination" props for the threatening finale room.
+    // curated "destination" props for the dry finale room (all on rock cells).
     decorations: [
         ...catacombsDecor(catacombsLayout, TILE),
-        // Destination element — scull door embedded in the finale's north wall,
-        // straight above the glowing basin (G cells) and the slow water.
+        // Destination element — scull door embedded in the finale's north wall
+        // (rock at c40 row 6). Floor stays normal and dry beneath it.
         { x: 2592, y: 384, sprite: undeadSprite('Scull_door_shadow1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2464, y: 960, frames: [undeadPng('water_detilazation.png'), undeadPng('water_detilazation_v2.png')], kind: 'undead-decor-anim', interval: 0.45, scale: 0.37 },
-        { x: 2432, y: 1056, sprite: undeadSprite('Pile_sculls_shadow2.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2720, y: 1056, sprite: undeadSprite('Pile_sculls_shadow3.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2784, y: 384, sprite: undeadSprite('Ruin_shadow2_3.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2432, y: 1152, sprite: undeadSprite('Pile_sculls_shadow2.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2688, y: 1152, sprite: undeadSprite('Pile_sculls_shadow3.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2624, y: 320, sprite: undeadSprite('Ruin_shadow2_3.png'), kind: 'undead-decor', layer: 'front' },
         { x: 2208, y: 384, sprite: undeadSprite('Ruin_shadow1_5.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2448, y: 1024, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2688, y: 928, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2336, y: 576, sprite: undeadSprite('Crystal_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2688, y: 576, sprite: undeadSprite('Crystal_shadow1_3.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2370, y: 1150, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2620, y: 1150, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2304, y: 320, sprite: undeadSprite('Crystal_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
+        { x: 2496, y: 320, sprite: undeadSprite('Crystal_shadow1_3.png'), kind: 'undead-decor', layer: 'front' },
         { x: 2304, y: 1184, sprite: undeadSprite('Dead_tree_shadow3_2.png'), kind: 'undead-decor', layer: 'front' },
         { x: 2528, y: 1248, sprite: undeadSprite('Dead_tree_shadow3_3.png'), kind: 'undead-decor', layer: 'front' },
     ],
