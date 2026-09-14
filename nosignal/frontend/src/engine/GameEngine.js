@@ -12,6 +12,7 @@ import { MAPS, MAP_IDS } from '../content/maps.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
+import { loadSettings } from '../state/stateStorage.js';
 
 const MAP_LABELS = {
     [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE MARTE',
@@ -130,6 +131,9 @@ export class GameEngine {
         this.ctx = this.canvas.getContext('2d');
         this.ctx.imageSmoothingEnabled = false;
 
+        // Aplica configurações persistidas (ex.: brilho ajustado na tela inicial)
+        this._applyStoredSettings();
+
         // Initialize Player with state name
         const astronautName = gameState.playerName || 'ARES-1';
         this.player = new Player(0, 0, astronautName);
@@ -229,6 +233,20 @@ export class GameEngine {
 
         this.canvas.style.width = `${Math.floor(renderW)}px`;
         this.canvas.style.height = `${Math.floor(renderH)}px`;
+    }
+
+    /**
+     * Aplica as configurações persistidas (tela inicial/pausa) ao game loop.
+     * O brilho ajusta o canvas; os volumes de áudio ficam disponíveis em
+     * loadSettings() para quando o sistema de som for implementado.
+     */
+    _applyStoredSettings() {
+        const settings = loadSettings();
+        if (this.canvas) {
+            this.canvas.style.filter = settings.brightness < 100
+                ? `brightness(${(settings.brightness / 100).toFixed(2)})`
+                : '';
+        }
     }
 
     _handleKeyDown(e) {

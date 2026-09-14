@@ -26,16 +26,16 @@ export function renderTitleScreen(container) {
 
                     <nav class="title-screen__menu" aria-label="Menu Principal">
                         <button type="button" id="btn-start" class="menu-btn is-selected" tabindex="0">
-                            NEW GAME
+                            NOVO JOGO
                         </button>
                         <button type="button" id="btn-load" class="menu-btn" tabindex="0">
-                            LOAD GAME
+                            CARREGAR JOGO
                         </button>
                         <button type="button" id="btn-options" class="menu-btn" tabindex="0">
-                            OPTIONS
+                            OPÇÕES
                         </button>
                         <button type="button" id="btn-credits" class="menu-btn" tabindex="0">
-                            CREDITS
+                            CRÉDITOS
                         </button>
                     </nav>
                 </div>
@@ -101,6 +101,10 @@ function setupKeyboardNavigation() {
     titleKeyHandler = (e) => {
         const wrapper = document.querySelector('.title-screen-wrapper');
         if (!wrapper) return;
+
+        // Overlays (opções/créditos) interceptam a navegação do menu
+        if (wrapper.querySelector('.credits-overlay, .title-options-overlay')) return;
+
         const currentButtons = Array.from(wrapper.querySelectorAll('.menu-btn'));
         if (currentButtons.length === 0) return;
 

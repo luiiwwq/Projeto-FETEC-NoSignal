@@ -1,5 +1,7 @@
 import { showToast } from './titleScreen.js';
 import { renderNameScreen } from './nameScreen.js';
+import { openOptionsScreen } from './optionsScreen.js';
+import { renderCreditsScreen } from './creditsScreen.js';
 
 export function initMainMenu() {
     const btnStart = document.getElementById('btn-start');
@@ -22,11 +24,17 @@ export function initMainMenu() {
 
     btnOptions?.addEventListener('click', () => {
         console.log('[Menu] Opções acionado.');
-        showToast('Painel de Opções em desenvolvimento.');
+        const appContainer = document.getElementById('app');
+        if (appContainer) {
+            openOptionsScreen(appContainer);
+        }
     });
 
     btnCredits?.addEventListener('click', () => {
         console.log('[Menu] Créditos acionado.');
-        showToast('No Signal - Protótipo Sci-Fi v1.0.0');
+        const appContainer = document.getElementById('app');
+        if (appContainer) {
+            renderCreditsScreen(appContainer);
+        }
     });
 }

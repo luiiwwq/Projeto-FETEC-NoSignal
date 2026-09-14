@@ -10,12 +10,15 @@
 
 import { showToast } from './titleScreen.js';
 import { gameState } from '../state/gameState.js';
+import { createOptionsContent, syncOptionsUI } from './optionsView.js';
 
 let menuElement = null;
 let isOpen = false;
 let mainMenuArmed = false;
 let containerRef = null;
 let engineRef = null;
+
+let optionsOpen = false;
 
 /**
  * Build and show the pause menu inside `container`.
@@ -41,7 +44,9 @@ export function openPauseMenu(container, engine) {
     menuElement.hidden = false;
     isOpen = true;
     mainMenuArmed = false;
+    optionsOpen = false;
     _updateMainMenuButton(false);
+    _showOptionsView(false);
 
     const firstBtn = menuElement.querySelector('button[data-action="options"]');
     if (firstBtn) setTimeout(() => firstBtn.focus(), 60);
@@ -54,6 +59,7 @@ export function closePauseMenu() {
     menuElement.hidden = true;
     isOpen = false;
     mainMenuArmed = false;
+    optionsOpen = false;
 }
 
 export function isPauseMenuOpen() {
@@ -66,6 +72,7 @@ export function destroyPauseMenu() {
     menuElement = null;
     isOpen = false;
     mainMenuArmed = false;
+    optionsOpen = false;
     containerRef = null;
     engineRef = null;
 }
@@ -87,10 +94,14 @@ function _buildDOM() {
                 <span class="pause-panel__icon">||</span>
             </div>
 
-            <div class="pause-panel__body">
-                <button type="button" data-action="options"   class="pause-panel__btn pause-panel__btn--primary">OPÇÕES</button>
-                <button type="button" data-action="main-menu" class="pause-panel__btn pause-panel__btn--secondary">VOLTAR AO MENU</button>
-                <button type="button" data-action="save"      class="pause-panel__btn pause-panel__btn--secondary">SALVAR</button>
+            <div class="pause-panel__stage">
+                <div class="pause-panel__body" data-pause-view="main">
+                    <button type="button" data-action="options"   class="pause-panel__btn">OPÇÕES</button>
+                    <button type="button" data-action="main-menu" class="pause-panel__btn">VOLTAR AO MENU</button>
+                    <button type="button" data-action="save"      class="pause-panel__btn">SALVAR</button>
+                </div>
+
+                <div class="pause-panel__options-layer" data-pause-view="options" hidden></div>
             </div>
 
             <div class="pause-panel__footer">
@@ -118,6 +129,11 @@ function _bindEvents() {
 
         const action = btn.dataset.action;
 
+        if (action === 'options') {
+            _showOptionsView(true);
+            return;
+        }
+
         if (action === 'main-menu') {
             if (mainMenuArmed) {
                 _returnToMainMenu();
@@ -132,10 +148,7 @@ function _bindEvents() {
         mainMenuArmed = false;
         _updateMainMenuButton(false);
 
-        if (action === 'options') {
-            showToast('Painel de Opções em desenvolvimento.');
-            closePauseMenu();
-        } else if (action === 'save') {
+        if (action === 'save') {
             showToast('Sistema de salvamento ainda não disponível.');
             closePauseMenu();
         }
@@ -143,8 +156,19 @@ function _bindEvents() {
 
     // Tab focus trap while the dialog is open
     menuElement.addEventListener('keydown', (e) => {
+        // ESC volta da tela de opções para o menu; fora dela o engine fecha o pause
+        if (e.key === 'Escape' && optionsOpen) {
+            e.preventDefault();
+            e.stopPropagation();
+            _showOptionsView(false);
+            return;
+        }
+
         if (e.key !== 'Tab') return;
-        const focusable = menuElement.querySelectorAll('button:not([disabled])');
+        const view = optionsOpen ? 'options' : 'main';
+        const focusable = Array.from(
+            menuElement.querySelectorAll(`[data-pause-view="${view}"] button:not([disabled]), [data-pause-view="${view}"] .opt-item__slider`)
+        ).filter((el) => el.offsetParent !== null);
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last  = focusable[focusable.length - 1];
@@ -156,6 +180,47 @@ function _bindEvents() {
             first.focus();
         }
     });
+}
+
+/* ── Options view (camada sobre os botões) ───────────────── */
+function _buildOptionsOnce(optsLayer) {
+    if (!optsLayer || optsLayer.querySelector('.opt-item__slider')) return;
+
+    const title = document.createElement('p');
+    title.className = 'pause-panel__options-title';
+    title.textContent = 'OPÇÕES';
+    optsLayer.appendChild(title);
+
+    const wrap = createOptionsContent({
+        onBack: () => _showOptionsView(false),
+        containerRef,
+    });
+    optsLayer.appendChild(wrap);
+}
+
+function _showOptionsView(open) {
+    optionsOpen = open;
+
+    const panel = menuElement.querySelector('.pause-panel');
+    const main = menuElement.querySelector('[data-pause-view="main"]');
+    const opts = menuElement.querySelector('[data-pause-view="options"]');
+
+    if (main) {
+        main.inert = open;
+        main.querySelectorAll('button').forEach((btn) => { btn.tabIndex = open ? -1 : 0; });
+    }
+    if (panel) panel.classList.toggle('pause-panel--options-open', open);
+    if (opts) opts.hidden = !open;
+
+    if (open) {
+        _buildOptionsOnce(opts);
+        syncOptionsUI(opts, containerRef);
+    }
+
+    const target = open
+        ? opts && opts.querySelector('.opt-item__slider')
+        : main && main.querySelector('button[data-action="options"]');
+    if (target) setTimeout(() => target.focus(), 60);
 }
 
 /* ── Actions ─────────────────────────────────────────────── */
@@ -171,6 +236,7 @@ function _returnToMainMenu() {
     }
     isOpen = false;
     mainMenuArmed = false;
+    optionsOpen = false;
     engineRef = null;
     containerRef = null;
 
