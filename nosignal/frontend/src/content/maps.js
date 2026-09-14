@@ -311,20 +311,46 @@ const CAT_CO_ROCKS = [
     'Rock_shadow3_1.png', 'Rock_shadow3_2.png', 'Rock_shadow3_3.png', 'Rock_shadow3_4.png', 'Rock_shadow3_5.png',
 ];
 const CAT_CO_BONES = [
+    // Every Bones_shadow* crop present in the tileset (families 1..3, all
+    // variants) so the wall bands stay varied instead of repeating 4.
     'Bones_shadow1_1.png', 'Bones_shadow1_2.png', 'Bones_shadow1_3.png', 'Bones_shadow1_4.png',
+    'Bones_shadow1_5.png', 'Bones_shadow1_6.png', 'Bones_shadow1_7.png', 'Bones_shadow1_8.png',
+    'Bones_shadow1_9.png', 'Bones_shadow1_10.png', 'Bones_shadow1_11.png', 'Bones_shadow1_12.png',
+    'Bones_shadow1_13.png', 'Bones_shadow1_14.png', 'Bones_shadow1_15.png', 'Bones_shadow1_16.png',
+    'Bones_shadow1_17.png', 'Bones_shadow1_18.png',
     'Bones_shadow2_1.png', 'Bones_shadow2_2.png', 'Bones_shadow2_3.png', 'Bones_shadow2_4.png',
+    'Bones_shadow2_5.png', 'Bones_shadow2_6.png', 'Bones_shadow2_7.png', 'Bones_shadow2_8.png',
+    'Bones_shadow2_9.png', 'Bones_shadow2_10.png', 'Bones_shadow2_11.png', 'Bones_shadow2_12.png',
+    'Bones_shadow2_13.png', 'Bones_shadow2_15.png', 'Bones_shadow2_16.png', 'Bones_shadow2_17.png',
+    'Bones_shadow2_18.png',
     'Bones_shadow3_1.png', 'Bones_shadow3_2.png', 'Bones_shadow3_3.png', 'Bones_shadow3_4.png',
+    'Bones_shadow3_5.png', 'Bones_shadow3_6.png', 'Bones_shadow3_7.png', 'Bones_shadow3_8.png',
+    'Bones_shadow3_9.png', 'Bones_shadow3_10.png', 'Bones_shadow3_11.png', 'Bones_shadow3_12.png',
+    'Bones_shadow3_13.png', 'Bones_shadow3_14.png', 'Bones_shadow3_15.png', 'Bones_shadow3_16.png',
+    'Bones_shadow3_17.png', 'Bones_shadow3_18.png',
 ];
 const CAT_CO_GRAVES = [
     'Grave_shadow1_1.png', 'Grave_shadow1_2.png', 'Grave_shadow1_3.png', 'Grave_shadow1_4.png',
     'Grave_shadow2_1.png', 'Grave_shadow2_2.png',
 ];
 const CAT_CO_SKULLS = ['Pile_sculls_shadow1.png', 'Pile_sculls_shadow2.png', 'Pile_sculls_shadow3.png'];
-const CAT_CO_CRYSTALS = ['Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow3_1.png'];
+const CAT_CO_CRYSTALS = [
+    'Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow1_3.png', 'Crystal_shadow1_4.png',
+    'Crystal_shadow2_1.png', 'Crystal_shadow2_2.png', 'Crystal_shadow2_3.png', 'Crystal_shadow2_4.png',
+    'Crystal_shadow3_1.png', 'Crystal_shadow3_2.png', 'Crystal_shadow3_3.png', 'Crystal_shadow3_4.png',
+];
 const CAT_CO_RUINS = [
     'Ruin_shadow1_2.png', 'Ruin_shadow1_4.png', 'Ruin_shadow1_5.png', 'Ruin_shadow2_1.png', 'Ruin_shadow3_2.png',
 ];
-const CAT_CO_PLANTS = ['Plant_shadow1_1.png', 'Plant_shadow1_4.png', 'Plant_shadow3_2.png'];
+const CAT_CO_PLANTS = [
+    'Plant_shadow1_1.png', 'Plant_shadow1_2.png', 'Plant_shadow1_3.png', 'Plant_shadow1_4.png', 'Plant_shadow1_5.png',
+    'Plant__shadow2_1.png', 'Plant__shadow2_2.png', 'Plant__shadow2_3.png', 'Plant__shadow2_4.png', 'Plant__shadow2_5.png',
+    'Plant_shadow3_1.png', 'Plant_shadow3_2.png', 'Plant_shadow3_3.png', 'Plant_shadow3_4.png', 'Plant_shadow3_5.png',
+];
+const CAT_CO_THORNS = [
+    'Thorn_plant_shadow1_1.png', 'Thorn_plant_shadow1_2.png', 'Thorn_plant_shadow1_3.png',
+    'Thorn_plant_shadow3_1.png', 'Thorn_plant_shadow3_2.png',
+];
 
 // Combat arena zone: rough box around the whole clearing (incl. mouth bulges).
 export const catacombsArenaRect = { x: 15 * TILE, y: 6 * TILE, w: 16 * TILE, h: 12 * TILE };
@@ -366,7 +392,7 @@ export function catacombsDecor(layout, tile) {
             const cellKey = `${r},${c}`;
             if (walk.has(layout[r][c]) || cellUsed.has(cellKey)) continue;
             if (!touchesFloor(r, c)) continue;
-            if (chi(c * 7 + 11, r * 13 + 5) > 0.34) continue;
+            if (chi(c * 7 + 11, r * 13 + 5) > 0.18) continue;
             let cr = r;
             let cc = c;
             const gLen = 2 + Math.floor(chi(c * 3, r * 9) * 4); // 2..5
@@ -377,7 +403,7 @@ export function catacombsDecor(layout, tile) {
                 const x = cc * tile + chi(cr, cc * 7) * tile * 0.6;
                 const y = cr * tile + chi(cc * 3, cr * 11) * tile * 0.6;
                 const kind = chi(cc * 13 + 3, cr * 7 + 5);
-                const pool = kind < 0.62 ? CAT_CO_ROCKS : kind < 0.85 ? CAT_CO_BONES : CAT_CO_PLANTS;
+                const pool = kind < 0.75 ? CAT_CO_ROCKS : kind < 0.9 ? CAT_CO_BONES : CAT_CO_PLANTS;
                 add(x, y, poolPick(pool, chi(cc, cr)), 'back', i === 0 ? tile : tile - 16);
                 if (chi(cc + 5, cr + 5) < 0.55) cc += 1;
                 else cr += 1;
@@ -399,7 +425,7 @@ export function catacombsDecor(layout, tile) {
     for (const [r, c] of bandSeeds) {
         const k = `${r},${c}`;
         if (cellUsed.has(k)) continue;
-        if (chi(c * 5 + 1, r * 9 + 3) > 0.5) continue;
+            if (chi(c * 5 + 1, r * 9 + 3) > 0.34) continue;
         cellUsed.add(k);
         const x = c * tile + chi(c, r) * tile * 0.5;
         const y = r * tile + chi(r, c) * tile * 0.3;
