@@ -230,6 +230,174 @@ const undeadSprite = (file) => `${UNDEAD_OBJECTS_DIR}${file}`;
 // Root PNG/ files (Ground_rocks floor, water animation frames, ...).
 const undeadPng = (file) => `UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/${file}`;
 
+/* ─────────────── Catacumbas: layout em grade ───────────────
+ * The catacombs map is authored as a 22×44 walkability mask (one cell = 64px,
+ * LOGICAL_TILE). `.` and `G` are walkable floor (G = glowing floor shown under
+ * the destination prop); `#` is solid rock. Rendering derives the real-tile
+ * floor/rock crops from this same mask (MapRenderer), collisions derive the
+ * merged AABBs from it too, and decorations are seeded from the same grid —
+ * one source of truth, deterministic every run. */
+
+const chi = (x, y) => {
+    const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return s - Math.floor(s);
+};
+const rockRow = (n) => '#'.repeat(n);
+const flatRow = (n) => '.'.repeat(n);
+
+// 0-4: top rock mass (+ arena wall row) · 5-16: arena/route/finale · 17-21: bottom rock mass.
+export const catacombsLayout = [
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+    rockRow(15) + flatRow(14) + rockRow(15), // arena top row
+    rockRow(15) + flatRow(14) + rockRow(4) + flatRow(10) + rockRow(1), // finale rows
+    rockRow(15) + flatRow(14) + rockRow(4) + flatRow(10) + rockRow(1),
+    rockRow(15) + flatRow(14) + rockRow(4) + flatRow(10) + rockRow(1),
+    rockRow(4) + flatRow(25) + rockRow(3) + flatRow(11) + rockRow(1), // west gate + passage lintel
+    flatRow(37) + 'GG' + flatRow(4) + rockRow(1), // entrance row
+    flatRow(30) + rockRow(1) + flatRow(6) + 'GG' + flatRow(4) + rockRow(1), // passage pillar + glow
+    flatRow(37) + 'GG' + flatRow(4) + rockRow(1),
+    flatRow(2) + rockRow(1) + flatRow(40) + rockRow(1), // entrance tooth
+    rockRow(7) + flatRow(36) + rockRow(1), // entrance floor lowered
+    rockRow(15) + flatRow(14) + rockRow(4) + flatRow(10) + rockRow(1), // arena bottom + finale
+    rockRow(15) + flatRow(14) + rockRow(15), // arena bottom row
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+    rockRow(44),
+];
+
+// Walkable cells (everything that is not solid rock).
+const CATACOMBS_WALKABLE = new Set(['.', 'G']);
+
+// Merged solid AABBs (one per contiguous rock run per row, 64px tall) — feeds
+// collisionSystem unchanged (kind 'undead-rock', no sprite: collision only).
+export function catacombsRockRects(layout, tile) {
+    const rects = [];
+    const rows = layout.length;
+    const cols = layout[0].length;
+    for (let r = 0; r < rows; r++) {
+        let c = 0;
+        while (c < cols) {
+            if (CATACOMBS_WALKABLE.has(layout[r][c])) {
+                c++;
+                continue;
+            }
+            let c2 = c;
+            while (c2 < cols && !CATACOMBS_WALKABLE.has(layout[r][c2])) c2++;
+            rects.push({ x: c * tile, y: r * tile, w: (c2 - c) * tile, h: tile, kind: 'undead-rock' });
+            c = c2;
+        }
+    }
+    return rects;
+}
+
+// Seeded decor for the catacombs: wall chips (rock props), bones, graves, skull
+// piles and crystals hugging every rock/floor boundary (never inside the arena
+// rect), plus glowing/secondary ambience along the outer walls. Deterministic.
+const CAT_CO_ROCKS = [
+    'Rock_shadow1_1.png', 'Rock_shadow1_2.png', 'Rock_shadow1_3.png', 'Rock_shadow1_4.png', 'Rock_shadow1_5.png',
+    'Rock_shadow2_1.png', 'Rock_shadow2_2.png', 'Rock_shadow2_3.png', 'Rock_shadow2_4.png', 'Rock_shadow2_5.png',
+    'Rock_shadow3_1.png', 'Rock_shadow3_2.png', 'Rock_shadow3_3.png', 'Rock_shadow3_4.png', 'Rock_shadow3_5.png',
+];
+const CAT_CO_BONES = [
+    'Bones_shadow1_1.png', 'Bones_shadow1_2.png', 'Bones_shadow1_3.png', 'Bones_shadow1_4.png',
+    'Bones_shadow2_1.png', 'Bones_shadow2_2.png', 'Bones_shadow2_3.png', 'Bones_shadow2_4.png',
+    'Bones_shadow3_1.png', 'Bones_shadow3_2.png', 'Bones_shadow3_3.png', 'Bones_shadow3_4.png',
+];
+const CAT_CO_GRAVES = ['Grave_shadow1_1.png', 'Grave_shadow1_2.png', 'Grave_shadow1_3.png', 'Grave_shadow2_1.png'];
+const CAT_CO_SKULLS = ['Pile_sculls_shadow1.png', 'Pile_sculls_shadow2.png', 'Pile_sculls_shadow3.png'];
+const CAT_CO_CRYSTALS = ['Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow3_1.png'];
+
+export const catacombsArenaRect = { x: 15 * TILE, y: 5 * TILE, w: 14 * TILE, h: 12 * TILE };
+
+export function catacombsDecor(layout, tile) {
+    const dec = [];
+    const rows = layout.length;
+    const cols = layout[0].length;
+    const arena = catacombsArenaRect;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            if (CATACOMBS_WALKABLE.has(layout[r][c])) continue;
+            // Only rock cells that touch a walkable cell get decor.
+            const neighbors =
+                (c > 0 && CATACOMBS_WALKABLE.has(layout[r][c - 1])) ||
+                (c < cols - 1 && CATACOMBS_WALKABLE.has(layout[r][c + 1])) ||
+                (r > 0 && CATACOMBS_WALKABLE.has(layout[r - 1][c])) ||
+                (r < rows - 1 && CATACOMBS_WALKABLE.has(layout[r + 1][c]));
+            if (!neighbors) continue;
+            const x = c * tile;
+            const y = r * tile;
+            const h = chi(c * 7 + 11, r * 13 + 5);
+            // Props must stay fully clear of the reserved arena (with their own
+            // size margin) — the arena interior is kept 100% free.
+            const clearOf = (px, py, size) =>
+                px + size <= arena.x || px >= arena.x + arena.w || py + size <= arena.y || py >= arena.y + arena.h;
+            if (h < 0.34) {
+                const off = chi(c, r) < 0.5 ? 0 : tile / 4;
+                let cy = Math.round(y + (chi(r, c) < 0.3 ? tile / 4 : 0));
+                // Wall chips flanking the arena must end exactly at its edge
+                // (top/bottom walls) so nothing hangs inside the free zone.
+                if (x + tile > arena.x && x < arena.x + arena.w) {
+                    if (cy < arena.y && cy + tile > arena.y) cy = arena.y - tile;
+                    else if (cy < arena.y + arena.h && cy + tile > arena.y + arena.h) cy = arena.y + arena.h;
+                }
+                dec.push({
+                    x: Math.round(x + off),
+                    y: cy,
+                    sprite: undeadSprite(CAT_CO_ROCKS[Math.floor(chi(c + 3, r + 9) * CAT_CO_ROCKS.length)]),
+                    kind: 'undead-decor',
+                });
+            } else if (h < 0.52) {
+                const bx = Math.round(x + chi(c * 3, r * 5) * tile - tile / 4);
+                const by = Math.round(y + chi(r * 3, c * 5) * tile - tile / 4);
+                if (clearOf(bx, by, tile + 32)) {
+                    dec.push({
+                        x: bx,
+                        y: by,
+                        sprite: undeadSprite(CAT_CO_BONES[Math.floor(chi(c * 11, r * 7) * CAT_CO_BONES.length)]),
+                        kind: 'undead-decor',
+                    });
+                }
+            } else if (h < 0.66) {
+                const gx = Math.round(x + chi(c * 5, r * 11) * tile - tile / 4);
+                const gy = Math.round(y + chi(r * 5, c * 11) * tile - tile / 4);
+                if (clearOf(gx, gy, tile + 32)) {
+                    dec.push({
+                        x: gx,
+                        y: gy,
+                        sprite: undeadSprite(CAT_CO_GRAVES[Math.floor(chi(c * 13, r * 3) * CAT_CO_GRAVES.length)]),
+                        kind: 'undead-decor',
+                    });
+                }
+            } else if (h < 0.72) {
+                const sx = Math.round(x + chi(c * 17, r * 3) * tile / 2);
+                const sy = Math.round(y + chi(r * 17, c * 3) * tile / 2);
+                if (clearOf(sx, sy, 2 * tile)) {
+                    dec.push({
+                        x: sx,
+                        y: sy,
+                        sprite: undeadSprite(CAT_CO_SKULLS[Math.floor(chi(c + 19, r + 11) * CAT_CO_SKULLS.length)]),
+                        kind: 'undead-decor',
+                    });
+                }
+            } else if (h < 0.8) {
+                dec.push({
+                    x: Math.round(x + chi(c * 2, r * 9)),
+                    y: Math.round(y + chi(r * 2, c * 9)),
+                    sprite: undeadSprite(CAT_CO_CRYSTALS[Math.floor(chi(c + 5, r + 5) * CAT_CO_CRYSTALS.length)]),
+                    kind: 'undead-decor',
+                });
+            }
+        }
+    }
+    return dec;
+}
+
 /* ─────────────── Núcleo de Marte ─────────────── */
 
 export const marsCoreMap = {
@@ -321,39 +489,29 @@ export const marsCoreMap = {
 export const marsCatacombsMap = {
     id: MAP_IDS.MARS_CATACOMBS,
     type: 'cave',
-    width: 2800,
-    height: 1800,
+    width: 44 * TILE, // 2816
+    height: 22 * TILE, // 1408 — exact 2:1, tile-aligned
     tileSize: TILE,
     dust: false,
-    spawn: { x: 200, y: 900 },
+    spawn: { x: 110, y: 752 },
     spawnPoints: {
-        'catacombs-entry': { x: 200, y: 900 },
+        'catacombs-entry': { x: 110, y: 752 },
     },
+    // Walkability mask shared by renderer/collisions (cells are 64px).
+    terrainMask: catacombsLayout,
     // Reserved open combat arena in the MIDDLE of the route, crossed on the
     // way in AND on the way back (corridor → arena → corridor). Kept 100% free
-    // (no obstacle, no decoration inside).
-    arenaCombatArea: { x: 1000, y: 500, w: 800, h: 800 },
+    // (no obstacle, no decoration inside) by both generation rules below.
+    arenaCombatArea: { ...catacombsArenaRect },
     obstacles: [
-        ...border4(2800, 1800, 140, 'cave-wall'),
-        // Corridor rocks (undead-rock, solid) framing both corridors to read
-        // as narrow passages — the central band always stays clear.
-        { x: 320, y: 680, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_1.png') },
-        { x: 320, y: 1140, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_1.png') },
-        { x: 560, y: 680, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_1.png') },
-        { x: 560, y: 1140, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_2.png') },
-        { x: 820, y: 700, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_2.png') },
-        { x: 820, y: 1120, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_3.png') },
-        { x: 2060, y: 680, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_1.png') },
-        { x: 2060, y: 1140, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_2.png') },
-        { x: 2300, y: 680, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_2.png') },
-        { x: 2300, y: 1140, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_1.png') },
-        { x: 2540, y: 700, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_1.png') },
-        { x: 2540, y: 1120, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_3.png') },
-        // Larger dead trees (solid, kind 'undead-rock'); one per corridor near
-        // the walls so the walkable lane and the combat arena stay free.
-        { x: 560, y: 300, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_1.png') },
-        { x: 600, y: 1460, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_2.png') },
-        { x: 2200, y: 1560, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow3_1.png') },
+        // Solid rock masses originate from the terrain mask (one AABB per
+        // contiguous rock run per row) — collision only (no sprite). Three big
+        // dead trees are planted fully inside the top/bottom rock mass so they
+        // add silhouette without touching any walkable path.
+        ...catacombsRockRects(catacombsLayout, TILE),
+        { x: 96, y: 192, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_1.png') },
+        { x: 2400, y: 160, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_2.png') },
+        { x: 1408, y: 1216, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow3_1.png') },
     ],
     exits: [
         {
@@ -361,136 +519,35 @@ export const marsCatacombsMap = {
             label: 'SAIR DAS CATACUMBAS',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'cave-return',
-            x: 300,
-            y: 900,
+            x: 288,
+            y: 800,
             radius: 62,
         },
     ],
-    decorations: [
-        // Dense bone/grave ambience along both corridors (no collision).
-        // West corridor — top band
-        { x: 210, y: 300, sprite: undeadSprite('Grave_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 260, y: 340, sprite: undeadSprite('Grave_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 320, y: 280, sprite: undeadSprite('Grave_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 430, y: 240, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 480, y: 300, sprite: undeadSprite('Bones_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 540, y: 250, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 630, y: 170, sprite: undeadSprite('Pile_sculls_shadow1.png'), kind: 'undead-decor' },
-        { x: 660, y: 290, sprite: undeadSprite('Ruin_shadow1_1.png'), kind: 'undead-decor' },
-        // West corridor — bottom band
-        { x: 440, y: 1560, sprite: undeadSprite('Bones_shadow3_1.png'), kind: 'undead-decor' },
-        { x: 500, y: 1600, sprite: undeadSprite('Bones_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 580, y: 1540, sprite: undeadSprite('Grave_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 700, y: 1450, sprite: undeadSprite('Pile_sculls_shadow2.png'), kind: 'undead-decor' },
-        { x: 770, y: 1400, sprite: undeadSprite('Ruin_shadow1_2.png'), kind: 'undead-decor' },
-        // East corridor — top band
-        { x: 1900, y: 320, sprite: undeadSprite('Grave_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 1960, y: 370, sprite: undeadSprite('Grave_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 2050, y: 250, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 2140, y: 190, sprite: undeadSprite('Pile_sculls_shadow3.png'), kind: 'undead-decor' },
-        // East corridor — bottom band
-        { x: 1920, y: 1560, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 1980, y: 1610, sprite: undeadSprite('Bones_shadow3_1.png'), kind: 'undead-decor' },
-        { x: 2080, y: 1550, sprite: undeadSprite('Grave_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 2180, y: 1450, sprite: undeadSprite('Pile_sculls_shadow1.png'), kind: 'undead-decor' },
-        { x: 2260, y: 1390, sprite: undeadSprite('Ruin_shadow1_2.png'), kind: 'undead-decor' },
-        // Arena periphery ONLY (hugs the rectangle edges, never inside it)
-        { x: 940, y: 470, sprite: undeadSprite('Grave_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 1820, y: 470, sprite: undeadSprite('Grave_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 940, y: 1310, sprite: undeadSprite('Pile_sculls_shadow3.png'), kind: 'undead-decor' },
-        // Lich spirits (decor only — NO enemy/AI logic, purely visual). Large
-        // 256px sprites, one per open corridor corner, outside the arena.
-        { x: 480, y: 180, sprite: undeadSprite('Lich_shadow1.png'), kind: 'undead-decor' },
-        { x: 520, y: 1400, sprite: undeadSprite('Lich_shadow2.png'), kind: 'undead-decor' },
-        { x: 2080, y: 180, sprite: undeadSprite('Lich_shadow3.png'), kind: 'undead-decor' },
-        // Broken trees (all 24 files) framing both corridor bands (decor; the
-        // 2–3 biggest dead trees above are the only solid ones).
-        { x: 160, y: 220, sprite: undeadSprite('Broken_tree_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 260, y: 150, sprite: undeadSprite('Broken_tree_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 380, y: 240, sprite: undeadSprite('Broken_tree_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 520, y: 150, sprite: undeadSprite('Broken_tree_shadow1_4.png'), kind: 'undead-decor' },
-        { x: 650, y: 260, sprite: undeadSprite('Broken_tree_shadow1_5.png'), kind: 'undead-decor' },
-        { x: 780, y: 180, sprite: undeadSprite('Broken_tree_shadow1_6.png'), kind: 'undead-decor' },
-        { x: 900, y: 260, sprite: undeadSprite('Broken_tree_shadow1_7.png'), kind: 'undead-decor' },
-        { x: 180, y: 1540, sprite: undeadSprite('Broken_tree_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 320, y: 1480, sprite: undeadSprite('Broken_tree_shadow2_2.png'), kind: 'undead-decor' },
-        { x: 480, y: 1520, sprite: undeadSprite('Broken_tree_shadow2_3.png'), kind: 'undead-decor' },
-        { x: 620, y: 1480, sprite: undeadSprite('Broken_tree_shadow2_4.png'), kind: 'undead-decor' },
-        { x: 760, y: 1530, sprite: undeadSprite('Broken_tree_shadow2_5.png'), kind: 'undead-decor' },
-        { x: 900, y: 1500, sprite: undeadSprite('Broken_tree_shadow2_6.png'), kind: 'undead-decor' },
-        { x: 1040, y: 1540, sprite: undeadSprite('Broken_tree_shadow2_7.png'), kind: 'undead-decor' },
-        { x: 1940, y: 200, sprite: undeadSprite('Broken_tree_shadow2_1-1.png'), kind: 'undead-decor' },
-        { x: 2060, y: 320, sprite: undeadSprite('Broken_tree_shadow2_2-1.png'), kind: 'undead-decor' },
-        { x: 2200, y: 180, sprite: undeadSprite('Broken_tree_shadow2_3-1.png'), kind: 'undead-decor' },
-        { x: 2340, y: 300, sprite: undeadSprite('Broken_ tree_shadow3_1.png'), kind: 'undead-decor' },
-        { x: 2460, y: 180, sprite: undeadSprite('Broken_ tree_shadow3_2.png'), kind: 'undead-decor' },
-        { x: 2520, y: 200, sprite: undeadSprite('Broken_ tree_shadow3_3.png'), kind: 'undead-decor' },
-        { x: 2100, y: 420, sprite: undeadSprite('Broken_ tree_shadow3_4.png'), kind: 'undead-decor' },
-        { x: 1940, y: 1500, sprite: undeadSprite('Broken_ tree_shadow3_5.png'), kind: 'undead-decor' },
-        { x: 2080, y: 1530, sprite: undeadSprite('Broken_ tree_shadow3_6.png'), kind: 'undead-decor' },
-        { x: 2220, y: 1480, sprite: undeadSprite('Broken_ tree_shadow3_7.png'), kind: 'undead-decor' },
-        // Remaining dead trees (decor).
-        { x: 220, y: 1220, sprite: undeadSprite('Dead_tree_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 2440, y: 460, sprite: undeadSprite('Dead_tree_shadow3_2.png'), kind: 'undead-decor' },
-        { x: 2500, y: 1250, sprite: undeadSprite('Dead_tree_shadow3_3.png'), kind: 'undead-decor' },
-        // All Bones_shadow* files (54/54) spread through the four corridor
-        // bands (32px, no collision; arena rect keeps strictly free).
-        { x: 170, y: 190, sprite: undeadSprite('Bones_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 225, y: 190, sprite: undeadSprite('Bones_shadow3_11.png'), kind: 'undead-decor' },
-        { x: 280, y: 190, sprite: undeadSprite('Bones_shadow2_8.png'), kind: 'undead-decor' },
-        { x: 335, y: 190, sprite: undeadSprite('Bones_shadow3_1.png'), kind: 'undead-decor' },
-        { x: 390, y: 190, sprite: undeadSprite('Bones_shadow1_4.png'), kind: 'undead-decor' },
-        { x: 445, y: 190, sprite: undeadSprite('Bones_shadow2_5.png'), kind: 'undead-decor' },
-        { x: 500, y: 310, sprite: undeadSprite('Bones_shadow2_9.png'), kind: 'undead-decor' },
-        { x: 555, y: 310, sprite: undeadSprite('Bones_shadow1_16.png'), kind: 'undead-decor' },
-        { x: 610, y: 310, sprite: undeadSprite('Bones_shadow3_10.png'), kind: 'undead-decor' },
-        { x: 665, y: 310, sprite: undeadSprite('Bones_shadow1_18.png'), kind: 'undead-decor' },
-        { x: 720, y: 310, sprite: undeadSprite('Bones_shadow1_14.png'), kind: 'undead-decor' },
-        { x: 775, y: 310, sprite: undeadSprite('Bones_shadow3_5.png'), kind: 'undead-decor' },
-        { x: 830, y: 430, sprite: undeadSprite('Bones_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 885, y: 430, sprite: undeadSprite('Bones_shadow2_4-1.png'), kind: 'undead-decor' },
-        { x: 170, y: 1360, sprite: undeadSprite('Bones_shadow3_4.png'), kind: 'undead-decor' },
-        { x: 225, y: 1360, sprite: undeadSprite('Bones_shadow3_6.png'), kind: 'undead-decor' },
-        { x: 280, y: 1360, sprite: undeadSprite('Bones_shadow3_3.png'), kind: 'undead-decor' },
-        { x: 335, y: 1360, sprite: undeadSprite('Bones_shadow2_2.png'), kind: 'undead-decor' },
-        { x: 390, y: 1360, sprite: undeadSprite('Bones_shadow3_7.png'), kind: 'undead-decor' },
-        { x: 445, y: 1360, sprite: undeadSprite('Bones_shadow3_14.png'), kind: 'undead-decor' },
-        { x: 500, y: 1480, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 555, y: 1480, sprite: undeadSprite('Bones_shadow3_12.png'), kind: 'undead-decor' },
-        { x: 610, y: 1480, sprite: undeadSprite('Bones_shadow2_6.png'), kind: 'undead-decor' },
-        { x: 665, y: 1480, sprite: undeadSprite('Bones_shadow1_17.png'), kind: 'undead-decor' },
-        { x: 720, y: 1480, sprite: undeadSprite('Bones_shadow2_16.png'), kind: 'undead-decor' },
-        { x: 775, y: 1480, sprite: undeadSprite('Bones_shadow2_10.png'), kind: 'undead-decor' },
-        { x: 830, y: 1600, sprite: undeadSprite('Bones_shadow3_2.png'), kind: 'undead-decor' },
-        { x: 885, y: 1600, sprite: undeadSprite('Bones_shadow3_9.png'), kind: 'undead-decor' },
-        { x: 1850, y: 190, sprite: undeadSprite('Bones_shadow2_11.png'), kind: 'undead-decor' },
-        { x: 1905, y: 190, sprite: undeadSprite('Bones_shadow3_18.png'), kind: 'undead-decor' },
-        { x: 1960, y: 190, sprite: undeadSprite('Bones_shadow1_12.png'), kind: 'undead-decor' },
-        { x: 2015, y: 190, sprite: undeadSprite('Bones_shadow2_13.png'), kind: 'undead-decor' },
-        { x: 2070, y: 190, sprite: undeadSprite('Bones_shadow2_12.png'), kind: 'undead-decor' },
-        { x: 2125, y: 190, sprite: undeadSprite('Bones_shadow3_8.png'), kind: 'undead-decor' },
-        { x: 2180, y: 310, sprite: undeadSprite('Bones_shadow2_4.png'), kind: 'undead-decor' },
-        { x: 2235, y: 310, sprite: undeadSprite('Bones_shadow1_13.png'), kind: 'undead-decor' },
-        { x: 2290, y: 310, sprite: undeadSprite('Bones_shadow1_6.png'), kind: 'undead-decor' },
-        { x: 2345, y: 310, sprite: undeadSprite('Bones_shadow1_9.png'), kind: 'undead-decor' },
-        { x: 2400, y: 310, sprite: undeadSprite('Bones_shadow1_8.png'), kind: 'undead-decor' },
-        { x: 2455, y: 310, sprite: undeadSprite('Bones_shadow1_5.png'), kind: 'undead-decor' },
-        { x: 2510, y: 430, sprite: undeadSprite('Bones_shadow1_15.png'), kind: 'undead-decor' },
-        { x: 2565, y: 430, sprite: undeadSprite('Bones_shadow3_15.png'), kind: 'undead-decor' },
-        { x: 1850, y: 1360, sprite: undeadSprite('Bones_shadow3_17.png'), kind: 'undead-decor' },
-        { x: 1905, y: 1360, sprite: undeadSprite('Bones_shadow2_3.png'), kind: 'undead-decor' },
-        { x: 1960, y: 1360, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 2015, y: 1360, sprite: undeadSprite('Bones_shadow1_11.png'), kind: 'undead-decor' },
-        { x: 2070, y: 1360, sprite: undeadSprite('Bones_shadow1_10.png'), kind: 'undead-decor' },
-        { x: 2125, y: 1360, sprite: undeadSprite('Bones_shadow1_7.png'), kind: 'undead-decor' },
-        { x: 2180, y: 1480, sprite: undeadSprite('Bones_shadow3_16.png'), kind: 'undead-decor' },
-        { x: 2235, y: 1480, sprite: undeadSprite('Bones_shadow2_7.png'), kind: 'undead-decor' },
-        { x: 2290, y: 1480, sprite: undeadSprite('Bones_shadow3_13.png'), kind: 'undead-decor' },
-        { x: 2345, y: 1480, sprite: undeadSprite('Bones_shadow2_18.png'), kind: 'undead-decor' },
-        { x: 2400, y: 1480, sprite: undeadSprite('Bones_shadow2_15.png'), kind: 'undead-decor' },
-        { x: 2455, y: 1480, sprite: undeadSprite('Bones_shadow2_17.png'), kind: 'undead-decor' },
-    ],
     structures: [],
+    // Seeded wall-hugging decor (bones/graves/skulls/rock chips/crystals) +
+    // curated "destination" props for the threatening finale room.
+    decorations: [
+        ...catacombsDecor(catacombsLayout, TILE),
+        // Destination element — scull door + glow pool + corpse field.
+        { x: 2432, y: 656, sprite: undeadSprite('Scull_door_shadow1.png'), kind: 'undead-decor' },
+        { x: 2336, y: 704, frames: [undeadPng('water_detilazation.png'), undeadPng('water_detilazation_v2.png')], kind: 'undead-decor-anim', interval: 0.45, scale: 0.37 },
+        { x: 2144, y: 704, sprite: undeadSprite('Ruin_shadow1_5.png'), kind: 'undead-decor' },
+        { x: 2592, y: 736, sprite: undeadSprite('Ruin_shadow2_3.png'), kind: 'undead-decor' },
+        { x: 2528, y: 736, sprite: undeadSprite('Pile_sculls_shadow2.png'), kind: 'undead-decor' },
+        { x: 2656, y: 704, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor' },
+        { x: 2336, y: 512, sprite: undeadSprite('Bones_shadow3_2.png'), kind: 'undead-decor' },
+        { x: 2720, y: 800, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor' },
+        { x: 2272, y: 512, sprite: undeadSprite('Crystal_shadow2_1.png'), kind: 'undead-decor' },
+        { x: 2656, y: 560, sprite: undeadSprite('Crystal_shadow1_3.png'), kind: 'undead-decor' },
+        { x: 2400, y: 1120, sprite: undeadSprite('Dead_tree_shadow3_2.png'), kind: 'undead-decor' },
+        { x: 2368, y: 1216, sprite: undeadSprite('Dead_tree_shadow3_3.png'), kind: 'undead-decor' },
+        // Lich spirits (decor only — NO enemy/AI logic), hovering fully inside
+        // the solid rock masses so they never block or overlap a walkable path.
+        { x: 640, y: 256, sprite: undeadSprite('Lich_shadow1.png'), kind: 'undead-decor' },
+        { x: 640, y: 1088, sprite: undeadSprite('Lich_shadow2.png'), kind: 'undead-decor' },
+        { x: 2176, y: 1088, sprite: undeadSprite('Lich_shadow3.png'), kind: 'undead-decor' },
+    ],
 };
 
 /* ─────────────── Castle interior maps ─────────────── */

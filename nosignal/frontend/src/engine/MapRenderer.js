@@ -71,6 +71,32 @@ const UNDEAD_GROUND_CROP = { sx: 96, sy: 32, sw: 32, sh: 32 };
 const UNDEAD_GROUND_SCALE = 2; // pattern.setTransform scale (crop cell = 32 world px → 64)
 const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core', 'mars-catacombs']);
 
+// ── Catacombs terrain composition (mars-catacombs only) ─────────────────────
+// Real crops picked programmatically from Ground_rocks.png, which uses 16px
+// tiles (31 cols × 37 rows). Each crop below is a single verified 16×16 tile,
+// upscaled 4× → 64 world px, one crop per LOGICAL_TILE cell. Selection is
+// seeded so the floor reads as a varied rocky surface instead of one repeating
+// cell, and the same mask that drives collision (maps.js catacombsLayout)
+// drives what is drawn here.
+const CATACOMBS_ID = 'mars-catacombs';
+
+// Bright floor tiles (lum 52-80) and shaded floor tiles (lum 38-52, slightly
+// darker, used directly under the north walls).
+const CATACOMBS_FLOOR_LIGHT = [
+    [128, 0], [192, 0], [256, 0], [384, 0], [128, 80], [384, 80],
+];
+const CATACOMBS_FLOOR_SHADE = [
+    [320, 176], [64, 240], [192, 240], [128, 256], [256, 256], [0, 336],
+];
+// Solid dark rock tiles (lum 25-42) for the enclosing wall mass.
+const CATACOMBS_FLOOR_ROCK = [
+    [0, 400], [96, 400], [192, 400], [288, 400], [384, 400], [480, 400],
+    [48, 432], [144, 400], [0, 240], [192, 240], [384, 256], [240, 400],
+];
+// Brightest glowing tile (row 23 col 6, lum 157) for the destination pool.
+const CATACOMBS_GLOW_CROP = [96, 368];
+const CATACOMBS_WALKABLE = new Set(['.', 'G']);
+
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
     const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
@@ -360,6 +386,56 @@ export class MapRenderer {
             this._undeadGroundPattern = null;
         }
         return this._undeadGroundPattern;
+    }
+
+    // Deterministic per-cell hash (same formula as maps.js chi) used to pick
+    // crops from the catacombs floor/rock pools without importing content.
+    _undeadHash(x, y) {
+        const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        return s - Math.floor(s);
+    }
+
+    // Catacombs terrain: real 16px Ground_rocks tiles composed from the same
+    // walkability mask that produces the collisions (maps.js catacombsLayout).
+    // `.` floor (seeded from two pools — slightly darker right under north
+    // walls), `G` glowing floor for the destination pool, `#` solid rock.
+    // While the ground image is still loading/failed this simply does nothing
+    // (the base pattern/legacy floor beneath already covers the view).
+    _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
+        if (this.mapId !== CATACOMBS_ID) return;
+        const img = this.undeadGroundTexture;
+        if (!img || !img.complete || img.naturalWidth === 0) return;
+        const mask = this.map.terrainMask;
+        if (!mask || mask.length === 0) return;
+        const cell = LOGICAL_TILE;
+        const cols = mask[0].length;
+        const rows = mask.length;
+        const minCol = Math.max(0, Math.floor(-offset.x / cell));
+        const maxCol = Math.min(cols - 1, Math.ceil((viewW - offset.x) / cell));
+        const minRow = Math.max(0, Math.floor(-offset.y / cell));
+        const maxRow = Math.min(rows - 1, Math.ceil((viewH - offset.y) / cell));
+
+        for (let r = minRow; r <= maxRow; r++) {
+            const rowMask = mask[r];
+            for (let c = minCol; c <= maxCol; c++) {
+                const ch = rowMask[c];
+                const dx = Math.round(c * cell + offset.x);
+                const dy = Math.round(r * cell + offset.y);
+                if (ch === '#') {
+                    const tile = CATACOMBS_FLOOR_ROCK[
+                        Math.floor(this._undeadHash(c * 3 + 1, r * 5 + 1) * CATACOMBS_FLOOR_ROCK.length)
+                    ];
+                    ctx.drawImage(img, tile[0], tile[1], 16, 16, dx, dy, cell, cell);
+                } else if (ch === 'G') {
+                    ctx.drawImage(img, CATACOMBS_GLOW_CROP[0], CATACOMBS_GLOW_CROP[1], 16, 16, dx, dy, cell, cell);
+                } else {
+                    const underWall = r > 0 && !CATACOMBS_WALKABLE.has(mask[r - 1][c]);
+                    const pool = underWall ? CATACOMBS_FLOOR_SHADE : CATACOMBS_FLOOR_LIGHT;
+                    const tile = pool[Math.floor(this._undeadHash(c + 1, r + 7) * pool.length)];
+                    ctx.drawImage(img, tile[0], tile[1], 16, 16, dx, dy, cell, cell);
+                }
+            }
+        }
     }
 
     // True only after the cave sprite has actually finished decoding, so we
@@ -932,6 +1008,10 @@ export class MapRenderer {
                 }
             }
         }
+
+        // Catacombs: draw the mask-driven floor/rock terrain with real ground
+        // crops on top of the base pattern (decorations/obstacles come later).
+        this._renderCatacombsTerrain(ctx, offset, viewW, viewH);
 
         this._drawLandingPad(ctx, offset);
         this._drawObstacles(ctx, offset);
