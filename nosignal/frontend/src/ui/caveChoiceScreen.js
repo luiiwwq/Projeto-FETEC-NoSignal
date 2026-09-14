@@ -13,6 +13,7 @@
  */
 
 import { gameState } from '../state/gameState.js';
+import { MAP_IDS } from '../content/maps.js';
 
 /* ── Caminhos de caverna ─────────────────────────────────── */
 // Valores gravados em gameState.lastCavePath (usados pelo roteamento futuro).
@@ -102,7 +103,6 @@ let bgElementRef = null;
 let isOpen = false;
 let containerRef = null;
 let engineRef = null;
-let openExitRef = null;
 // Modalidade de navegação: true = teclado (destaque permanece no foco),
 // false = mouse (destaque só existe enquanto o ponteiro está em cima).
 let keyboardNav = false;
@@ -122,7 +122,6 @@ export function openCaveChoiceScreen(container, engine, exit) {
     if (isOpen) return;
     containerRef = container;
     engineRef = engine;
-    openExitRef = exit;
 
     // Garante que o fundo seja solicitado (guarda interna evita recarregar).
     loadCavernChoiceBackground();
@@ -159,21 +158,18 @@ export function closeCaveChoiceScreen() {
     if (engineRef) engineRef.paused = false;
     engineRef = null;
     containerRef = null;
-    openExitRef = null;
 }
 
 export function isCaveChoiceOpen() {
     return isOpen;
 }
 
-/* ── Roteamento das escolhas (PASSO 4 — provisório) ──────── */
-// Os mapas reais de "Núcleo de Marte" e "Catacumbas Marcianas" ainda não
-// existem; por enquanto ambas as opções levam a mars-cave (mesmo destino e
-// spawn da transição atual do cave-entrance), apenas gravando a escolha.
+/* ── Roteamento das escolhas ────────────────────────────── */
+// Cada opção leva ao seu mapa dedicado (antes, ambas caíam em mars-cave).
+// A escolha continua sendo gravada em gameState.lastCavePath.
 function _beginCaveTravel(path) {
     const engine = engineRef;
-    const exit = openExitRef;
-    if (!engine || !exit) return;
+    if (!engine) return;
 
     gameState.lastCavePath = path;
 
@@ -181,11 +177,9 @@ function _beginCaveTravel(path) {
     closeCaveChoiceScreen();
 
     if (path === CAVE_PATHS.MARS_CORE) {
-        // TODO: substituir por mapa dedicado quando Núcleo de Marte for implementado.
-        engine.changeMap(exit.targetMap, exit.targetSpawn);
+        engine.changeMap(MAP_IDS.MARS_CORE, 'core-entry');
     } else {
-        // TODO: substituir por mapa dedicado quando Catacumbas Marcianas forem implementadas.
-        engine.changeMap(exit.targetMap, exit.targetSpawn);
+        engine.changeMap(MAP_IDS.MARS_CATACOMBS, 'catacombs-entry');
     }
 }
 

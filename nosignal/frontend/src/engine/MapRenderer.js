@@ -45,6 +45,11 @@ const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 940, originX: 0.5, originY: 1.0, scal
 const CAVE_SPRITE_PATH = './src/assets/sprites/Cavern/cavern_entrance.png?v=3';
 const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale: 0.167 };
 
+// Base folder for individual prop sprites (loaded generically via
+// _loadSpriteOnce; each undead obstacle/decoration stores its own `sprite`
+// path relative to this base).
+const SPRITE_BASE = './src/assets/sprites/';
+
 // Ground texture (tileable JPEG), loaded once and used as a CanvasPattern in
 // _drawSurfaceGroundCell when available; otherwise procedural ground fallback.
 const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.jpeg';
@@ -53,6 +58,18 @@ const MAP_SURFACE_PATTERN_SCALE = 0.5; // pattern.setTransform scale (texture ce
 // saturated ONCE when it is baked into the offscreen canvas (the procedural
 // ground it replaces was ~100); never applied per frame.
 const SURFACE_PATTERN_FILTER = 'brightness(1.15) saturate(1.1)';
+
+// Real rock floor for the Undead maps (mars-core / mars-catacombs). Ground 1:1
+// from Ground_rocks.png as a 32x32 crop (its tileset uses 16px tiles, so this
+// is a 2x2 block) — chosen programmatically: fully opaque, textured (sd≈19) and
+// with the best outer-edge continuity. Tiled with pattern.setTransform scale 2
+// so each cell is 64 world px (same grid as the legacy cave LOGICAL_TILE).
+// When the texture is still loading or fails, the maps fall back to the
+// procedural cave floor (no change for mars-surface / mars-cave / castle).
+const UNDEAD_GROUND_PATH = './src/assets/sprites/UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/Ground_rocks.png';
+const UNDEAD_GROUND_CROP = { sx: 96, sy: 32, sw: 32, sh: 32 };
+const UNDEAD_GROUND_SCALE = 2; // pattern.setTransform scale (crop cell = 32 world px → 64)
+const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core', 'mars-catacombs']);
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -102,6 +119,17 @@ export class MapRenderer {
         this._mapSurfacePattern = null;
         this._mapSurfaceRequested = false;
         this._mapSurfaceWarned = false;
+        // Undead rock floor (see UNDEAD_GROUND_* above). Same lazy Pattern:
+        // image loads once, pattern is baked/cached on first ground draw.
+        this.undeadGroundTexture = null;
+        this._undeadGroundPattern = null;
+        this._undeadGroundRequested = false;
+        this._undeadGroundWarned = false;
+        // Generic individual-sprite cache (undead props: rocks, skulls, graves,
+        // ruins, crystals). key = full URL; value = Image once ready, null while
+        // loading or after a failed load.
+        this._spriteCache = new Map();
+        this._undeadWarned = new Set();
     }
 
     setMap(map) {
@@ -130,6 +158,7 @@ export class MapRenderer {
         this.loadCastleSprite();
         this.loadCaveEntranceSprite();
         this.loadMapSurfaceTexture();
+        if (UNDEAD_GROUND_MAP_IDS.has(map.id)) this.loadUndeadGroundTexture();
     }
 
     /**
@@ -202,6 +231,87 @@ export class MapRenderer {
         img.src = MAP_SURFACE_TEXTURE_PATH;
     }
 
+    // Undead rock floor texture (Ground_rocks.png). Loaded exactly once, only
+    // when the current map is one of the Undead maps (mars-core/mars-catacombs).
+    // The floor pattern uses an unfiltered 32x32 crop (see UNDEAD_GROUND_*).
+    loadUndeadGroundTexture() {
+        if (this.undeadGroundTexture || this._undeadGroundRequested) return;
+        this._undeadGroundRequested = true;
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.undeadGroundTexture = img;
+        };
+        img.onerror = () => {
+            if (!this._undeadGroundWarned) {
+                this._undeadGroundWarned = true;
+                console.warn(
+                    `[MapRenderer] ${UNDEAD_GROUND_PATH} não carregou — usando chão procedural dos mapas Undead.`
+                );
+            }
+        };
+        img.src = UNDEAD_GROUND_PATH;
+    }
+
+    /**
+     * Loads a generic individual sprite exactly once and caches it by `key`
+     * (internal Map, e.g. this._spriteCache). Guards against reloading the
+     * same file and silently returns null while the image is still loading or
+     * after a failed load — the renderer simply skips drawing that frame.
+     * Used for the many undead-tileset props instead of one loadX() per file.
+     */
+    _loadSpriteOnce(key, path) {
+        if (this._spriteCache.has(key)) return this._spriteCache.get(key);
+        this._spriteCache.set(key, null); // mark as requested (no reloads)
+        if (typeof Image === 'undefined') return null; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this._spriteCache.set(key, img);
+        };
+        img.onerror = () => {
+            this._spriteCache.set(key, null);
+            if (!this._undeadWarned.has(key)) {
+                this._undeadWarned.add(key);
+                console.warn(`[MapRenderer] ${path} não carregou — sprite não desenhado.`);
+            }
+        };
+        img.src = path;
+        return null;
+    }
+
+    // Draws one full individual sprite (no sub-rect crop — each file is a
+    // complete sprite already) at the obstacle/decoration's world position.
+    // Returns without drawing if the sprite is still loading or failed, so a
+    // missing asset never breaks a frame.
+    _drawUndeadSprite(ctx, o, offset) {
+        if (!o.sprite) return;
+        const path = `${SPRITE_BASE}${o.sprite}`;
+        const img = this._loadSpriteOnce(path, path);
+        if (!img || !img.complete || img.naturalWidth === 0) return;
+        ctx.drawImage(img, Math.round(o.x + offset.x), Math.round(o.y + offset.y));
+    }
+
+    // Animated decor (kind 'undead-decor-anim'): picks a frame from o.frames
+    // (sprite paths) cycling every o.interval seconds (default 0.45), drawn at
+    // natural size × o.scale (default 1). Both water frames share position/size.
+    _drawUndeadAnim(ctx, o, offset) {
+        const frames = o.frames || (o.sprite ? [o.sprite] : []);
+        if (!frames.length) return;
+        const interval = o.interval || 0.45;
+        const idx = frames.length > 1 ? Math.floor(this.time / interval) % frames.length : 0;
+        const path = `${SPRITE_BASE}${frames[idx]}`;
+        const img = this._loadSpriteOnce(path, path);
+        if (!img || !img.complete || img.naturalWidth === 0) return;
+        const scale = o.scale || 1;
+        ctx.drawImage(
+            img,
+            Math.round(o.x + offset.x),
+            Math.round(o.y + offset.y),
+            Math.round(img.naturalWidth * scale),
+            Math.round(img.naturalHeight * scale)
+        );
+    }
+
     _ensureMapSurfacePattern(ctx) {
         if (this._mapSurfacePattern || !this.mapSurfaceTexture) return this._mapSurfacePattern;
         try {
@@ -225,6 +335,31 @@ export class MapRenderer {
             this._mapSurfacePattern = null;
         }
         return this._mapSurfacePattern;
+    }
+
+    // Lazy CanvasPattern for the Undead rock floor: crops the 32x32 block once
+    // into an offscreen canvas and patterns from it (no per-frame filter/crop).
+    // Returns null while the image is loading or after a failure — the caller
+    // then falls back to the procedural cave floor.
+    _ensureUndeadGroundPattern(ctx) {
+        if (this._undeadGroundPattern) return this._undeadGroundPattern;
+        if (!this.undeadGroundTexture || this.undeadGroundTexture.naturalWidth === 0) return null;
+        try {
+            const c = UNDEAD_GROUND_CROP;
+            const bake = document.createElement('canvas');
+            bake.width = c.sw;
+            bake.height = c.sh;
+            const bctx = bake.getContext('2d');
+            bctx.drawImage(this.undeadGroundTexture, c.sx, c.sy, c.sw, c.sh, 0, 0, c.sw, c.sh);
+            const pattern = ctx.createPattern(bake, 'repeat');
+            if (pattern) {
+                pattern.setTransform(new DOMMatrix().scale(UNDEAD_GROUND_SCALE));
+                this._undeadGroundPattern = pattern;
+            }
+        } catch (e) {
+            this._undeadGroundPattern = null;
+        }
+        return this._undeadGroundPattern;
     }
 
     // True only after the cave sprite has actually finished decoding, so we
@@ -772,11 +907,29 @@ export class MapRenderer {
         const minRow = Math.max(0, Math.floor(-offset.y / tile));
         const maxRow = Math.min(this.rows - 1, Math.ceil((viewH - offset.y) / tile));
 
-        for (let r = minRow; r <= maxRow; r++) {
-            for (let c = minCol; c <= maxCol; c++) {
-                const sx = Math.round(c * tile + offset.x);
-                const sy = Math.round(r * tile + offset.y);
-                this._drawTile(ctx, sx, sy, this.tiles[r][c]);
+        // Undead maps swap the procedural cave floor for the real Ground_rocks
+        // texture (world-anchored pattern, like the surface pipeline). While the
+        // texture is loading/failed we keep the old procedural tiles untouched.
+        const undeadFloor = UNDEAD_GROUND_MAP_IDS.has(this.mapId)
+            ? this._ensureUndeadGroundPattern(ctx)
+            : null;
+        if (undeadFloor) {
+            if (typeof DOMMatrix !== 'undefined') {
+                undeadFloor.setTransform(
+                    new DOMMatrix()
+                        .translate(Math.round(offset.x), Math.round(offset.y))
+                        .scale(UNDEAD_GROUND_SCALE)
+                );
+            }
+            ctx.fillStyle = undeadFloor;
+            ctx.fillRect(Math.round(offset.x), Math.round(offset.y), Math.round(this.map.width), Math.round(this.map.height));
+        } else {
+            for (let r = minRow; r <= maxRow; r++) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    const sx = Math.round(c * tile + offset.x);
+                    const sy = Math.round(r * tile + offset.y);
+                    this._drawTile(ctx, sx, sy, this.tiles[r][c]);
+                }
             }
         }
 
@@ -982,7 +1135,21 @@ export class MapRenderer {
         for (const o of this.map.obstacles) {
             const sx = Math.round(o.x + offset.x);
             const sy = Math.round(o.y + offset.y);
+            if (o.kind === 'undead-rock' || o.kind === 'undead-decor') {
+                this._drawUndeadSprite(ctx, o, offset);
+                continue;
+            }
             this._drawBlock(ctx, sx, sy, o.w, o.h, o.kind);
+        }
+        // Non-solid undead decorations live in map.decorations (kept out of
+        // map.obstacles so collisionSystem never blocks them) and are drawn
+        // right alongside the solid obstacles, same layer.
+        for (const d of this.map.decorations || []) {
+            if (d.kind === 'undead-decor-anim') {
+                this._drawUndeadAnim(ctx, d, offset);
+                continue;
+            }
+            this._drawUndeadSprite(ctx, d, offset);
         }
     }
 
