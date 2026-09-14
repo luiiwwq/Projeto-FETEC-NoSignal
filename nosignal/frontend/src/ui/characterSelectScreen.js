@@ -5,7 +5,7 @@
  */
 
 import { gameState } from '../state/gameState.js';
-import { CHARACTERS, CHARACTER_IDS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
+import { CHARACTERS, CHARACTER_IDS, DEFAULT_CHARACTER_ID, getCharacterRotationPaths } from '../content/characters.js';
 import { renderLoadingScreen } from './loadingScreen.js';
 import { renderNameScreen } from './nameScreen.js';
 
@@ -83,18 +83,41 @@ export function renderCharacterSelectScreen(container) {
         });
     };
 
+    const spinners = new Map();
+
+    const stopSpin = (card) => {
+        const timer = spinners.get(card);
+        if (timer) {
+            clearInterval(timer);
+            spinners.delete(card);
+        }
+    };
+
     cards.forEach((card) => {
+        const rotationPaths = getCharacterRotationPaths(card.dataset.char);
+        const preview = card.querySelector('.char-card__preview');
+        let frame = 0;
+
         card.addEventListener('click', () => {
             selectedId = card.dataset.char;
             applySelection();
         });
         card.addEventListener('mouseleave', () => {
+            stopSpin(card);
+            preview.src = rotationPaths[0];
             if (card.dataset.char !== selectedId) {
                 card.classList.remove('is-hover');
             }
         });
         card.addEventListener('mouseenter', () => {
             card.classList.add('is-hover');
+            stopSpin(card);
+            frame = 0;
+            const timer = setInterval(() => {
+                frame = (frame + 1) % rotationPaths.length;
+                preview.src = rotationPaths[frame];
+            }, 160);
+            spinners.set(card, timer);
         });
     });
 

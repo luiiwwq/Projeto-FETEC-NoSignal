@@ -117,3 +117,20 @@ export const CHARACTERS = {
 export function getCharacter(characterId) {
     return CHARACTERS[characterId] || CHARACTERS[DEFAULT_CHARACTER_ID];
 }
+
+const ROTATION_ORDER = [
+    'south',
+    'south-east',
+    'east',
+    'north-east',
+    'north',
+    'north-west',
+    'west',
+    'south-west'
+];
+
+export function getCharacterRotationPaths(characterId) {
+    const profile = getCharacter(characterId);
+    const base = profile.previewPath.replace('rotations/south.png', 'rotations/');
+    return ROTATION_ORDER.map((name) => `${base}${name}.png`);
+}
