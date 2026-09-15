@@ -81,40 +81,56 @@ const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core', 'mars-catacombs']);
 const CATACOMBS_ID = 'mars-catacombs';
 
 // ── Catacombs microtile composition ──
-// Every 64px logical cell is painted as a 4×4 grid of 16px microtiles (source
-// crops from PNG/Ground_rocks.png: 496×592, 31×37 tiles of 16px). Pools are
-// verified crops by luminance: light floor 53-80, shade 38-52, contact shadow
-// <30 printed right at each wall base, rock mass 25-42 with slightly lighter
-// "edge faces" 46-60 where a wall meets walkable floor, and sparse floor
-// "detail" speckles 26-39.
+// Every 64px logical cell is composed as a 4×4 grid of NATIVE 16px crops from
+// Ground_rocks.png (496×592, 31×37 tiles of 16px). Pools are classified by
+// alpha AND luminance via backend/scripts/analyze_catacombs_tiles.py:
+//   • FUNÇÃO  é decidida pelo caso de vizinhança da máscara (nunca por hash);
+//   • FILL opaco = preenchimento (piso/rocha) — nunca usado como borda;
+//   • DARK/SHADE = sombra de contato do piso que toca rocha;
+//   • EDGE      = lábio claro só na face de rocha que toca o chão;
+//   • OVERLAY   = detalhe por cima de base opaca (interior ou face).
+// Nenhum crop é esticado para preencher 64×64 — a base é o grid de microtiles,
+// então o piso não lê como blocos, faixas nem quadrados isolados.
 const CATACOMBS_MS = 16;
 const CATACOMBS_MICRO_PER_CELL = LOGICAL_TILE / CATACOMBS_MS; // 4
-const CATACOMBS_FLOOR_LIGHT = [
-    [80, 0], [128, 0], [192, 0], [256, 0], [96, 0], [160, 0], [224, 0], [288, 0], [384, 0],
-    [128, 80], [192, 80], [384, 80],
+// Piso claro — duas sub-famílias de luminância homogênea (~56 e ~66). Misturar
+// os dois conjuntos micro-a-micro criaria xadrez; a transição usa campo suave.
+const CATACOMBS_FLOOR_LIGHT_A = [
+    [80, 0], [128, 0], [192, 0], [256, 0], [384, 0],
 ];
-const CATACOMBS_FLOOR_SHADE = [
-    [336, 16], [352, 16], [368, 16], [400, 16], [416, 16], [16, 48], [224, 48], [288, 48],
+const CATACOMBS_FLOOR_LIGHT_B = [
+    [96, 0], [160, 0], [224, 0], [288, 0],
 ];
-const CATACOMBS_FLOOR_DARK = [
+const CATACOMBS_FLOOR_SHADE_FILL = [
+    [352, 16], [368, 16], [400, 16], [416, 16], [16, 48], [224, 48], [288, 48],
+];
+const CATACOMBS_FLOOR_DARK_FILL = [
     [80, 16], [128, 16], [208, 16], [256, 16],
 ];
-const CATACOMBS_ROCK = [
-    [0, 240], [48, 240], [64, 240], [96, 240], [144, 240], [176, 240], [224, 240], [272, 240],
-    [32, 256], [112, 256], [208, 256], [0, 400], [96, 400], [288, 400], [384, 400], [48, 432],
+const CATACOMBS_FLOOR_SPECK = [
+    [128, 80], [192, 80], [384, 80],
+];
+const CATACOMBS_ROCK_FILL = [
+    [64, 240], [96, 240], [144, 240], [176, 240], [32, 256],
 ];
 const CATACOMBS_ROCK_EDGE = [
-    [80, 80], [112, 80], [144, 80], [240, 80], [352, 80], [416, 80],
+    [80, 80], [112, 80],
 ];
-const CATACOMBS_DETAIL = [
-    [80, 32], [128, 32], [176, 32], [192, 32], [208, 32], [256, 32],
+const CATACOMBS_ROCK_EDGE_DETAIL = [
+    [144, 80], [240, 80], [352, 80], [416, 80],
 ];
+const CATACOMBS_ROCK_SPECK = [
+    [0, 240], [48, 240], [224, 240], [272, 240], [112, 256], [208, 256],
+    [0, 400], [96, 400], [288, 400], [384, 400], [48, 432],
+];
+const CATACOMBS_ROCK_CRACK = [
+    [80, 32], [128, 32], [192, 32], [208, 32], [256, 32],
+];
+// Base procedural opaca de fallback (carregamento/falha de textura): garante
+// que nenhuma célula visível revele o CanvasPattern global.
+const CATACOMBS_FLOOR_FALLBACK = '#493827';
+const CATACOMBS_ROCK_FALLBACK = '#31261c';
 const CATACOMBS_WALKABLE = new Set(['.']);
-// Some Ground_rocks crops carry transparent pixels. Every pool is baked ONCE
-// into an opaque atlas composited over a solid base tone so the repeating base
-// CanvasPattern never bleeds through the terrain — rock masses get the deep
-// rock brown, floor pools the same base — keeping every cell fully opaque.
-const CATACOMBS_BASE_ROCK = [32, 12, 9];
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -175,10 +191,6 @@ export class MapRenderer {
         // loading or after a failed load.
         this._spriteCache = new Map();
         this._undeadWarned = new Set();
-        // Baked opaque microtile atlases (one canvas per pool) — see
-        // _catacombsAtlas: transparent source pixels are composited over a base
-        // tone once, so the repeating floor pattern never shows through.
-        this._catAtlases = new Map();
     }
 
     setMap(map) {
@@ -418,52 +430,25 @@ export class MapRenderer {
         return s - Math.floor(s);
     }
 
-    // Bakes a pool of 16px source crops into one opaque 16px-tall atlas canvas,
-    // composited over a solid base tone. Cached per (base + tiles) combo so it
-    // happens exactly once. Returns { canvas, tiles: [[x,0], …] } where the
-    // tile coordinates already point inside the baked atlas.
-    _catacombsAtlas(tiles, base) {
-        const key = (base ? base.join('-') : '0') + '|' + tiles.map((t) => t.join('-')).join('|');
-        if (this._catAtlases.has(key)) return this._catAtlases.get(key);
-        const w = tiles.length * CATACOMBS_MS;
-        const bake = document.createElement('canvas');
-        bake.width = w;
-        bake.height = CATACOMBS_MS;
-        const b = bake.getContext('2d');
-        if (base) {
-            b.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
-            b.fillRect(0, 0, w, CATACOMBS_MS);
-        }
-        tiles.forEach((t, i) =>
-            b.drawImage(
-                this.undeadGroundTexture,
-                t[0], t[1], CATACOMBS_MS, CATACOMBS_MS,
-                i * CATACOMBS_MS, 0, CATACOMBS_MS, CATACOMBS_MS
-            )
-        );
-        const at = { canvas: bake, tiles: tiles.map((t, i) => [i * CATACOMBS_MS, 0]) };
-        this._catAtlases.set(key, at);
-        return at;
-    }
-
-    // Catacombs terrain: painted as a 4×4 grid of 16px Ground_rocks microtiles
-    // per 64px logical cell, driven by the SAME walkability mask that produces
-    // the collisions (maps.js catacombsLayout). Composition rules read the 8
-    // macro neighbors of every cell:
-    //   • floor cells get ragged shade bands (1..2 microcells, hashed per micro
-    //     position so no straight seam) under each rock neighbor, a darkest
-    //     contact tile at the exact wall base, DARK inner corners where two
-    //     walls meet, and sparse detail speckles away from walls;
-    //   • rock cells get a slightly lighter "edge face" band (ragged 1..2)
-    //     wherever they touch a floor, plain mass away from faces.
-    // While the ground image is loading/failed this does nothing (the base
-    // pattern/legacy floor beneath already covers the whole view).
+    // Catacombs terrain: composed cell-by-cell (64px) ON the walkability mask
+    // that also drives collisions. Every cell is painted opaque BEFORE any
+    // overlay, so the global CanvasPattern never shows through:
+    //   • piso ('.') – base de microtiles nativos 16px (famílias claras fundidas
+    //     por campo de tom suave), sombra de contato DARK→SHADE só na face que
+    //     toca rocha (N/S/E/W), penumbra na 2ª linha de chão e detritos esparsos
+    //     longe das paredes;
+    //   • rocha ('#') – base de microtiles da família ROCK (massa contínua),
+    //     lábio EDGE claro somente na face que toca o chão, trincas/sevus rare
+    //     no interior apenas.
+    // A FUNÇÃO sai dos vizinhos da máscara (cardeais + diagonais: contato só
+    // diagonal nunca gera face); o hash só varia QUAL crop de um pool fixo da
+    // função. Nenhum crop é esticado nem repetido para preencher a célula.
     _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
         if (this.mapId !== CATACOMBS_ID) return;
-        const img = this.undeadGroundTexture;
-        if (!img || !img.complete || img.naturalWidth === 0) return;
         const mask = this.map.terrainMask;
         if (!mask || mask.length === 0) return;
+        const img = this.undeadGroundTexture;
+        const tex = !!img && img.complete && img.naturalWidth !== 0;
         const cell = LOGICAL_TILE;
         const m = CATACOMBS_MS;
         const p = CATACOMBS_MICRO_PER_CELL;
@@ -475,68 +460,221 @@ export class MapRenderer {
         const maxRow = Math.min(rows - 1, Math.ceil((viewH - offset.y) / cell));
 
         const hash = (x, y) => this._undeadHash(x, y);
-        // Pools are baked to one opaque atlas each (single canvas per pool);
-        // the repeating base pattern never shows through the composition.
-        const A = {
-            light: this._catacombsAtlas(CATACOMBS_FLOOR_LIGHT, CATACOMBS_BASE_ROCK),
-            shade: this._catacombsAtlas(CATACOMBS_FLOOR_SHADE, CATACOMBS_BASE_ROCK),
-            dark: this._catacombsAtlas(CATACOMBS_FLOOR_DARK, CATACOMBS_BASE_ROCK),
-            rock: this._catacombsAtlas(CATACOMBS_ROCK, CATACOMBS_BASE_ROCK),
-            edge: this._catacombsAtlas(CATACOMBS_ROCK_EDGE, CATACOMBS_BASE_ROCK),
-            detail: this._catacombsAtlas(CATACOMBS_DETAIL, CATACOMBS_BASE_ROCK),
+        const walkable = CATACOMBS_WALKABLE;
+        const rockAt = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && !walkable.has(mask[r][c]);
+        const floorAt = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && walkable.has(mask[r][c]);
+        // Escolha determinística de crop dentro do pool FIXO da função — nunca
+        // decide função, cobertura ou formato de borda.
+        const pick = (pool, ax, ay) => pool[Math.floor(hash(ax, ay) * pool.length) % pool.length];
+        // Espessura serrilhada (1..2 micros) só quebra a linearidade da faixa.
+        const ragged = (ax, ay) => 1 + Math.floor(hash(ax, ay) * 2);
+        const drawTile = (sx, sy, dx, dy) => ctx.drawImage(img, sx, sy, m, m, dx, dy, m, m);
+        // Campo de tom suave por célula (bilinear): funde as duas famílias de
+        // piso (~56 / ~66) sem costura dura entre células vizinhas.
+        const floorTone = (c, r) => bilinearHash(c, r, 0.5, 0.5);
+        const pickFloorBase = (mc, mr, c, r) => {
+            const t = floorTone(c, r);
+            const bm = 1 - clamp01((t - 0.3) / 0.5); // 1 = só A, 0 = só B
+            const h = hash(c * 4 + mc + 11, r * 4 + mr + 7);
+            return pick(h < bm ? CATACOMBS_FLOOR_LIGHT_A : CATACOMBS_FLOOR_LIGHT_B, c * 4 + mc, r * 4 + mr);
         };
-        const drawAt = (atlas, k, px, py) => {
-            const t = atlas.tiles[Math.floor(k * atlas.tiles.length)];
-            ctx.drawImage(atlas.canvas, t[0], t[1], m, m, px, py, m, m);
+
+        // Faixa de contato de uma face. Rods: bandRow desenha em uma linha de
+        // micros (ao longo do eixo X da face); anchor 0 = topo, 1 = fundo.
+        const bandRow = (mc, anchor, baseX, baseY, c, r) => {
+            const top = anchor === 0;
+            const d = ragged(c * 3 + mc, r * 2 + 1);
+            for (let i = 0; i < d && i < p; i++) {
+                const row = top ? i : p - 1 - i;
+                const t = pick(CATACOMBS_FLOOR_DARK_FILL, c * 4 + mc, r * 7 + i);
+                drawTile(t[0], t[1], baseX + mc * m, baseY + row * m);
+            }
+            const shade = ragged(c * 5 + mc, r * 3 + 1) + 1; // 2..3
+            for (let i = d; i < Math.min(p, d + shade); i++) {
+                const row = top ? i : p - 1 - i;
+                const soft = i === d + shade - 1 && hash(c + 9, r + 13 + mc) < 0.4;
+                const t = soft
+                    ? pickFloorBase(mc, row, c, r)
+                    : pick(CATACOMBS_FLOOR_SHADE_FILL, c * 4 + mc, r * 11 + i);
+                drawTile(t[0], t[1], baseX + mc * m, baseY + row * m);
+            }
+        };
+        const bandCol = (mr, anchor, baseX, baseY, c, r) => {
+            const left = anchor === 0;
+            const d = ragged(c * 5 + mr, r * 4);
+            for (let i = 0; i < d && i < p; i++) {
+                const col = left ? i : p - 1 - i;
+                const t = pick(CATACOMBS_FLOOR_DARK_FILL, c * 9 + i, r * 4 + mr);
+                drawTile(t[0], t[1], baseX + col * m, baseY + mr * m);
+            }
+            const shade = ragged(c * 7 + mr, r * 4 + 2) + 1;
+            for (let i = d; i < Math.min(p, d + shade); i++) {
+                const col = left ? i : p - 1 - i;
+                const soft = i === d + shade - 1 && hash(c + 5, r + 17 + mr) < 0.4;
+                const t = soft
+                    ? pickFloorBase(col, mr, c, r)
+                    : pick(CATACOMBS_FLOOR_SHADE_FILL, c * 13 + i, r * 4 + mr);
+                drawTile(t[0], t[1], baseX + col * m, baseY + mr * m);
+            }
+        };
+        // Penumbra leve na 2ª célula de chão (distância 2 da rocha) — suaviza a
+        // transição da sombra, sem faixa dura contra o piso claro.
+        const penumbraRow = (mc, anchor, baseX, baseY, c, r) => {
+            const top = anchor === 0;
+            const d = ragged(c + 2 + mc, r * 3);
+            for (let i = 0; i < d && i < p; i++) {
+                const row = top ? i : p - 1 - i;
+                const soft = i === d - 1 && hash(c + 3, r * 7 + mc) < 0.5;
+                const t = soft
+                    ? pickFloorBase(mc, row, c, r)
+                    : pick(CATACOMBS_FLOOR_SHADE_FILL, c * 4 + mc, r * 13 + i);
+                drawTile(t[0], t[1], baseX + mc * m, baseY + row * m);
+            }
+        };
+        const penumbraCol = (mr, anchor, baseX, baseY, c, r) => {
+            const left = anchor === 0;
+            const d = ragged(c * 4, r + 2 + mr);
+            for (let i = 0; i < d && i < p; i++) {
+                const col = left ? i : p - 1 - i;
+                const soft = i === d - 1 && hash(c * 7 + 3, r + mr) < 0.5;
+                const t = soft
+                    ? pickFloorBase(col, mr, c, r)
+                    : pick(CATACOMBS_FLOOR_SHADE_FILL, c, r * 4 + mr);
+                drawTile(t[0], t[1], baseX + col * m, baseY + mr * m);
+            }
         };
 
         for (let r = minRow; r <= maxRow; r++) {
-            const rowMask = mask[r];
             for (let c = minCol; c <= maxCol; c++) {
-                const ch = rowMask[c];
+                const ch = mask[r][c];
                 const baseX = Math.round(c * cell + offset.x);
                 const baseY = Math.round(r * cell + offset.y);
-                const nRock = r > 0 && !CATACOMBS_WALKABLE.has(mask[r - 1][c]);
-                const sRock = r < rows - 1 && !CATACOMBS_WALKABLE.has(mask[r + 1][c]);
-                const wRock = c > 0 && !CATACOMBS_WALKABLE.has(rowMask[c - 1]);
-                const eRock = c < cols - 1 && !CATACOMBS_WALKABLE.has(rowMask[c + 1]);
-                const nFloor = r > 0 && CATACOMBS_WALKABLE.has(mask[r - 1][c]);
-                const sFloor = r < rows - 1 && CATACOMBS_WALKABLE.has(mask[r + 1][c]);
-                const wFloor = c > 0 && CATACOMBS_WALKABLE.has(rowMask[c - 1]);
-                const eFloor = c < cols - 1 && CATACOMBS_WALKABLE.has(rowMask[c + 1]);
+                const nRock = rockAt(r - 1, c);
+                const sRock = rockAt(r + 1, c);
+                const wRock = rockAt(r, c - 1);
+                const eRock = rockAt(r, c + 1);
+                const nFloor = floorAt(r - 1, c);
+                const sFloor = floorAt(r + 1, c);
+                const wFloor = floorAt(r, c - 1);
+                const eFloor = floorAt(r, c + 1);
 
-                for (let mr = 0; mr < p; mr++) {
-                    for (let mc = 0; mc < p; mc++) {
-                        const px = baseX + mc * m;
-                        const py = baseY + mr * m;
-                        const h = hash(c * 17 + mc * 5, r * 13 + mr * 7);
-                        if (ch === '.') {
-                            // Ragged shade-band depth toward each rock neighbor.
-                            const dN = nRock ? 1 + Math.floor(hash(c * 3 + mc, r * 2) * 2) : 0;
-                            const dS = sRock ? 1 + Math.floor(hash(c * 7 + mc, r * 4) * 2) : 0;
-                            const dW = wRock ? 1 + Math.floor(hash(c * 2, r * 3 + mr) * 2) : 0;
-                            const dE = eRock ? 1 + Math.floor(hash(c * 4, r * 5 + mr) * 2) : 0;
-                            const atWallBase =
-                                (nRock && mr === 0) ||
-                                (sRock && mr === p - 1) ||
-                                (wRock && mc === 0) ||
-                                (eRock && mc === p - 1);
-                            const innerCorner =
-                                (nRock && wRock && mr === 0 && mc === 0) ||
-                                (nRock && eRock && mr === 0 && mc === p - 1) ||
-                                (sRock && wRock && mr === p - 1 && mc === 0) ||
-                                (sRock && eRock && mr === p - 1 && mc === p - 1);
-                            const shaded = mr < dN || mr >= p - dS || mc < dW || mc >= p - dE;
-                            if (shaded) drawAt(innerCorner || atWallBase ? A.dark : A.shade, h, px, py);
-                            else drawAt(h < 0.06 ? A.detail : A.light, h, px, py);
-                        } else {
-                            // Ragged "face" band toward each floor neighbor.
-                            const eN = nFloor ? 1 + Math.floor(hash(c * 3 + mc, r * 2) * 2) : 0;
-                            const eS = sFloor ? 1 + Math.floor(hash(c * 7 + mc, r * 4) * 2) : 0;
-                            const eW = wFloor ? 1 + Math.floor(hash(c * 2, r * 3 + mr) * 2) : 0;
-                            const eE = eFloor ? 1 + Math.floor(hash(c * 4, r * 5 + mr) * 2) : 0;
-                            const isFace = mr < eN || mr >= p - eS || mc < eW || mc >= p - eE;
-                            drawAt(isFace ? A.edge : A.rock, h, px, py);
+                if (walkable.has(ch)) {
+                    // ── Célula de PISO ──
+                    // Base opaca obrigatória (flat no fallback, microtiles reais
+                    // quando a textura existe) — as duas famílias claras fundidas.
+                    ctx.fillStyle = CATACOMBS_FLOOR_FALLBACK;
+                    ctx.fillRect(baseX, baseY, cell, cell);
+                    if (tex) {
+                        for (let mr = 0; mr < p; mr++) {
+                            for (let mc = 0; mc < p; mc++) {
+                                const t = pickFloorBase(mc, mr, c, r);
+                                drawTile(t[0], t[1], baseX + mc * m, baseY + mr * m);
+                            }
+                        }
+                        // Sombra de contato (DARK→SHADE) nas faces que tocam rocha.
+                        if (nRock) {
+                            for (let mc = 0; mc < p; mc++) bandRow(mc, 0, baseX, baseY, c, r);
+                        }
+                        if (sRock) {
+                            for (let mc = 0; mc < p; mc++) bandRow(mc, 1, baseX, baseY, c, r);
+                        }
+                        if (wRock) {
+                            for (let mr = 0; mr < p; mr++) bandCol(mr, 0, baseX, baseY, c, r);
+                        }
+                        if (eRock) {
+                            for (let mr = 0; mr < p; mr++) bandCol(mr, 1, baseX, baseY, c, r);
+                        }
+                        // Penumbra na 2ª linha de chão (suaviza o fim da sombra).
+                        if (nFloor && rockAt(r - 2, c)) {
+                            for (let mc = 0; mc < p; mc++) penumbraRow(mc, 0, baseX, baseY, c, r);
+                        }
+                        if (sFloor && rockAt(r + 2, c)) {
+                            for (let mc = 0; mc < p; mc++) penumbraRow(mc, 1, baseX, baseY, c, r);
+                        }
+                        if (wFloor && rockAt(r, c - 2)) {
+                            for (let mr = 0; mr < p; mr++) penumbraCol(mr, 0, baseX, baseY, c, r);
+                        }
+                        if (eFloor && rockAt(r, c + 2)) {
+                            for (let mr = 0; mr < p; mr++) penumbraCol(mr, 1, baseX, baseY, c, r);
+                        }
+                        // Detritos esparsos, só longe das paredes.
+                        for (let mr = 0; mr < p; mr++) {
+                            for (let mc = 0; mc < p; mc++) {
+                                const atWall =
+                                    (nRock && mr < 2) || (sRock && mr >= p - 2) ||
+                                    (wRock && mc < 2) || (eRock && mc >= p - 2);
+                                if (atWall) continue;
+                                if (hash(c * 3 + mc, r * 5 + mr) < 0.07) {
+                                    const d = pick(CATACOMBS_FLOOR_SPECK, c * 4 + mc, r * 4 + mr);
+                                    drawTile(d[0], d[1], baseX + mc * m, baseY + mr * m);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // ── Célula de ROCHA ──
+                    ctx.fillStyle = CATACOMBS_ROCK_FALLBACK;
+                    ctx.fillRect(baseX, baseY, cell, cell);
+                    if (tex) {
+                        for (let mr = 0; mr < p; mr++) {
+                            for (let mc = 0; mc < p; mc++) {
+                                const t = pick(CATACOMBS_ROCK_FILL, c * 4 + mc, r * 4 + mr);
+                                drawTile(t[0], t[1], baseX + mc * m, baseY + mr * m);
+                            }
+                        }
+                        // Lábio claro SÓ na face que toca o chão (nunca interior).
+                        const lipRow = (rowKe, c4, rSeed) => {
+                            for (let mc = 0; mc < p; mc++) {
+                                const t = pick(CATACOMBS_ROCK_EDGE, c4 + mc, rSeed);
+                                drawTile(t[0], t[1], baseX + mc * m, baseY + rowKe * m);
+                                if (hash(c4 + mc * 3, rSeed + 1) < 0.3) {
+                                    const o = pick(CATACOMBS_ROCK_EDGE_DETAIL, c4 + mc, rSeed + 2);
+                                    drawTile(o[0], o[1], baseX + mc * m, baseY + rowKe * m);
+                                }
+                            }
+                        };
+                        const lipCol = (colKe, cSeed, r4) => {
+                            for (let mr = 0; mr < p; mr++) {
+                                const t = pick(CATACOMBS_ROCK_EDGE, cSeed, r4 + mr);
+                                drawTile(t[0], t[1], baseX + colKe * m, baseY + mr * m);
+                                if (hash(cSeed + 1, r4 + mr * 3) < 0.3) {
+                                    const o = pick(CATACOMBS_ROCK_EDGE_DETAIL, cSeed + 2, r4 + mr);
+                                    drawTile(o[0], o[1], baseX + colKe * m, baseY + mr * m);
+                                }
+                            }
+                        };
+                        if (nFloor) {
+                            const d = ragged(c * 3, r * 2);
+                            for (let k = 0; k < d && k < p; k++) lipRow(k, c * 4, r * 7 + k);
+                        }
+                        if (sFloor) {
+                            const d = ragged(c * 7, r * 4);
+                            for (let k = 0; k < d && k < p; k++) lipRow(p - 1 - k, c * 4, r * 11 + k);
+                        }
+                        if (wFloor) {
+                            const d = ragged(c * 2, r * 3);
+                            for (let k = 0; k < d && k < p; k++) lipCol(k, c * 9 + k, r * 4);
+                        }
+                        if (eFloor) {
+                            const d = ragged(c * 4, r * 5);
+                            for (let k = 0; k < d && k < p; k++) lipCol(p - 1 - k, c * 13 + k, r * 4);
+                        }
+                        // Textura do interior (longe das faces): speck + trinca rara.
+                        for (let mr = 0; mr < p; mr++) {
+                            for (let mc = 0; mc < p; mc++) {
+                                const atFace =
+                                    (nFloor && mr < 2) || (sFloor && mr >= p - 2) ||
+                                    (wFloor && mc < 2) || (eFloor && mc >= p - 2);
+                                if (atFace) continue;
+                                const hh = hash(c * 2 + mc, r * 4 + mr);
+                                if (hh < 0.085) {
+                                    const d = pick(CATACOMBS_ROCK_SPECK, c * 4 + mc, r * 4 + mr);
+                                    drawTile(d[0], d[1], baseX + mc * m, baseY + mr * m);
+                                } else if (hh < 0.11) {
+                                    const d = pick(CATACOMBS_ROCK_CRACK, c * 4 + mc, r * 4 + mr);
+                                    drawTile(d[0], d[1], baseX + mc * m, baseY + mr * m);
+                                }
+                            }
                         }
                     }
                 }

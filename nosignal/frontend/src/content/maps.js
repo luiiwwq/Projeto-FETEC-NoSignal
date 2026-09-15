@@ -298,21 +298,15 @@ export function catacombsRockRects(layout, tile) {
     return rects;
 }
 
-// Seeded decor for the catacombs — region-based composition groups read off the
-// same mask: wall clusters (2..5 props walking the boundary), grave/bone bands
-// along the long horizontal walls, curated ruins at the transitions and skull
-// piles around the finale. Props spawn ONLY on rock cells at the wall mass.
-// Every prop is tagged with a layer ('back' drawn right after the terrain,
-// 'front' after the structures) and is kept off the reserved arena clearing +
-// spawn plaza.
-const CAT_CO_ROCKS = [
-    'Rock_shadow1_1.png', 'Rock_shadow1_2.png', 'Rock_shadow1_3.png', 'Rock_shadow1_4.png', 'Rock_shadow1_5.png',
-    'Rock_shadow2_1.png', 'Rock_shadow2_2.png', 'Rock_shadow2_3.png', 'Rock_shadow2_4.png', 'Rock_shadow2_5.png',
-    'Rock_shadow3_1.png', 'Rock_shadow3_2.png', 'Rock_shadow3_3.png', 'Rock_shadow3_4.png', 'Rock_shadow3_5.png',
-];
+// Seeded decor for the catacombs — region-based plant/bone groups. Groups walk
+// the rock/floor boundary (only rock cells that touch the floor), 2..5 props
+// each, with MORE clusters at the west mouth, the arena rim, the east throat
+// and the final hall. Spawn plaza, arena clearing and every walkable path stay
+// free. Every prop is tagged with a layer ('back' drawn right after the
+// terrain, 'front' after the structures).
 const CAT_CO_BONES = [
     // Every Bones_shadow* crop present in the tileset (families 1..3, all
-    // variants) so the wall bands stay varied instead of repeating 4.
+    // variants) so the wall groups stay varied instead of repeating 4.
     'Bones_shadow1_1.png', 'Bones_shadow1_2.png', 'Bones_shadow1_3.png', 'Bones_shadow1_4.png',
     'Bones_shadow1_5.png', 'Bones_shadow1_6.png', 'Bones_shadow1_7.png', 'Bones_shadow1_8.png',
     'Bones_shadow1_9.png', 'Bones_shadow1_10.png', 'Bones_shadow1_11.png', 'Bones_shadow1_12.png',
@@ -329,27 +323,10 @@ const CAT_CO_BONES = [
     'Bones_shadow3_13.png', 'Bones_shadow3_14.png', 'Bones_shadow3_15.png', 'Bones_shadow3_16.png',
     'Bones_shadow3_17.png', 'Bones_shadow3_18.png',
 ];
-const CAT_CO_GRAVES = [
-    'Grave_shadow1_1.png', 'Grave_shadow1_2.png', 'Grave_shadow1_3.png', 'Grave_shadow1_4.png',
-    'Grave_shadow2_1.png', 'Grave_shadow2_2.png',
-];
-const CAT_CO_SKULLS = ['Pile_sculls_shadow1.png', 'Pile_sculls_shadow2.png', 'Pile_sculls_shadow3.png'];
-const CAT_CO_CRYSTALS = [
-    'Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow1_3.png', 'Crystal_shadow1_4.png',
-    'Crystal_shadow2_1.png', 'Crystal_shadow2_2.png', 'Crystal_shadow2_3.png', 'Crystal_shadow2_4.png',
-    'Crystal_shadow3_1.png', 'Crystal_shadow3_2.png', 'Crystal_shadow3_3.png', 'Crystal_shadow3_4.png',
-];
-const CAT_CO_RUINS = [
-    'Ruin_shadow1_2.png', 'Ruin_shadow1_4.png', 'Ruin_shadow1_5.png', 'Ruin_shadow2_1.png', 'Ruin_shadow3_2.png',
-];
 const CAT_CO_PLANTS = [
     'Plant_shadow1_1.png', 'Plant_shadow1_2.png', 'Plant_shadow1_3.png', 'Plant_shadow1_4.png', 'Plant_shadow1_5.png',
     'Plant__shadow2_1.png', 'Plant__shadow2_2.png', 'Plant__shadow2_3.png', 'Plant__shadow2_4.png', 'Plant__shadow2_5.png',
     'Plant_shadow3_1.png', 'Plant_shadow3_2.png', 'Plant_shadow3_3.png', 'Plant_shadow3_4.png', 'Plant_shadow3_5.png',
-];
-const CAT_CO_THORNS = [
-    'Thorn_plant_shadow1_1.png', 'Thorn_plant_shadow1_2.png', 'Thorn_plant_shadow1_3.png',
-    'Thorn_plant_shadow3_1.png', 'Thorn_plant_shadow3_2.png',
 ];
 
 // Combat arena zone: rough box around the whole clearing (incl. mouth bulges).
@@ -376,6 +353,7 @@ export function catacombsDecor(layout, tile) {
 
     const pxUsed = new Set();
     const cellUsed = new Set();
+    const placed = [];
     const add = (x, y, sprite, layer = 'back', size = tile) => {
         x = Math.round(x);
         y = Math.round(y);
@@ -386,89 +364,81 @@ export function catacombsDecor(layout, tile) {
     };
     const poolPick = (pool, h) => pool[Math.floor(h * pool.length)];
 
-    // ── 1) Wall clusters: 2..5 props walking along the rock/floor boundary.
+    // Regiões com mais grupos: boca oeste, rim da arena, gargalo e salão final.
+    const regionWeight = (c, r) => {
+        if (c >= 34) return 1.5; // salão final
+        if (c >= 30 && c <= 33) return 1.35; // gargalo
+        if (c >= 15 && c <= 30 && r >= 5 && r <= 16) return 1.2; // rim da arena
+        if (c <= 8 && r >= 5) return 1.25; // boca/corredor oeste
+        return 1.0;
+    };
+
+    // Grupos naturais de 2..5 plantas/ossos caminhando pela fronteira
+    // rocha/chão — SOMENTE em rocha que encosta no chão. Função da continuidade
+    // vem do deslocamento ao longo da parede; cada membro usa a pool correta.
     for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
             const cellKey = `${r},${c}`;
             if (walk.has(layout[r][c]) || cellUsed.has(cellKey)) continue;
             if (!touchesFloor(r, c)) continue;
-            if (chi(c * 7 + 11, r * 13 + 5) > 0.18) continue;
+            const w = regionWeight(c, r);
+            if (chi(c * 7 + 11, r * 13 + 5) > 0.16 / w) continue;
+            // Caminha pela fronteira rocha/chão marcando a cadeia inteira antes
+            // de desenhar: grupo só nasce com 2..5 elementos (pontas sem
+            // continuação são descartadas). Nas esquinas a caminhada vira.
+            const chain = [];
             let cr = r;
             let cc = c;
             const gLen = 2 + Math.floor(chi(c * 3, r * 9) * 4); // 2..5
-            for (let i = 0; i < gLen; i++) {
+            const dirs = (() => {
+                const forward = chi(cc + 5, cr + 5) < 0.55 ? [[0, 1], [1, 0]] : [[1, 0], [0, 1]];
+                return [...forward, [-1, 0], [0, -1]];
+            })();
+            while (chain.length < gLen && chain.length < 5) {
                 const k = `${cr},${cc}`;
                 if (cellUsed.has(k) || !rockAt(cr, cc) || !touchesFloor(cr, cc)) break;
+                chain.push([cr, cc]);
                 cellUsed.add(k);
-                const x = cc * tile + chi(cr, cc * 7) * tile * 0.6;
-                const y = cr * tile + chi(cc * 3, cr * 11) * tile * 0.6;
-                const kind = chi(cc * 13 + 3, cr * 7 + 5);
-                const pool = kind < 0.75 ? CAT_CO_ROCKS : kind < 0.9 ? CAT_CO_BONES : CAT_CO_PLANTS;
-                add(x, y, poolPick(pool, chi(cc, cr)), 'back', i === 0 ? tile : tile - 16);
-                if (chi(cc + 5, cr + 5) < 0.55) cc += 1;
-                else cr += 1;
+                let moved = false;
+                for (const [dr, dc] of dirs) {
+                    const nr = cr + dr;
+                    const nc = cc + dc;
+                    if (rockAt(nr, nc) && touchesFloor(nr, nc) && !cellUsed.has(`${nr},${nc}`)) {
+                        cr = nr;
+                        cc = nc;
+                        moved = true;
+                        break;
+                    }
+                }
+                if (!moved) break;
+            }
+            if (chain.length < 2) {
+                for (const [pr, pc] of chain) cellUsed.delete(`${pr},${pc}`);
+                continue;
+            }
+            // Publica só um prefixo contíguo que passe no clear() (rects
+            // livres/bordas) e não encoste em grupo já publicado (espaçamento
+            // mínimo de 1 célula). Se sobrar menos de 2, a cadeia inteira é
+            // devolvida para outra semente aproveitar.
+            const commit = [];
+            for (const [pr, pc] of chain) {
+                const size = commit.length === 0 ? tile : tile - 16;
+                const x = pc * tile + chi(pr, pc * 7) * tile * 0.6;
+                const y = pr * tile + chi(pc * 3, pr * 11) * tile * 0.6;
+                const near = placed.filter(([pr0, pc0]) => Math.abs(pr0 - pr) <= 1 && Math.abs(pc0 - pc) <= 1);
+                if (!clear(x, y, size) || near.length) break;
+                commit.push([pr, pc, x, y, size]);
+            }
+            if (commit.length < 2) {
+                for (const [pr, pc] of chain) cellUsed.delete(`${pr},${pc}`);
+                continue;
+            }
+            for (const [pr, pc, x, y, size] of commit) {
+                placed.push([pr, pc]);
+                const pool = chi(pc * 13 + 3, pr * 7 + 5) < 0.5 ? CAT_CO_PLANTS : CAT_CO_BONES;
+                add(x, y, poolPick(pool, chi(pc, pr)), 'back', size);
             }
         }
-    }
-
-    // ── 2) Grave/bone bands along the long horizontal walls (with staggered
-    //    offsets, no evenly spaced lines).
-    const bandSeeds = [];
-    for (let c = 0; c < cols; c++) {
-        let top = -1;
-        for (let r = 0; r < rows && top < 0; r++) if (walk.has(layout[r][c])) top = r;
-        if (top > 0) bandSeeds.push([top - 1, c]);
-        let bottom = -1;
-        for (let r = rows - 1; r >= 0 && bottom < 0; r--) if (walk.has(layout[r][c])) bottom = r;
-        if (bottom >= 0 && bottom + 1 < rows) bandSeeds.push([bottom + 1, c]);
-    }
-    for (const [r, c] of bandSeeds) {
-        const k = `${r},${c}`;
-        if (cellUsed.has(k)) continue;
-            if (chi(c * 5 + 1, r * 9 + 3) > 0.34) continue;
-        cellUsed.add(k);
-        const x = c * tile + chi(c, r) * tile * 0.5;
-        const y = r * tile + chi(r, c) * tile * 0.3;
-        const pool = chi(r + 3, c + 1) < 0.5 ? CAT_CO_GRAVES : CAT_CO_BONES;
-        add(x, y, poolPick(pool, chi(c * 3, r * 5)), 'front', tile + 24);
-    }
-
-    // ── 3) Curated ruin transitions + skull piles around the finale door.
-    const ruinSpots = [
-        [15, 6, 'Ruin_shadow1_4.png'], // lintel of the arena west mouth
-        [30, 5, 'Ruin_shadow2_3.png'], // above the throat
-        [9, 6, 'Ruin_shadow1_2.png'], // corridor lintel
-        [33, 4, 'Ruin_shadow3_2.png'], // hall top approach
-        [16, 4, 'Ruin_shadow2_1.png'], // west mouth shoulder
-        [41, 5, 'Ruin_shadow1_5.png'], // finale ceiling
-    ];
-    for (const [c, r, s] of ruinSpots) {
-        if (!rockAt(r, c)) continue;
-        add(c * tile + tile * 0.1, r * tile, s, 'front', tile * 1.5);
-    }
-    const skullSpots = [
-        [39, 2], [42, 3], [33, 3],
-    ];
-    for (const [c, r] of skullSpots) {
-        if (!rockAt(r, c)) continue;
-        add(c * tile + tile * 0.3, r * tile + tile * 0.2, poolPick(CAT_CO_SKULLS, chi(c, r)), 'front', tile);
-    }
-
-    // ── 4) Crystal accents on rock near the finale door and the arena bulges.
-    const crystalSpots = [
-        [40, 5], [42, 5], [42, 18], [18, 4], [29, 18], [30, 6],
-    ];
-    for (const [c, r] of crystalSpots) {
-        if (!rockAt(r, c)) continue;
-        add(c * tile + tile * 0.3, r * tile, poolPick(CAT_CO_CRYSTALS, chi(c, r)), 'front', tile * 0.8);
-    }
-
-    // ── 5) Lich spirits (decor only, no AI), deep inside rock off the route.
-    const lichSpots = [[9, 3], [34, 3]];
-    for (let i = 0; i < lichSpots.length; i++) {
-        const [c, r] = lichSpots[i];
-        if (!rockAt(r, c)) continue;
-        add(c * tile + tile * 0.3, r * tile + tile * 0.2, `Lich_shadow${i + 1}.png`, 'front', tile);
     }
 
     return dec;
@@ -581,13 +551,8 @@ export const marsCatacombsMap = {
     arenaCombatArea: { ...catacombsArenaRect },
     obstacles: [
         // Solid rock masses originate from the terrain mask (one AABB per
-        // contiguous rock run per row) — collision only (no sprite). Three big
-        // dead trees are planted fully inside the top/bottom rock mass so they
-        // add silhouette without touching any walkable path.
+        // contiguous rock run per row) — collision only (no sprite).
         ...catacombsRockRects(catacombsLayout, TILE),
-        { x: 96, y: 192, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_1.png') },
-        { x: 2400, y: 160, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow1_2.png') },
-        { x: 1408, y: 1216, w: 96, h: 96, kind: 'undead-rock', sprite: undeadSprite('Dead_tree_shadow3_1.png') },
     ],
     exits: [
         {
@@ -601,23 +566,11 @@ export const marsCatacombsMap = {
         },
     ],
     structures: [],
-    // Seeded wall-hugging decor (bones/graves/skulls/rock chips/crystals) +
-    // curated "destination" props for the dry finale room (all on rock cells).
+    // Grupos de plantas e ossos na fronteira rocha/chão (boca, curvas da
+    // arena, gargalo e câmara final) — ver catacombsDecor(). Nada além disso:
+    // spawn, arena e caminho permanecem livres.
     decorations: [
         ...catacombsDecor(catacombsLayout, TILE),
-        // Destination element — scull door embedded in the finale's north wall
-        // (rock at c40 row 6). Floor stays normal and dry beneath it.
-        { x: 2592, y: 384, sprite: undeadSprite('Scull_door_shadow1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2432, y: 1152, sprite: undeadSprite('Pile_sculls_shadow2.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2688, y: 1152, sprite: undeadSprite('Pile_sculls_shadow3.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2624, y: 320, sprite: undeadSprite('Ruin_shadow2_3.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2208, y: 384, sprite: undeadSprite('Ruin_shadow1_5.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2370, y: 1150, sprite: undeadSprite('Bones_shadow1_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2620, y: 1150, sprite: undeadSprite('Bones_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2304, y: 320, sprite: undeadSprite('Crystal_shadow2_1.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2496, y: 320, sprite: undeadSprite('Crystal_shadow1_3.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2304, y: 1184, sprite: undeadSprite('Dead_tree_shadow3_2.png'), kind: 'undead-decor', layer: 'front' },
-        { x: 2528, y: 1248, sprite: undeadSprite('Dead_tree_shadow3_3.png'), kind: 'undead-decor', layer: 'front' },
     ],
 };
 
