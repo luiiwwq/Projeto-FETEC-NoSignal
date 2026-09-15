@@ -327,6 +327,15 @@ const CAT_CO_PLANTS = [
     'Plant_shadow1_1.png', 'Plant_shadow1_2.png', 'Plant_shadow1_3.png', 'Plant_shadow1_4.png', 'Plant_shadow1_5.png',
     'Plant__shadow2_1.png', 'Plant__shadow2_2.png', 'Plant__shadow2_3.png', 'Plant__shadow2_4.png', 'Plant__shadow2_5.png',
     'Plant_shadow3_1.png', 'Plant_shadow3_2.png', 'Plant_shadow3_3.png', 'Plant_shadow3_4.png', 'Plant_shadow3_5.png',
+    'Thorn_palnt_shadow2_1.png', 'Thorn_palnt_shadow2_2.png', 'Thorn_palnt_shadow2_3.png',
+    'Thorn_palnt_shadow2_4.png', 'Thorn_palnt_shadow2_5.png', 'Thorn_palnt_shadow2_6.png',
+];
+const CAT_CO_STRUCTURES = [
+    'Ruin_shadow1_1.png', 'Ruin_shadow1_2.png', 'Ruin_shadow1_3.png', 'Ruin_shadow2_1.png',
+    'Grave_shadow1_1.png', 'Grave_shadow1_2.png', 'Grave_shadow1_3.png', 'Grave_shadow2_1.png',
+    'Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow2_1.png', 'Crystal_shadow2_2.png',
+    'Rock_shadow1_1.png', 'Rock_shadow1_2.png', 'Rock_shadow2_1.png',
+    'Pile_sculls_shadow1.png', 'Pile_sculls_shadow2.png', 'Pile_sculls_shadow3.png',
 ];
 
 // Combat arena zone: rough box around the whole clearing (incl. mouth bulges).
@@ -435,11 +444,38 @@ export function catacombsDecor(layout, tile) {
             }
             for (const [pr, pc, x, y, size] of commit) {
                 placed.push([pr, pc]);
-                const pool = chi(pc * 13 + 3, pr * 7 + 5) < 0.5 ? CAT_CO_PLANTS : CAT_CO_BONES;
+                const roll = chi(pc * 13 + 3, pr * 7 + 5);
+                const pool = roll < 0.45 ? CAT_CO_BONES : roll < 0.75 ? CAT_CO_PLANTS : CAT_CO_STRUCTURES;
                 add(x, y, poolPick(pool, chi(pc, pr)), 'back', size);
             }
         }
     }
+
+    // Elementos de destaque: Lichs (256×256) sobre as paredes de rocha (fora da passagem do jogador)
+    dec.push({
+        x: 37 * tile,
+        y: 3 * tile,
+        sprite: undeadSprite('Lich_shadow1.png'),
+        kind: 'undead-decor',
+        layer: 'back',
+        scale: 0.8,
+    });
+    dec.push({
+        x: 20 * tile,
+        y: 1 * tile,
+        sprite: undeadSprite('Lich_shadow2.png'),
+        kind: 'undead-decor',
+        layer: 'back',
+        scale: 0.8,
+    });
+    dec.push({
+        x: 31 * tile,
+        y: 15 * tile,
+        sprite: undeadSprite('Lich_shadow3.png'),
+        kind: 'undead-decor',
+        layer: 'back',
+        scale: 0.75,
+    });
 
     return dec;
 }

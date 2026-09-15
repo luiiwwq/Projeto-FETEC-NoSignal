@@ -72,16 +72,16 @@ const UNDEAD_GROUND_CROP = { sx: 96, sy: 32, sw: 32, sh: 32 };
 const UNDEAD_GROUND_SCALE = 2; // pattern.setTransform scale (crop cell = 32 world px → 64)
 const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core']);
 
-// ── Catacombs terrain (mars-catacombs only) ─────────────────────────────────
-// Look "canvas 2D antigo": cores PLANAS e sólidas, zero assets (nenhum crop do
-// tileset, nenhum CanvasPattern, grain, borda ou partícula). A mesma máscara
-// de walkability que gera as colisões (maps.js catacombsLayout) decide a cor
-// de cada célula. Estrutura intacta: máscara 44×22, colisões, arena, spawn e
-// portal de saída — removido apenas o design artístico do terreno.
+// ── Catacombs terrain (mars-catacombs) ─────────────────────────────────
+// Terreno das Catacumbas: máscara 44×22 (2816×1408) com rochas sólidas (#)
+// e chão caminhável (.). O chão recebe a textura map_catacombs_surface.jpeg
+// e as paredes mantêm cores distintas e sólidas com colisão física.
 const CATACOMBS_ID = 'mars-catacombs';
 const CATACOMBS_WALKABLE = new Set(['.']);
 const CATACOMBS_FLOOR = [118, 46, 26];
 const CATACOMBS_ROCK = [68, 27, 15];
+const MAP_CATACOMBS_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_catacombs_surface.jpeg';
+const MAP_CATACOMBS_SURFACE_SCALE = 0.5;
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -137,6 +137,11 @@ export class MapRenderer {
         this._undeadGroundPattern = null;
         this._undeadGroundRequested = false;
         this._undeadGroundWarned = false;
+        // Catacombs ground texture pattern (map_catacombs_surface.jpeg)
+        this.mapCatacombsSurfaceTexture = null;
+        this._mapCatacombsSurfacePattern = null;
+        this._mapCatacombsSurfaceRequested = false;
+        this._mapCatacombsSurfaceWarned = false;
         // Generic individual-sprite cache (undead props: rocks, skulls, graves,
         // ruins, crystals). key = full URL; value = Image once ready, null while
         // loading or after a failed load.
@@ -300,7 +305,15 @@ export class MapRenderer {
         const path = `${SPRITE_BASE}${o.sprite}`;
         const img = this._loadSpriteOnce(path, path);
         if (!img || !img.complete || img.naturalWidth === 0) return;
-        ctx.drawImage(img, Math.round(o.x + offset.x), Math.round(o.y + offset.y));
+        const x = Math.round(o.x + offset.x);
+        const y = Math.round(o.y + offset.y);
+        if (o.w && o.h) {
+            ctx.drawImage(img, x, y, o.w, o.h);
+        } else if (o.scale) {
+            ctx.drawImage(img, x, y, Math.round(img.naturalWidth * o.scale), Math.round(img.naturalHeight * o.scale));
+        } else {
+            ctx.drawImage(img, x, y);
+        }
     }
 
     // Animated decor (kind 'undead-decor-anim'): picks a frame from o.frames
@@ -374,10 +387,48 @@ export class MapRenderer {
         return this._undeadGroundPattern;
     }
 
-    // Catacomb terrain — versão antiga "canvas 2D": cores PLANAS por célula,
-    // sem assets. A máscara de walkability (maps.js catacombsLayout) é a mesma
-    // que gera as colisões; cada célula recebe o bloco sólido da cor do piso ou
-    // da rocha. Nenhum crop, pattern, grain, borda, lattice ou partícula.
+    // Lazy CanvasPattern for the Catacombs floor (map_catacombs_surface.jpeg):
+    // Loads the image once and patterns from it with world offset alignment.
+    _ensureCatacombsSurfacePattern(ctx) {
+        if (this._mapCatacombsSurfacePattern) return this._mapCatacombsSurfacePattern;
+        if (!this._mapCatacombsSurfaceRequested) {
+            this._mapCatacombsSurfaceRequested = true;
+            const img = new Image();
+            img.src = MAP_CATACOMBS_SURFACE_TEXTURE_PATH;
+            img.onload = () => {
+                this.mapCatacombsSurfaceTexture = img;
+            };
+            img.onerror = () => {
+                const fallback = new Image();
+                fallback.src = './src/assets/sprites/Map/maps_catacombs_surface.jpeg';
+                fallback.onload = () => {
+                    this.mapCatacombsSurfaceTexture = fallback;
+                };
+                fallback.onerror = () => {
+                    if (!this._mapCatacombsSurfaceWarned) {
+                        this._mapCatacombsSurfaceWarned = true;
+                        console.warn('[MapRenderer] Falha ao carregar textura do chão das Catacumbas:', MAP_CATACOMBS_SURFACE_TEXTURE_PATH);
+                    }
+                };
+            };
+        }
+        if (!this.mapCatacombsSurfaceTexture || this.mapCatacombsSurfaceTexture.naturalWidth === 0) {
+            return null;
+        }
+        try {
+            const pattern = ctx.createPattern(this.mapCatacombsSurfaceTexture, 'repeat');
+            if (pattern) {
+                this._mapCatacombsSurfacePattern = pattern;
+            }
+        } catch (e) {
+            this._mapCatacombsSurfacePattern = null;
+        }
+        return this._mapCatacombsSurfacePattern;
+    }
+
+    // Catacomb terrain:
+    // Chão mais claro com textura (map_catacombs_surface.jpeg) e paredes
+    // rochosas escuras com cores sólidas e relevo sombreado nas bordas.
     _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
         if (this.mapId !== CATACOMBS_ID) return;
         const mask = this.map.terrainMask;
@@ -393,16 +444,60 @@ export class MapRenderer {
         const walkable = CATACOMBS_WALKABLE;
         const floor = `rgb(${CATACOMBS_FLOOR[0]}, ${CATACOMBS_FLOOR[1]}, ${CATACOMBS_FLOOR[2]})`;
         const rock = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
+        const rockDark = `rgb(${Math.max(0, CATACOMBS_ROCK[0] - 22)}, ${Math.max(0, CATACOMBS_ROCK[1] - 10)}, ${Math.max(0, CATACOMBS_ROCK[2] - 6)})`;
+        const rockLight = `rgb(${Math.min(255, CATACOMBS_ROCK[0] + 28)}, ${Math.min(255, CATACOMBS_ROCK[1] + 14)}, ${Math.min(255, CATACOMBS_ROCK[2] + 10)})`;
+
+        const floorPattern = this._ensureCatacombsSurfacePattern(ctx);
+        if (floorPattern && typeof DOMMatrix !== 'undefined') {
+            floorPattern.setTransform(
+                new DOMMatrix()
+                    .translate(Math.round(offset.x), Math.round(offset.y))
+                    .scale(MAP_CATACOMBS_SURFACE_SCALE)
+            );
+        }
 
         for (let r = minRow; r <= maxRow; r++) {
             for (let c = minCol; c <= maxCol; c++) {
-                ctx.fillStyle = walkable.has(mask[r][c]) ? floor : rock;
-                ctx.fillRect(
-                    Math.round(c * cell + offset.x),
-                    Math.round(r * cell + offset.y),
-                    cell,
-                    cell
-                );
+                const isFloor = walkable.has(mask[r][c]);
+                const sx = Math.round(c * cell + offset.x);
+                const sy = Math.round(r * cell + offset.y);
+
+                if (isFloor) {
+                    ctx.fillStyle = floor;
+                    ctx.fillRect(sx, sy, cell, cell);
+                    if (floorPattern) {
+                        ctx.fillStyle = floorPattern;
+                        ctx.fillRect(sx, sy, cell, cell);
+                    }
+                } else {
+                    ctx.fillStyle = rock;
+                    ctx.fillRect(sx, sy, cell, cell);
+
+                    // Relevo da rocha nas bordas em contato com o chão
+                    const botFloor = r < rows - 1 && walkable.has(mask[r + 1][c]);
+                    const topFloor = r > 0 && walkable.has(mask[r - 1][c]);
+                    const rightFloor = c < cols - 1 && walkable.has(mask[r][c + 1]);
+                    const leftFloor = c > 0 && walkable.has(mask[r][c - 1]);
+
+                    if (botFloor) {
+                        // Borda voltada para o chão abaixo: sombra inferior
+                        ctx.fillStyle = rockDark;
+                        ctx.fillRect(sx, sy + cell - 8, cell, 8);
+                    }
+                    if (topFloor) {
+                        // Borda voltada para o chão acima: realce superior
+                        ctx.fillStyle = rockLight;
+                        ctx.fillRect(sx, sy, cell, 4);
+                    }
+                    if (rightFloor) {
+                        ctx.fillStyle = rockDark;
+                        ctx.fillRect(sx + cell - 6, sy, 6, cell);
+                    }
+                    if (leftFloor) {
+                        ctx.fillStyle = rockLight;
+                        ctx.fillRect(sx, sy, 4, cell);
+                    }
+                }
             }
         }
     }
@@ -981,19 +1076,16 @@ export class MapRenderer {
             }
         }
 
-        // Catacombs: draw the mask-driven flat-color floor/rock terrain.
+        // Catacombs: draw the mask-driven textured floor/rock terrain.
         // Layer order: terrain → landing pad → [back decor] → [obstacles] →
-        // [structures] → [front decor] → exits. Catacombs SÓ cores sólidas:
-        // decor/obstacles/structures (todos sprites) ficam de fora; o terreno
-        // já cobre as paredes de rocha (obstacles são as mesmas células da
-        // máscara) e o portal de saída + landing pad são desenho canvas puro.
+        // [structures] → [front decor] → exits.
         this._renderCatacombsTerrain(ctx, offset, viewW, viewH);
 
         this._drawLandingPad(ctx, offset);
-        if (!catacombs) this._drawDecorations(ctx, offset, 'back');
+        this._drawDecorations(ctx, offset, 'back');
         if (!catacombs) this._drawObstacles(ctx, offset);
-        if (!catacombs) this._drawStructures(ctx, offset);
-        if (!catacombs) this._drawDecorations(ctx, offset, 'front');
+        this._drawStructures(ctx, offset);
+        this._drawDecorations(ctx, offset, 'front');
         this._drawExits(ctx, offset);
     }
 
