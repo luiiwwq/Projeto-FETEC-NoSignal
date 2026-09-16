@@ -75,9 +75,16 @@
     }
 
     function runAnalysis() {
-        // Wait (real time) until the shared renderer's Ground_rocks texture is
-        // loaded so the mask terrain is actually painted before the pixel check.
-        if (!renderer.undeadGroundTexture || renderer.undeadGroundTexture.naturalWidth === 0) {
+        // Wait (real time) until the shared renderer's wall texture + edge
+        // plates are actually decoded, so the mask terrain is painted with the
+        // rim system before the pixel check runs.
+        if (
+            !renderer.undeadGroundTexture ||
+            renderer.undeadGroundTexture.naturalWidth === 0 ||
+            !renderer.mapCatacombsWallTexture ||
+            renderer.mapCatacombsWallTexture.naturalWidth === 0 ||
+            !renderer._catacombsEdgesReady()
+        ) {
             setTimeout(runAnalysis, 120);
             return;
         }
