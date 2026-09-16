@@ -83,36 +83,76 @@ const CATACOMBS_ROCK = [68, 27, 15];
 const MAP_CATACOMBS_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_catacombs_surface.jpeg';
 const MAP_CATACOMBS_SURFACE_SCALE = 0.5;
 
-// ── Catacombs walls & rim plates ────────────────────────────────────────
-// Interior of every `#` cell is filled with the continuous rock photo
-// (mars_catacombs_surface2.jpg), anchored to world coords so neighbouring
-// cells share an unseamed pattern. The six EdgeSprites sheets are NOT whole
-// images: each sheet holds one connected rock piece buried in a big
-// transparent canvas, so they are always used through the source rects below.
-// All plates are drawn at half native size (0.5) to match the floor pattern
-// scale and to keep rim depth proportional to the 64px cells.
+// ── Catacombs walls: continuous base & modular rock piece library ──────────
+// Entire '#' mass is filled with continuous mars_catacombs_surface2.jpg anchored
+// to world coordinates (0.5 scale = 128px native -> 64px cell).
+// On top of this base, modular rock pieces extracted from EdgeSprites (edge1-6)
+// are composed: interior fills, directional faces (N, S, W, E), convex corners,
+// concave inner corners and caps.
 const CATACOMBS_WALL_TEXTURE_PATH = './src/assets/sprites/mars_catacombs_surface2.jpg';
 const CATACOMBS_WALL_SCALE = 0.5;
 const CATACOMBS_EDGE_DIR = './src/assets/sprites/EdgeSprites/';
 const CATACOMBS_EDGE_SCALE = 0.5;
-// Horizontal band (flat top, jagged/undercut bottom) — top & bottom faces.
-const CATACOMBS_EDGE_TOP = { file: 'edge1.png', sx: 71, sy: 44, sw: 725, sh: 157 };
-// Small compact band (solid top + short right nub) — short face runs.
-const CATACOMBS_EDGE_SMALL = { file: 'edge6.png', sx: 934, sy: 576, sw: 181, sh: 153 };
-// Wide irregular vertical slab — left faces (flipped so its more solid edge
-// faces the floor).
-const CATACOMBS_EDGE_LEFT = { file: 'edge5.png', sx: 1146, sy: 387, sw: 184, sh: 356 };
-// Narrow vertical slab with a solid right column — right faces.
-const CATACOMBS_EDGE_RIGHT = { file: 'edge3.png', sx: 823, sy: 36, sw: 73, sh: 162 };
-// Corner plates: horizontal band that turns into a vertical leg on the right.
-// Big one sits on the northern/massive wall corners (edge2), the smaller one
-// (edge4) on the southern wall corners, giving volume without obvious repeats.
-const CATACOMBS_EDGE_CORNER_BIG = { file: 'edge2.png', sx: 74, sy: 279, sw: 700, sh: 443 };
-const CATACOMBS_EDGE_CORNER_SMALL = { file: 'edge4.png', sx: 957, sy: 21, sw: 373, sh: 353 };
-// Native (native px) -> world multiplier for a crop.
-function catacombPlateSize(scale, native) {
-    return Math.max(1, Math.round(native * scale));
-}
+
+export const CATACOMBS_WALL_PIECES = {
+    fill: [
+        { file: 'edge1.png', sx: 100, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 260, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 420, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 580, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge2.png', sx: 160, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge2.png', sx: 320, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge2.png', sx: 460, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge4.png', sx: 980, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge4.png', sx: 1130, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge6.png', sx: 940, sy: 580, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
+    ],
+    top: [
+        { file: 'edge1.png', sx: 100, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 260, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 420, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge1.png', sx: 580, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge4.png', sx: 1140, sy: 25, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
+    ],
+    bottom: [
+        { file: 'edge1.png', sx: 100, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
+        { file: 'edge1.png', sx: 260, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
+        { file: 'edge1.png', sx: 420, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
+        { file: 'edge1.png', sx: 580, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
+    ],
+    left: [
+        { file: 'edge5.png', sx: 1145, sy: 390, sw: 130, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge5.png', sx: 1145, sy: 540, sw: 130, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge2.png', sx: 75, sy: 350, sw: 128, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
+    ],
+    right: [
+        { file: 'edge3.png', sx: 823, sy: 35, sw: 74, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
+        { file: 'edge4.png', sx: 1180, sy: 160, sw: 128, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
+        { file: 'edge2.png', sx: 640, sy: 500, sw: 128, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
+    ],
+    innerCorner: [
+        { file: 'edge2.png', sx: 480, sy: 440, sw: 128, sh: 128, orientation: 'innerCorner', scale: 0.5, anchor: 'center' },
+        { file: 'edge4.png', sx: 1050, sy: 150, sw: 128, sh: 128, orientation: 'innerCorner', scale: 0.5, anchor: 'center' },
+    ],
+    outerCorner: [
+        { file: 'edge2.png', sx: 80, sy: 280, sw: 128, sh: 128, orientation: 'NW', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'NW', scale: 0.5, anchor: 'top-left' },
+        { file: 'edge2.png', sx: 630, sy: 280, sw: 128, sh: 128, orientation: 'NE', scale: 0.5, anchor: 'top-right' },
+        { file: 'edge2.png', sx: 80, sy: 280, sw: 128, sh: 128, orientation: 'SW', scale: 0.5, anchor: 'bottom-left', flipV: true },
+        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'SW', scale: 0.5, anchor: 'bottom-left', flipV: true },
+        { file: 'edge2.png', sx: 630, sy: 580, sw: 128, sh: 128, orientation: 'SE', scale: 0.5, anchor: 'bottom-right' },
+        { file: 'edge4.png', sx: 1180, sy: 220, sw: 128, sh: 128, orientation: 'SE', scale: 0.5, anchor: 'bottom-right' },
+    ],
+    end: [
+        { file: 'edge6.png', sx: 940, sy: 580, sw: 128, sh: 128, orientation: 'end', scale: 0.5, anchor: 'center' },
+        { file: 'edge3.png', sx: 823, sy: 35, sw: 74, sh: 128, orientation: 'end', scale: 0.5, anchor: 'center' },
+    ],
+    detail: [
+        { file: 'edge6.png', sx: 980, sy: 600, sw: 90, sh: 90, orientation: 'detail', scale: 0.5, anchor: 'center' },
+        { file: 'edge4.png', sx: 1050, sy: 80, sw: 90, sh: 90, orientation: 'detail', scale: 0.5, anchor: 'center' },
+    ],
+};
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -179,7 +219,7 @@ export class MapRenderer {
         this._mapCatacombsWallPattern = null;
         this._mapCatacombsWallRequested = false;
         this._mapCatacombsWallWarned = false;
-        this._catacombEdgePlan = null;
+        this._catacombsWallCanvas = null;
         this._catacombEdgeImages = new Map();
         // Generic individual-sprite cache (undead props: rocks, skulls, graves,
         // ruins, crystals). key = full URL; value = Image once ready, null while
@@ -216,8 +256,8 @@ export class MapRenderer {
         this.loadMapSurfaceTexture();
         if (UNDEAD_GROUND_MAP_IDS.has(map.id)) this.loadUndeadGroundTexture();
         if (map.id === CATACOMBS_ID) {
-            // Catacomb rim plan depends only on the static mask → rebuild once.
-            this._catacombEdgePlan = null;
+            // Catacomb complete wall canvas built once when assets ready.
+            this._catacombsWallCanvas = null;
             this.loadCatacombsWallTexture();
             this.loadCatacombEdges();
         }
@@ -480,7 +520,10 @@ export class MapRenderer {
         this._mapCatacombsWallRequested = true;
         if (typeof Image === 'undefined') return;
         const img = new Image();
-        img.onload = () => { this.mapCatacombsWallTexture = img; };
+        img.onload = () => {
+            this.mapCatacombsWallTexture = img;
+            this._catacombsWallCanvas = null;
+        };
         img.onerror = () => {
             if (!this._mapCatacombsWallWarned) {
                 this._mapCatacombsWallWarned = true;
@@ -491,9 +534,7 @@ export class MapRenderer {
     }
 
     // Eagerly requests all six edge sprite images the first time the catacomb
-    // map is used. Each file is a huge transparent PNG with a single rock
-    // piece inside; the precomputed plan selects sub-rects so the full sheet
-    // is never drawn.
+    // map is used.
     loadCatacombEdges() {
         if (this._catacombsEdgesReady()) return;
         const files = ['edge1.png','edge2.png','edge3.png','edge4.png','edge5.png','edge6.png'];
@@ -501,15 +542,17 @@ export class MapRenderer {
             if (this._catacombEdgeImages.has(f)) continue;
             if (typeof Image === 'undefined') { this._catacombEdgeImages.set(f, null); continue; }
             const img = new Image();
-            img.onload = () => { this._catacombEdgeImages.set(f, img); };
+            img.onload = () => {
+                this._catacombEdgeImages.set(f, img);
+                this._catacombsWallCanvas = null;
+            };
             img.onerror = () => { this._catacombEdgeImages.set(f, null); };
             img.src = CATACOMBS_EDGE_DIR + f;
             this._catacombEdgeImages.set(f, undefined);
         }
     }
 
-    // True once every edge sprite has finished (loaded or failed), so callers
-    // can know the plates stopped changing frame to frame.
+    // True once every edge sprite has finished (loaded or failed).
     _catacombsEdgesReady() {
         for (const f of ['edge1.png','edge2.png','edge3.png','edge4.png','edge5.png','edge6.png']) {
             if (!this._catacombEdgeImages.has(f)) return false;
@@ -523,248 +566,228 @@ export class MapRenderer {
         return (v && v.complete && v.naturalWidth > 0) ? v : null;
     }
 
-    // World-anchored CanvasPattern for the wall interior (same approach as
-    // the floor pattern but using mars_catacombs_surface2.jpg).
-    _ensureCatacombsWallPattern(ctx) {
-        if (this._mapCatacombsWallPattern) return this._mapCatacombsWallPattern;
-        if (!this.mapCatacombsWallTexture || this.mapCatacombsWallTexture.naturalWidth === 0) return null;
-        try {
-            const pattern = ctx.createPattern(this.mapCatacombsWallTexture, 'repeat');
-            if (pattern) this._mapCatacombsWallPattern = pattern;
-        } catch (e) {
-            this._mapCatacombsWallPattern = null;
-        }
-        return this._mapCatacombsWallPattern;
-    }
-
-    // Precomputes the full list of edge plate placements from the static mask.
-    // Each entry: { img, sx, sy, sw, sh (native src), dx, dy, dw, dh (world
-    // dest at CATACOMBS_EDGE_SCALE), flipH, flipV }.
-    // Wall-clipping: horizontal & vertical plates are clamped to the wall
-    // depth so they never bleed onto floor cells. Corner plates are drawn
-    // with a per-plate clip rect over the wall mask cells they overlap.
-    _buildCatacombEdgePlan() {
-        if (this._catacombEdgePlan) return this._catacombEdgePlan;
-        const mask = this.map.terrainMask;
-        if (!mask || mask.length === 0) return (this._catacombEdgePlan = []);
-        const rows = mask.length;
-        const cols = mask[0].length;
-        const cell = LOGICAL_TILE;
-        const walkable = CATACOMBS_WALKABLE;
-        const isWall = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && !walkable.has(mask[r][c]);
-        const isFloor = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && walkable.has(mask[r][c]);
-        const S = CATACOMBS_EDGE_SCALE;
-        const plan = [];
-
-        const push = (proto, dx, dy, dw, dh, flipH, flipV, clipCells) => {
-            plan.push({ file: proto.file, sx: proto.sx, sy: proto.sy, sw: proto.sw, sh: proto.sh,
-                        dx, dy, dw, dh, flipH: !!flipH, flipV: !!flipV, clip: clipCells || null });
-        };
-        // Clip rect helper: all # cells overlapping world rect, or null.
-        const wallClipFor = (wx, wy, ww, wh) => {
-            const c0 = Math.max(0, Math.floor(wx / cell));
-            const c1 = Math.min(cols - 1, Math.floor((wx + ww) / cell));
-            const r0 = Math.max(0, Math.floor(wy / cell));
-            const r1 = Math.min(rows - 1, Math.floor((wy + wh) / cell));
-            const cells = [];
-            for (let r = r0; r <= r1; r++)
-                for (let c = c0; c <= c1; c++)
-                    if (isWall(r, c)) cells.push({ x: c * cell, y: r * cell, w: cell, h: cell });
-            return cells.length > 0 ? cells : null;
-        };
-
-        // ── Top face runs (floor north of wall) ──────────────────────────
-        for (let r = 0; r < rows; r++) {
-            let c = 0;
-            while (c < cols) {
-                if (!(isWall(r, c) && isFloor(r - 1, c))) { c++; continue; }
-                const start = c;
-                while (c < cols && isWall(r, c) && isFloor(r - 1, c)) c++;
-                const runLen = c - start;
-                // wall depth below the run
-                let minDepth = rows;
-                for (let j = start; j < c; j++) {
-                    let d = 0;
-                    while (isWall(r + d, j)) d++;
-                    if (d < minDepth) minDepth = d;
-                }
-                const proto = runLen <= 2 ? CATACOMBS_EDGE_SMALL : CATACOMBS_EDGE_TOP;
-                // Plate spans the FULL run (source wraps inside the crop); only
-                // the depth-gain (perpendicular) is clamped so it never bleeds
-                // onto the floor rows below.
-                const dw = runLen * cell;
-                const dh = Math.min(catacombPlateSize(S, proto.sh), minDepth * cell);
-                const dx = start * cell;
-                const dy = r * cell;
-                push(proto, dx, dy, dw, dh, false, false, null);
-            }
-        }
-
-        // ── Bottom face runs (floor south of wall) ───────────────────────
-        for (let r = 0; r < rows; r++) {
-            let c = 0;
-            while (c < cols) {
-                if (!(isWall(r, c) && isFloor(r + 1, c))) { c++; continue; }
-                const start = c;
-                while (c < cols && isWall(r, c) && isFloor(r + 1, c)) c++;
-                const runLen = c - start;
-                let minDepth = rows;
-                for (let j = start; j < c; j++) {
-                    let d = 0;
-                    while (isWall(r - d, j)) d++;
-                    if (d < minDepth) minDepth = d;
-                }
-                const proto = runLen <= 2 ? CATACOMBS_EDGE_SMALL : CATACOMBS_EDGE_TOP;
-                const dw = runLen * cell;
-                const dh = Math.min(catacombPlateSize(S, proto.sh), minDepth * cell);
-                const dx = start * cell;
-                const dy = (r + 1) * cell - dh;
-                push(proto, dx, dy, dw, dh, false, true, null);
-            }
-        }
-
-        // ── Left face runs (floor west of wall) ──────────────────────────
-        for (let c = 0; c < cols; c++) {
-            let r = 0;
-            while (r < rows) {
-                if (!(isWall(r, c) && isFloor(r, c - 1))) { r++; continue; }
-                const start = r;
-                while (r < rows && isWall(r, c) && isFloor(r, c - 1)) r++;
-                const runH = (r - start) * cell;
-                let minDepth = cols;
-                for (let j = start; j < r; j++) {
-                    let d = 0;
-                    while (isWall(j, c + d)) d++;
-                    if (d < minDepth) minDepth = d;
-                }
-                const proto = CATACOMBS_EDGE_LEFT;
-                const pw = catacombPlateSize(S, proto.sw);
-                const ph = catacombPlateSize(S, proto.sh);
-                const dw = Math.min(pw, minDepth * cell);
-                const dh = runH; // full run height; source wraps vertically
-                const dx = c * cell;
-                const dy = start * cell;
-                // edge5's right column (~65% solid) is the more solid edge;
-                // flipH so that edge lands on the west (floor) boundary.
-                const clip = wallClipFor(dx, dy, dw, runH);
-                push(proto, dx, dy, dw, dh, true, false, clip);
-            }
-        }
-
-        // ── Right face runs (floor east of wall) ─────────────────────────
-        for (let c = 0; c < cols; c++) {
-            let r = 0;
-            while (r < rows) {
-                if (!(isWall(r, c) && isFloor(r, c + 1))) { r++; continue; }
-                const start = r;
-                while (r < rows && isWall(r, c) && isFloor(r, c + 1)) r++;
-                const runH = (r - start) * cell;
-                let minDepth = cols;
-                for (let j = start; j < r; j++) {
-                    let d = 0;
-                    while (isWall(j, c - d)) d++;
-                    if (d < minDepth) minDepth = d;
-                }
-                const proto = CATACOMBS_EDGE_RIGHT;
-                const pw = catacombPlateSize(S, proto.sw);
-                const ph = catacombPlateSize(S, proto.sh);
-                const dw = Math.min(pw, minDepth * cell);
-                const dh = runH; // full run height; source wraps vertically
-                const dx = (c + 1) * cell - dw;
-                const dy = start * cell;
-                // edge3's solid right column sits naturally on the east boundary.
-                push(proto, dx, dy, dw, dh, false, false, null);
-            }
-        }
-
-        // ── Convex corner cells (two perpendicular floor sides) ──────────
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (!isWall(r, c)) continue;
-                const fN = isFloor(r - 1, c), fS = isFloor(r + 1, c);
-                const fW = isFloor(r, c - 1), fE = isFloor(r, c + 1);
-                // Exactly two perpendicular floor sides → convex corner.
-                if ((fN && fE) || (fN && fW) || (fS && fE) || (fS && fW)) {
-                    const isSouth = fS; // floor on south → wall mass north → big plate
-                    const proto = isSouth ? CATACOMBS_EDGE_CORNER_BIG : CATACOMBS_EDGE_CORNER_SMALL;
-                    const dw = catacombPlateSize(S, proto.sw);
-                    const dh = catacombPlateSize(S, proto.sh);
-                    const flipH = !!(fW);
-                    const flipV = !!(fS);
-                    const dx = fE ? (c + 1) * cell - dw : c * cell;
-                    const dy = fS ? (r + 1) * cell - dh : r * cell;
-                    const clip = wallClipFor(dx, dy, dw, dh);
-                    push(proto, dx, dy, dw, dh, flipH, flipV, clip);
-                }
-            }
-        }
-
-        this._catacombEdgePlan = plan;
-        return plan;
-    }
-
-    // Draws a single precomputed edge plate, with optional flip and optional
-    // wall-cell clip. Handles source wrapping for runs longer than the plate
-    // (segments tile the crop horizontally/vertically).
-    _drawCatacombsPlate(ctx, p, ox, oy) {
+    // Draws a single piece from CATACOMBS_WALL_PIECES onto the target context.
+    _drawWallPiece(ctx, p, dx, dy, dw, dh, alpha = 1.0) {
+        if (!p) return;
         const img = this._catacombsEdgeImage(p.file);
         if (!img) return;
-        const sx0 = Math.round(p.dx + ox);
-        const sy0 = Math.round(p.dy + oy);
         ctx.save();
-        // Clip to overlapping wall cells if provided.
-        if (p.clip) {
-            ctx.beginPath();
-            for (const rc of p.clip) ctx.rect(rc.x + ox, rc.y + oy, rc.w, rc.h);
-            ctx.clip();
-        }
-        // Flip (around plate centre).
+        if (alpha < 1.0) ctx.globalAlpha = alpha;
         if (p.flipH || p.flipV) {
-            const cx = sx0 + p.dw * 0.5, cy = sy0 + p.dh * 0.5;
+            const cx = dx + dw * 0.5;
+            const cy = dy + dh * 0.5;
             ctx.translate(cx, cy);
             ctx.scale(p.flipH ? -1 : 1, p.flipV ? -1 : 1);
             ctx.translate(-cx, -cy);
         }
-        const sw = p.sw * CATACOMBS_EDGE_SCALE; // src crop width → dest width
-        const sh = p.sh * CATACOMBS_EDGE_SCALE;
-        let ry = p.dy, remH = p.dh;
-        let srcY = p.sy;
-        while (remH > 0) {
-            const useH = Math.min(sh, remH);
-            let rx = p.dx, remW = p.dw;
-            let srcX = p.sx;
-            while (remW > 0) {
-                const useW = Math.min(sw, remW);
-                ctx.drawImage(img,
-                    srcX, srcY,
-                    useW / CATACOMBS_EDGE_SCALE, useH / CATACOMBS_EDGE_SCALE,
-                    Math.round(rx + ox), Math.round(ry + oy),
-                    Math.round(useW), Math.round(useH));
-                remW -= sw;
-                rx += sw;
-                srcX = p.sx; // wrap source x
-            }
-            remH -= sh;
-            ry += sh;
-            srcY = p.sy; // wrap source y
-        }
+        ctx.drawImage(img, p.sx, p.sy, p.sw, p.sh, dx, dy, dw, dh);
         ctx.restore();
     }
 
-    // Draws all edge plates whose world rects overlap the visible area.
-    _drawCatacombsEdges(ctx, ox, oy, viewW, viewH) {
-        const plan = this._buildCatacombEdgePlan();
-        if (!plan) return;
-        for (const p of plan) {
-            const wx = p.dx, wy = p.dy;
-            if (wx + p.dw < 0 || wx > viewW || wy + p.dh < 0 || wy > viewH) continue;
-            this._drawCatacombsPlate(ctx, p, ox, oy);
+    // Bakes the complete catacombs wall mass into an offscreen canvas (2816x1408)
+    // exactly once when all wall assets are loaded.
+    // 1. Continuous world-anchored mars_catacombs_surface2.jpg base on all '#' cells
+    // 2. Interior rock overlay composition from edge1-6
+    // 3. Faces, transitions, convex and concave corners touching floor
+    // 4. Subtle contact depth rim on boundaries
+    // 5. Strict destination-in clipping to guarantee 0 bleeding onto floor '.' cells
+    _buildCatacombsWallCanvas() {
+        if (!this.map || this.mapId !== CATACOMBS_ID) return null;
+        const mask = this.map.terrainMask;
+        if (!mask || mask.length === 0) return null;
+        if (!this.mapCatacombsWallTexture || !this.mapCatacombsWallTexture.complete || this.mapCatacombsWallTexture.naturalWidth === 0) return null;
+        if (!this._catacombsEdgesReady()) return null;
+        if (typeof document === 'undefined') return null;
+
+        const rows = mask.length;
+        const cols = mask[0].length;
+        const cell = LOGICAL_TILE;
+        const w = cols * cell;
+        const h = rows * cell;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        // 1. Base contínua: mars_catacombs_surface2.jpg ancorada ao mundo em todas as células '#'
+        const baseImg = this.mapCatacombsWallTexture;
+        const bw = Math.round(baseImg.naturalWidth * CATACOMBS_WALL_SCALE);
+        const bh = Math.round(baseImg.naturalHeight * CATACOMBS_WALL_SCALE);
+        const baseCanvas = document.createElement('canvas');
+        baseCanvas.width = bw;
+        baseCanvas.height = bh;
+        const bctx = baseCanvas.getContext('2d');
+        bctx.imageSmoothingEnabled = false;
+        bctx.drawImage(baseImg, 0, 0, bw, bh);
+
+        let basePattern = null;
+        try {
+            basePattern = ctx.createPattern(baseCanvas, 'repeat');
+        } catch (e) {
+            basePattern = null;
         }
+
+        const wallSolid = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
+        ctx.fillStyle = wallSolid;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (mask[r][c] !== '.') {
+                    ctx.fillRect(c * cell, r * cell, cell, cell);
+                }
+            }
+        }
+        if (basePattern) {
+            ctx.fillStyle = basePattern;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (mask[r][c] !== '.') {
+                        ctx.fillRect(c * cell, r * cell, cell, cell);
+                    }
+                }
+            }
+        }
+
+        // 2. Composição interna de rocha usando crops dos edge sprites
+        const fillPieces = CATACOMBS_WALL_PIECES.fill;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (mask[r][c] === '.') continue;
+                const hVal = hash2(c * 17 + 3, r * 29 + 7);
+                if (hVal < 0.85) {
+                    const pidx = Math.floor(hash2(c * 31, r * 47) * fillPieces.length) % fillPieces.length;
+                    this._drawWallPiece(ctx, fillPieces[pidx], c * cell, r * cell, cell, cell, 0.75);
+                }
+                if (hash2(c * 53 + 1, r * 37 + 9) < 0.25) {
+                    const didx = Math.floor(hash2(c * 11, r * 19) * CATACOMBS_WALL_PIECES.detail.length) % CATACOMBS_WALL_PIECES.detail.length;
+                    this._drawWallPiece(ctx, CATACOMBS_WALL_PIECES.detail[didx], c * cell, r * cell, cell, cell, 0.6);
+                }
+            }
+        }
+
+        // 3. Faces, cantos e transições em contato com o chão
+        const isFloor = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && mask[r][c] === '.';
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (mask[r][c] === '.') continue;
+                const fN = isFloor(r - 1, c);
+                const fS = isFloor(r + 1, c);
+                const fW = isFloor(r, c - 1);
+                const fE = isFloor(r, c + 1);
+                const ortho = (fN ? 1 : 0) + (fS ? 1 : 0) + (fW ? 1 : 0) + (fE ? 1 : 0);
+
+                const diagNW = isFloor(r - 1, c - 1) && !fN && !fW;
+                const diagNE = isFloor(r - 1, c + 1) && !fN && !fE;
+                const diagSW = isFloor(r + 1, c - 1) && !fS && !fW;
+                const diagSE = isFloor(r + 1, c + 1) && !fS && !fE;
+
+                const dx = c * cell;
+                const dy = r * cell;
+                const hVal = hash2(c * 13 + 5, r * 19 + 11);
+
+                if (ortho >= 3) {
+                    const list = CATACOMBS_WALL_PIECES.end;
+                    const p = list[Math.floor(hVal * list.length) % list.length];
+                    this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                } else if (ortho === 2) {
+                    if (fN && fW) {
+                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'NW');
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fN && fE) {
+                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'NE');
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fS && fW) {
+                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'SW');
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fS && fE) {
+                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'SE');
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fN && fS) {
+                        const topP = CATACOMBS_WALL_PIECES.top[Math.floor(hVal * CATACOMBS_WALL_PIECES.top.length) % CATACOMBS_WALL_PIECES.top.length];
+                        const botP = CATACOMBS_WALL_PIECES.bottom[Math.floor((1 - hVal) * CATACOMBS_WALL_PIECES.bottom.length) % CATACOMBS_WALL_PIECES.bottom.length];
+                        this._drawWallPiece(ctx, topP, dx, dy, cell, cell, 1.0);
+                        this._drawWallPiece(ctx, botP, dx, dy, cell, cell, 0.9);
+                    } else if (fW && fE) {
+                        const leftP = CATACOMBS_WALL_PIECES.left[Math.floor(hVal * CATACOMBS_WALL_PIECES.left.length) % CATACOMBS_WALL_PIECES.left.length];
+                        const rightP = CATACOMBS_WALL_PIECES.right[Math.floor((1 - hVal) * CATACOMBS_WALL_PIECES.right.length) % CATACOMBS_WALL_PIECES.right.length];
+                        this._drawWallPiece(ctx, leftP, dx, dy, cell, cell, 1.0);
+                        this._drawWallPiece(ctx, rightP, dx, dy, cell, cell, 0.9);
+                    }
+                } else if (ortho === 1) {
+                    if (fN) {
+                        const list = CATACOMBS_WALL_PIECES.top;
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fS) {
+                        const list = CATACOMBS_WALL_PIECES.bottom;
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fW) {
+                        const list = CATACOMBS_WALL_PIECES.left;
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    } else if (fE) {
+                        const list = CATACOMBS_WALL_PIECES.right;
+                        const p = list[Math.floor(hVal * list.length) % list.length];
+                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
+                    }
+                } else if (diagNW || diagNE || diagSW || diagSE) {
+                    const list = CATACOMBS_WALL_PIECES.innerCorner;
+                    const p = list[Math.floor(hVal * list.length) % list.length];
+                    this._drawWallPiece(ctx, p, dx, dy, cell, cell, 0.9);
+                }
+            }
+        }
+
+        // 4. Sombreamento sutil de profundidade nas bordas internas voltadas para o chão
+        ctx.fillStyle = 'rgba(25, 8, 4, 0.35)';
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (mask[r][c] === '.') continue;
+                const fN = isFloor(r - 1, c);
+                const fS = isFloor(r + 1, c);
+                const fW = isFloor(r, c - 1);
+                const fE = isFloor(r, c + 1);
+                if (fN) ctx.fillRect(c * cell, r * cell, cell, 4);
+                if (fS) ctx.fillRect(c * cell, (r + 1) * cell - 5, cell, 5);
+                if (fW) ctx.fillRect(c * cell, r * cell, 4, cell);
+                if (fE) ctx.fillRect((c + 1) * cell - 4, r * cell, 4, cell);
+            }
+        }
+
+        // 5. Garantia matemática: clip estrito na máscara de parede '#'
+        // Impede rigorosamente qualquer vazamento de pixel para as células de chão '.'
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.beginPath();
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (mask[r][c] !== '.') {
+                    ctx.rect(c * cell, r * cell, cell, cell);
+                }
+            }
+        }
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.restore();
+
+        this._catacombsWallCanvas = canvas;
+        return canvas;
+    }
+
+    _ensureCatacombsWallCanvas() {
+        if (this._catacombsWallCanvas) return this._catacombsWallCanvas;
+        return this._buildCatacombsWallCanvas();
     }
 
     // Catacomb terrain:
-    // Chão mais claro com textura (map_catacombs_surface.jpeg) e paredes
-    // rochosas escuras com cores sólidas e relevo sombreado nas bordas.
+    // 1. Chão com textura aprovada (map_catacombs_surface.jpeg) — 100% PRESERVADO
+    // 2. Massa completa de paredes a partir da camada pré-composta offscreen (mars_catacombs_surface2 + EdgeSprites)
     _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
         if (this.mapId !== CATACOMBS_ID) return;
         const mask = this.map.terrainMask;
@@ -780,6 +803,7 @@ export class MapRenderer {
         const walkable = CATACOMBS_WALKABLE;
         const floor = `rgb(${CATACOMBS_FLOOR[0]}, ${CATACOMBS_FLOOR[1]}, ${CATACOMBS_FLOOR[2]})`;
 
+        // 1. Chão aprovado — SEM NENHUMA ALTERAÇÃO
         const floorPattern = this._ensureCatacombsSurfacePattern(ctx);
         if (floorPattern && typeof DOMMatrix !== 'undefined') {
             floorPattern.setTransform(
@@ -789,45 +813,44 @@ export class MapRenderer {
             );
         }
 
-        // Wall pattern: continuous rock texture anchored to world coords.
-        const wallPattern = this._ensureCatacombsWallPattern(ctx);
-        if (wallPattern && typeof DOMMatrix !== 'undefined') {
-            wallPattern.setTransform(
-                new DOMMatrix()
-                    .translate(Math.round(offset.x), Math.round(offset.y))
-                    .scale(CATACOMBS_WALL_SCALE)
-            );
-        }
-        const wallSolid = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
-
         for (let r = minRow; r <= maxRow; r++) {
             for (let c = minCol; c <= maxCol; c++) {
-                const isFloor = walkable.has(mask[r][c]);
-                const sx = Math.round(c * cell + offset.x);
-                const sy = Math.round(r * cell + offset.y);
-
-                if (isFloor) {
+                if (walkable.has(mask[r][c])) {
+                    const sx = Math.round(c * cell + offset.x);
+                    const sy = Math.round(r * cell + offset.y);
                     ctx.fillStyle = floor;
                     ctx.fillRect(sx, sy, cell, cell);
                     if (floorPattern) {
                         ctx.fillStyle = floorPattern;
                         ctx.fillRect(sx, sy, cell, cell);
                     }
-                } else {
-                    // Dark base ensures no brightness leak if the photo has
-                    // subtle gaps; the world-anchored pattern paints on top.
-                    ctx.fillStyle = wallSolid;
-                    ctx.fillRect(sx, sy, cell, cell);
-                    if (wallPattern) {
-                        ctx.fillStyle = wallPattern;
+                }
+            }
+        }
+
+        // 2. Paredes completas: camada pré-composta offscreen (ou fallback enquanto assets carregam)
+        const wallCanvas = this._ensureCatacombsWallCanvas();
+        if (wallCanvas) {
+            const sx = Math.max(0, minCol * cell);
+            const sy = Math.max(0, minRow * cell);
+            const sw = Math.min(wallCanvas.width - sx, (maxCol - minCol + 1) * cell);
+            const sh = Math.min(wallCanvas.height - sy, (maxRow - minRow + 1) * cell);
+            const dx = Math.round(sx + offset.x);
+            const dy = Math.round(sy + offset.y);
+            ctx.drawImage(wallCanvas, sx, sy, sw, sh, dx, dy, sw, sh);
+        } else {
+            const wallSolid = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
+            for (let r = minRow; r <= maxRow; r++) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    if (!walkable.has(mask[r][c])) {
+                        const sx = Math.round(c * cell + offset.x);
+                        const sy = Math.round(r * cell + offset.y);
+                        ctx.fillStyle = wallSolid;
                         ctx.fillRect(sx, sy, cell, cell);
                     }
                 }
             }
         }
-
-        // Rim plates: photo-based rock edges at every floor/wall boundary.
-        this._drawCatacombsEdges(ctx, offset.x, offset.y, viewW, viewH);
     }
 
     // True only after the cave sprite has actually finished decoding, so we
@@ -1405,16 +1428,15 @@ export class MapRenderer {
         }
 
         // Catacombs: draw the mask-driven textured floor/rock terrain.
-        // Layer order: terrain → landing pad → [back decor] → [obstacles] →
-        // [structures] → [front decor] → exits.
+        // Layer order: terrain → [back decor] → [obstacles] → [structures] → [front decor].
         this._renderCatacombsTerrain(ctx, offset, viewW, viewH);
 
-        this._drawLandingPad(ctx, offset);
+        if (!catacombs) this._drawLandingPad(ctx, offset);
         this._drawDecorations(ctx, offset, 'back');
         if (!catacombs) this._drawObstacles(ctx, offset);
         this._drawStructures(ctx, offset);
         this._drawDecorations(ctx, offset, 'front');
-        this._drawExits(ctx, offset);
+        if (!catacombs) this._drawExits(ctx, offset);
     }
 
     _renderSurface(ctx, camera) {
