@@ -336,7 +336,16 @@ export class MapRenderer {
             drawX = baseX;
             drawY = baseY;
         }
-        if (o.source) {
+        if (o.flipV) {
+            // Vertical flip: the sprite hangs from the base point
+            // (bottom-center anchor), inverted, as if embedded in
+            // the wall below it.
+            ctx.save();
+            ctx.translate(baseX, baseY);
+            ctx.scale(1, -1);
+            ctx.drawImage(img, -drawW / 2, -drawH, drawW, drawH);
+            ctx.restore();
+        } else if (o.source) {
             const s = o.source;
             ctx.drawImage(img, s.x, s.y, s.w, s.h, drawX, drawY, drawW, drawH);
         } else {

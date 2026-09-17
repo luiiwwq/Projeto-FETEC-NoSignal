@@ -409,6 +409,173 @@ export const marsCoreMap = {
 const CATACOMBS_OBJECTS_DIR =
     './Cavern/Catacombs Objects/';
 
+// ── Braços mortos na lateral noroeste (parede diagonal do topo-esquerda
+//     até a entrada oeste). 6–9 braços, alternando variantes. ──
+const CATACOMBS_NORTHWEST_ARMS = [
+    // zona superior próxima ao Lich
+    {
+        x: 400,
+        y: 192,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 320,
+        y: 256,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    // zona intermediária superior
+    {
+        x: 256,
+        y: 320,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 192,
+        y: 384,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    // zona intermediária inferior
+    {
+        x: 224,
+        y: 448,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 160,
+        y: 448,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    // zona inferior (perto da entrada oeste)
+    {
+        x: 128,
+        y: 448,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 96,
+        y: 480,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+];
+
+// ── Segunda área de decoração: Lich inferior invertido, objetos ao seu
+//     redor e pilhas de crânios na lateral direita isolada. ──
+const CATACOMBS_LOWER_AND_SIDE_OBJECTS = [
+    // Lich invertido na área inferior esquerda, apoiado na parede
+    // inferior com a base voltada para dentro da caverna.
+    {
+        x: 300,
+        y: 992,
+        sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        flipV: true,
+        scale: 1,
+    },
+
+    // ── Grupo esquerdo do Lich ──
+    {
+        x: 200,
+        y: 960,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 160,
+        y: 980,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 180,
+        y: 940,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_1.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+
+    // ── Grupo direito do Lich ──
+    {
+        x: 420,
+        y: 960,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 460,
+        y: 980,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 440,
+        y: 940,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+
+    // ── Pile skulls na lateral direita isolada ──
+    {
+        x: 1200,
+        y: 832,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 1200,
+        y: 928,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 1200,
+        y: 1024,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+];
+
 const catacombsObjects = [
     // Lich — área superior central, encostado à parede norte.
     {
@@ -532,7 +699,11 @@ export const marsCatacombsMap = {
         },
     ],
     structures: [],
-    decorations: catacombsObjects,
+    decorations: [
+        ...catacombsObjects,
+        ...CATACOMBS_NORTHWEST_ARMS,
+        ...CATACOMBS_LOWER_AND_SIDE_OBJECTS,
+    ],
 };
 
 /* ─────────────── Castle interior maps ─────────────── */
