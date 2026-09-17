@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>debug cavern (sprite-cavern)</title>
+<style>
+    html, body { margin: 0; padding: 0; background: #000; }
+    canvas { display: block; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+    import { MAPS, MAP_IDS } from './src/content/maps.js';
+    import { MapRenderer } from './src/engine/MapRenderer.js';
+
+    const params = new URLSearchParams(location.search);
+    const which = params.get('map') || 'catacombs';
+    const map = which === 'nucleo' || which === 'nucle' ? MAPS[MAP_IDS.MARS_CORE] : MAPS[MAP_IDS.MARS_CATACOMBS];
+
+    const canvas = document.getElementById('c');
+    canvas.width = map.width;
+    canvas.height = map.height;
+    const ctx = canvas.getContext('2d');
+
+    const renderer = new MapRenderer();
+    renderer.setMap(map);
+
+    const camera = {
+        viewportWidth: map.width,
+        viewportHeight: map.height,
+        getRenderOffset: () => ({ x: 0, y: 0 }),
+    };
+
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(String(e.message)));
+
+    function draw() {
+        renderer.time = performance.now() / 1000;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, map.width, map.height);
+        renderer.render(ctx, camera);
+
+        // overlay=1: walkable cells (cyan) + solid AABBs (red) for mask review.
+        if (params.get('overlay') === '1') {
+            const cell = map.maskCell;
+            ctx.fillStyle = 'rgba(80, 214, 200, 0.35)';
+            for (let r = 0; r < map.terrainMask.length; r++) {
+                for (let c = 0; c < map.terrainMask[r].length; c++) {
+                    if (map.terrainMask[r][c] === '.') ctx.fillRect(c * cell, r * cell, cell, cell);
+                }
+            }
+            ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
+            ctx.lineWidth = 2;
+            for (const o of map.obstacles) ctx.strokeRect(o.x, o.y, o.w, o.h);
+        }
+
+        const img = renderer.cavernSprites.get(map.id);
+        const d = ctx.getImageData(0, 0, map.width, map.height).data;
+        let nonBlack = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i] > 8 || d[i + 1] > 8 || d[i + 2] > 8) nonBlack++;
+        }
+        // analyze=1: per-cell mean luminance for walkable vs solid cells — proves
+        // the authored mask actually sits on the floor of the rendered artwork.
+        let lumWalk = 0, nWalk = 0, lumSolid = 0, nSolid = 0, darkWalk = 0;
+        const darkWalkCells = [];
+        if (params.get('analyze') === '1') {
+            const cell = map.maskCell;
+            for (let r = 0; r < map.terrainMask.length; r++) {
+                for (let c = 0; c < map.terrainMask[r].length; c++) {
+                    let s = 0, n = 0;
+                    for (let yy = r * cell; yy < Math.min((r + 1) * cell, map.height); yy += 4) {
+                        for (let xx = c * cell; xx < Math.min((c + 1) * cell, map.width); xx += 4) {
+                            const p = (yy * map.width + xx) * 4;
+                            s += (d[p] + d[p + 1] + d[p + 2]) / 3;
+                            n++;
+                        }
+                    }
+                    const mean = s / n;
+                    if (map.terrainMask[r][c] === '.') {
+                        lumWalk += mean; nWalk++;
+                        if (mean < 24) { darkWalk++; darkWalkCells.push([c, r, +mean.toFixed(1)]); }
+                    } else {
+                        lumSolid += mean; nSolid++;
+                    }
+                }
+            }
+        }
+        const report = 'CAVERN ' + JSON.stringify({
+            map: map.id,
+            size: [map.width, map.height],
+            spriteLoaded: !!img,
+            spriteNatural: img ? [img.naturalWidth, img.naturalHeight] : null,
+            obstacles: map.obstacles.length,
+            walkableCells: map.terrainMask.reduce((a, r) => a + [...r].filter((c) => c === '.').length, 0),
+            nonBlackPixels: nonBlack,
+            meanLumWalkable: nWalk ? +(lumWalk / nWalk).toFixed(1) : null,
+            meanLumSolid: nSolid ? +(lumSolid / nSolid).toFixed(1) : null,
+            walkableDarkCells: nWalk ? darkWalk : null,
+            darkWalkCells,
+            errors,
+        });
+        console.log(report);
+        let out = document.getElementById('out');
+        if (!out) {
+            out = document.createElement('pre');
+            out.id = 'out';
+            document.body.appendChild(out);
+        }
+        out.textContent = report;
+    }
+
+    draw();
+    setTimeout(draw, 600);
+    setTimeout(draw, 1600);
+</script>
+</body>
+</html>

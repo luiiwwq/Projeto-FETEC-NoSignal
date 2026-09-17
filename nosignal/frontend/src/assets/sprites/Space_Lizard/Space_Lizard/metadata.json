@@ -1,0 +1,692 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "7b4bb027-4eb4-4c5b-afc0-de91ae6a0e38",
+        "name": "Space Lizard Sprite",
+        "prompt": "Make a crocodile astronaut sprite. Futuristic space pirate look with gun holsters on hips. Like the kind that Samus Aran might fight in her games. Be careful not to infringe or rip off copy right! Like a future space adventurer, but dangerous! (Must wear astronaut helmet! Helmet is see-through to see the croc's face!)",
+        "size": {
+          "width": 88,
+          "height": 88
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "side",
+        "created_at": "2026-07-21T03:56:25.528470+00:00"
+      },
+      "folder": "Space_Lizard_Sprite",
+      "frames": {
+        "rotations": {
+          "south": "Space_Lizard_Sprite/rotations/south.png",
+          "south-east": "Space_Lizard_Sprite/rotations/south-east.png",
+          "east": "Space_Lizard_Sprite/rotations/east.png",
+          "north-east": "Space_Lizard_Sprite/rotations/north-east.png",
+          "north": "Space_Lizard_Sprite/rotations/north.png",
+          "north-west": "Space_Lizard_Sprite/rotations/north-west.png",
+          "west": "Space_Lizard_Sprite/rotations/west.png",
+          "south-west": "Space_Lizard_Sprite/rotations/south-west.png"
+        },
+        "animations": {
+          "Float": {
+            "south": [
+              "Space_Lizard_Sprite/animations/Float/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/south/frame_007.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/south-east/frame_007.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/north-east/frame_007.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Float/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_007.png",
+              "Space_Lizard_Sprite/animations/Float/west/frame_008.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/north-west/frame_007.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Float/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_007.png",
+              "Space_Lizard_Sprite/animations/Float/north/frame_008.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Float/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_007.png",
+              "Space_Lizard_Sprite/animations/Float/east/frame_008.png"
+            ]
+          },
+          "Death": {
+            "north": [
+              "Space_Lizard_Sprite/animations/Death/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/north/frame_008.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Death/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/west/frame_008.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Death/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/east/frame_008.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/south-west/frame_008.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/south-east/frame_008.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/north-west/frame_008.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/north-east/frame_008.png"
+            ],
+            "south": [
+              "Space_Lizard_Sprite/animations/Death/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_005.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_006.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_007.png",
+              "Space_Lizard_Sprite/animations/Death/south/frame_008.png"
+            ]
+          },
+          "Pull_Object": {
+            "north": [
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north/frame_005.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-west/frame_005.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/north-east/frame_005.png"
+            ],
+            "south": [
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south/frame_005.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/south-west/frame_005.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/west/frame_005.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Pull_Object/east/frame_005.png"
+            ]
+          },
+          "Walk": {
+            "south": [
+              "Space_Lizard_Sprite/animations/Walk/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/south/frame_005.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/south-west/frame_005.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/north-west/frame_005.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Walk/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/west/frame_005.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/south-east/frame_005.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Walk/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/east/frame_005.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/north-east/frame_005.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Walk/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Walk/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Walk/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Walk/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Walk/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Walk/north/frame_005.png"
+            ]
+          },
+          "Two-Footed_Jump": {
+            "north": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north/frame_006.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/east/frame_006.png"
+            ],
+            "south": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south/frame_006.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-west/frame_006.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/south-east/frame_006.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/west/frame_006.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-west/frame_006.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Two-Footed_Jump/north-east/frame_006.png"
+            ]
+          },
+          "Punch": {
+            "south": [
+              "Space_Lizard_Sprite/animations/Punch/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/south/frame_005.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/north-west/frame_005.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Punch/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/east/frame_005.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Punch/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/north/frame_005.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/south-west/frame_005.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/south-east/frame_005.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/north-east/frame_005.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Punch/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Punch/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Punch/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Punch/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Punch/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Punch/west/frame_005.png"
+            ]
+          },
+          "Hit_Knocked_Back": {
+            "south": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south/frame_006.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-west/frame_006.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-east/frame_006.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/east/frame_006.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/west/frame_006.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north-east/frame_006.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/south-west/frame_006.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_005.png",
+              "Space_Lizard_Sprite/animations/Hit_Knocked_Back/north/frame_006.png"
+            ]
+          },
+          "Breathing_Idle": {
+            "south": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south/frame_003.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/east/frame_003.png"
+            ],
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-west/frame_003.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/west/frame_003.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north/frame_003.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-east/frame_003.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/north-east/frame_003.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Breathing_Idle/south-west/frame_003.png"
+            ]
+          },
+          "Shooting": {
+            "north-west": [
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-west/frame_007.png"
+            ],
+            "south": [
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/south/frame_007.png"
+            ],
+            "west": [
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_007.png",
+              "Space_Lizard_Sprite/animations/Shooting/west/frame_008.png"
+            ],
+            "north": [
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/north/frame_007.png"
+            ],
+            "south-east": [
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-east/frame_007.png"
+            ],
+            "south-west": [
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/south-west/frame_007.png"
+            ],
+            "north-east": [
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/north-east/frame_007.png"
+            ],
+            "east": [
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_000.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_001.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_002.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_003.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_004.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_005.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_006.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_007.png",
+              "Space_Lizard_Sprite/animations/Shooting/east/frame_008.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-27T15:34:06.467207"
+}

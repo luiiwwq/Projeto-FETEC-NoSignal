@@ -1,0 +1,25 @@
+:root {
+    /* Paleta Oficial Pixel Art Sci-Fi - No Signal */
+    --space-black: #05050b;
+    --space-blue: #0b0b16;
+    --space-deep: #090913;
+    --mars-dark: #582114;
+    --mars-red: #8f3419;
+    --mars-orange: #d85a22;
+    --mars-light: #ed8733;
+    --logo-gold: #e39a3e;
+    --logo-dark-gold: #a66224;
+    --panel-border: #2a0e12;
+    --panel-brown: #4d1d15;
+    --panel-orange: #9c411d;
+    --panel-highlight: #c75624;
+    --text-cream: #f6c885;
+    --text-cream-dim: #c5975b;
+    --pixel-shadow: #1c080b;
+
+    /* Fontes e Proporção da Referência (1791 x 942) */
+    --font-pixel: 'Press Start 2P', 'Courier New', monospace, sans-serif;
+    --base-width: 1791px;
+    --base-height: 942px;
+    --aspect-ratio: calc(1791 / 942);
+}

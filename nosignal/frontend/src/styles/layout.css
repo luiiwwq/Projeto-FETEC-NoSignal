@@ -1,0 +1,55 @@
+/* Reset e Base */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    background-color: var(--space-black);
+    color: var(--text-cream);
+    font-family: var(--font-pixel);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Container Principal com Proporção Panorâmica Dinâmica (1446 x 720) */
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #000;
+    overflow: hidden;
+    touch-action: none;
+}
+
+.title-screen-wrapper {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--space-deep);
+    overflow: hidden;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: -moz-crisp-edges;
+}
+
+/* Telas Mobile em modo portrait */
+@media (max-width: 600px) and (orientation: portrait) {
+    .title-screen-wrapper {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        aspect-ratio: auto;
+    }
+}
