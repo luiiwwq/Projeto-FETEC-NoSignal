@@ -474,12 +474,12 @@ const CATACOMBS_LOWER_AND_SIDE_OBJECTS = [
 const catacombsObjects = [
     // Lich — área superior central, encostado à parede norte.
     {
-        x: 800,
-        y: 224,
+        x: 710,
+        y: 250,
         sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
         layer: 'back',
         anchor: 'bottom-center',
-        scale: 1,
+        scale: 1.5,
     },
 
     // ── Grupo esquerdo (x: 535–625, y: 170–270) ──
@@ -507,14 +507,7 @@ const catacombsObjects = [
         anchor: 'bottom-center',
         scale: 1,
     },
-    {
-        x: 560,
-        y: 272,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
+
     {
         x: 592,
         y: 224,
@@ -549,22 +542,7 @@ const catacombsObjects = [
         anchor: 'bottom-center',
         scale: 1,
     },
-    {
-        x: 850,
-        y: 251,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 895,
-        y: 215,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_2.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
+
 ];
 
 export const marsCatacombsMap = {
