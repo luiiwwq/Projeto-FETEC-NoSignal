@@ -45,12 +45,20 @@ export const CHARACTER_ALLY_SHOP_POSITION = {
     y: 410
 };
 
+// Enemy spawn — just east of the parked enemy spaceship (surface). The hull
+// obstacle spans x3111..3411 / y1927..2173 (center ≈ 3261, 2050), so the enemy
+// stands at the ship's right flank, centered vertically on the hull.
+export const CHARACTER_ENEMY_SHIP_POSITION = {
+    x: 3480,
+    y: 2050
+};
+
 // Enemy spawn table (per remaining character). `null` means the enemy is
 // registered as an enemy but NOT spawned until a position is configured.
 export const CHARACTER_ENEMY_SPAWNS = {
-    [CHARACTER_IDS.ASTRONAUT]: null,
-    [CHARACTER_IDS.SPACE_LIZARD]: null,
-    [CHARACTER_IDS.OCSTRONAUT]: null
+    [CHARACTER_IDS.ASTRONAUT]: CHARACTER_ENEMY_SHIP_POSITION,
+    [CHARACTER_IDS.SPACE_LIZARD]: CHARACTER_ENEMY_SHIP_POSITION,
+    [CHARACTER_IDS.OCSTRONAUT]: CHARACTER_ENEMY_SHIP_POSITION
 };
 
 /**

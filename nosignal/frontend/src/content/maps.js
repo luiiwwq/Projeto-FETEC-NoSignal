@@ -101,6 +101,21 @@ const shopNpc = {
     sprite: 'Map/shop_npc.png',
 };
 
+// Enemy spaceship — static prop (Map/enemie_spaceship.png) parked on the
+// surface. The sprite is 1024×1024 with transparent margins; `source` crops to
+// the opaque hull (694×570) and it is scaled down to roughly the shop NPC size
+// (300×246) so the AABB below is small and tight. Center ≈ (3261, 2050).
+const enemySpaceship = {
+    id: 'enemy-spaceship',
+    kind: 'npc',
+    x: 3111,
+    y: 1927,
+    w: 300,
+    h: 246,
+    source: { x: 157, y: 204, w: 694, h: 570 },
+    sprite: 'Map/enemie_spaceship.png',
+};
+
 
 export const marsSurfaceMap = {
     id: MAP_IDS.MARS_SURFACE,
@@ -123,6 +138,7 @@ export const marsSurfaceMap = {
     obstacles: [
         ...surfaceBorderRocks,
         shopNpc,
+        enemySpaceship,
         caveRockOuterLeft,
         cavePillarLeft,
         caveArchTop,
@@ -237,390 +253,186 @@ export const marsCaveMap = {
     ],
 };
 
-/* ─────────────── Undead Mars maps (Núcleo + Catacumbas) ─────────────── */
+/* ─────────────── Sprite-cavern maps (Núcleo + Catacumbas) ───────────────
+ * Both maps are a single pre-composed PNG (pure black background + the whole
+ * cave artwork) drawn 1:1 at world (0,0) by MapRenderer's `sprite-cavern`
+ * path. Collisions do NOT come from the pixels: each map carries its own
+ * walkability mask (cell = CAVERN_CELL) derived from the artwork and reviewed
+ * cell by cell. '.' = walkable floor, '#' = solid (black background + rock
+ * walls/shadows). AABBs are generated from the mask — one per contiguous
+ * blocked run per row — so the existing collisionSystem keeps working
+ * unchanged, and bullets stop on the same geometry.                          */
 
-// Individual undead-tileset props. Each object stores its own `sprite` path
-// relative to src/assets/sprites/ (rendered generically via MapRenderer's
-// _loadSpriteOnce — one load per file, reused across all placements).
-const UNDEAD_OBJECTS_DIR = 'UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/Objects_separately/';
-const undeadSprite = (file) => `${UNDEAD_OBJECTS_DIR}${file}`;
-// Root PNG/ files (Ground_rocks floor, water animation frames, ...).
-const undeadPng = (file) => `UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/${file}`;
+const CAVERN_CELL = 32;
 
-/* ─────────────── Catacumbas: máscara de terreno ───────────────
- * Ground truth do mapa: grade única 44×22 de células de 64px (2816×1408, 2:1).
- * Símbolos exclusivos: `.` = chão caminhável, `#` = rocha sólida. Um único
- * componente navegável liga boca oeste → corredor oeste → arena central →
- * gargalo leste → salão final. As paredes externas são massas contínuas de
- * `#` (norte e sul inteiros, leste selado); a única abertura na borda é o
- * ponto de entrada/saída a oeste. Não há nichos, bolsões, aberturas falsas
- * nem células de chão isoladas dentro da rocha. Renderização, colisões e
- * decoração derivam desta mesma máscara (fonte única, determinística). */
-
-const chi = (x, y) => {
-    const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-    return s - Math.floor(s);
-};
-
-// 22 linhas × 44 colunas. Regiões (aprox.): boca oeste c0-1 r10-14; entrada
-// c2-5 r9-14; corredor oeste c6-15 (r7-16); arena c15-30 (interior livre
-// c17-28 r8-15); gargalo leste c30-33 (r9-15); salão final c34-42 (r6-17).
-export const catacombsLayout = [
-    '############################################', // 00 topo
-    '############################################', // 01
-    '############################################', // 02
-    '############################################', // 03
-    '############################################', // 04
-    '##################.........#################', // 05 teto da arena
-    '################.............#########..####', // 06
-    '###############...............######......##', // 07
-    '###########....................####........#', // 08
-    '##.........................................#', // 09 corredor
-    '...........................................#', // 10 entrada/corredor
-    '...........................................#', // 11
-    '...........................................#', // 12
-    '...........................................#', // 13
-    '...........................................#', // 14
-    '######.....................................#', // 15
-    '#############..................###.........#', // 16 fim da arena
-    '#################...........########......##', // 17
-    '############################################', // 18 base
-    '############################################', // 19
-    '############################################', // 20
-    '############################################', // 21 base
+// Núcleo de Marte — artwork 1536×1024 → 48×32 cells (exact). A single connected
+// navigable region; the west mouth (rows 13..16, col 6) is the only entrance.
+// Dark rock/shadows inside the chamber stay solid.
+const NUCLEO_MASK = [
+    '################################################',
+    '################################################',
+    '################################################',
+    '################################################',
+    '################################################',
+    '################################################',
+    '##########################.....#################',
+    '########################.......##.....##########',
+    '#######################...............##########',
+    '#######################.................########',
+    '###################...................#.########',
+    '###################...................##########',
+    '##########...##.........................########',
+    '######..#..............................#########',
+    '######.................................###.#####',
+    '######.................................###.#####',
+    '######.....................................#####',
+    '#########..................................#####',
+    '############..............................######',
+    '###############..........................#######',
+    '################.........................#######',
+    '################........................########',
+    '#####################..............#############',
+    '#####################..............#############',
+    '#######################...........##############',
+    '########################........################',
+    '#########################.......################',
+    '#########################.#.....################',
+    '################################################',
+    '################################################',
+    '################################################',
+    '################################################',
 ];
 
-// Walkable cells (everything that is not solid rock).
-const CATACOMBS_WALKABLE = new Set(['.']);
+// Catacumbas Marcianas — artwork 1254×1254 → 39×39 cells (last cell extended
+// to 1254). One connected navigable region opening on the west mouth
+// (rows 17..19). Only the real floor is walkable.
+const CATACOMBS_MASK = [
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#####################...###############',
+    '###################......##....########',
+    '##################............#########',
+    '################..............#########',
+    '###############................########',
+    '##############....................#..##',
+    '############........................###',
+    '###########..........................##',
+    '#########............................##',
+    '########.............................##',
+    '####.##...............................#',
+    '#.....................................#',
+    '#....................................##',
+    '#....................................##',
+    '###.................................###',
+    '#####..............................####',
+    '#######............................####',
+    '#########.........................#####',
+    '##########.........................####',
+    '###########.........................###',
+    '############.......................####',
+    '#############.#....................####',
+    '################..................#####',
+    '################..............#########',
+    '##################..........#.#########',
+    '###################........############',
+    '###################.......#############',
+    '####################.##.###############',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+    '#######################################',
+];
 
-// Merged solid AABBs (one per contiguous rock run per row, 64px tall) — feeds
-// collisionSystem unchanged (kind 'undead-rock', no sprite: collision only).
-export function catacombsRockRects(layout, tile) {
+// Merge every contiguous run of solid cells (per row) into one AABB. The final
+// partial column/row is extended to the real map edge, since the mask only
+// covers floor(width / cell) cells.
+function cavernObstacles(mask, cell, mapWidth, mapHeight) {
     const rects = [];
-    const rows = layout.length;
-    const cols = layout[0].length;
+    const rows = mask.length;
+    const cols = mask[0].length;
     for (let r = 0; r < rows; r++) {
         let c = 0;
         while (c < cols) {
-            if (CATACOMBS_WALKABLE.has(layout[r][c])) {
+            if (mask[r][c] === '.') {
                 c++;
                 continue;
             }
             let c2 = c;
-            while (c2 < cols && !CATACOMBS_WALKABLE.has(layout[r][c2])) c2++;
-            rects.push({ x: c * tile, y: r * tile, w: (c2 - c) * tile, h: tile, kind: 'undead-rock' });
+            while (c2 < cols && mask[r][c2] !== '.') c2++;
+            const x = c * cell;
+            const x2 = c2 >= cols ? mapWidth : c2 * cell;
+            const y = r * cell;
+            const y2 = r === rows - 1 ? mapHeight : (r + 1) * cell;
+            rects.push({ x, y, w: x2 - x, h: y2 - y, kind: 'undead-rock' });
             c = c2;
         }
     }
     return rects;
 }
 
-// Seeded decor for the catacombs — region-based plant/bone groups. Groups walk
-// the rock/floor boundary (only rock cells that touch the floor), 2..5 props
-// each, with MORE clusters at the west mouth, the arena rim, the east throat
-// and the final hall. Spawn plaza, arena clearing and every walkable path stay
-// free. Every prop is tagged with a layer ('back' drawn right after the
-// terrain, 'front' after the structures).
-const CAT_CO_BONES = [
-    // Every Bones_shadow* crop present in the tileset (families 1..3, all
-    // variants) so the wall groups stay varied instead of repeating 4.
-    'Bones_shadow1_1.png', 'Bones_shadow1_2.png', 'Bones_shadow1_3.png', 'Bones_shadow1_4.png',
-    'Bones_shadow1_5.png', 'Bones_shadow1_6.png', 'Bones_shadow1_7.png', 'Bones_shadow1_8.png',
-    'Bones_shadow1_9.png', 'Bones_shadow1_10.png', 'Bones_shadow1_11.png', 'Bones_shadow1_12.png',
-    'Bones_shadow1_13.png', 'Bones_shadow1_14.png', 'Bones_shadow1_15.png', 'Bones_shadow1_16.png',
-    'Bones_shadow1_17.png', 'Bones_shadow1_18.png',
-    'Bones_shadow2_1.png', 'Bones_shadow2_2.png', 'Bones_shadow2_3.png', 'Bones_shadow2_4.png',
-    'Bones_shadow2_5.png', 'Bones_shadow2_6.png', 'Bones_shadow2_7.png', 'Bones_shadow2_8.png',
-    'Bones_shadow2_9.png', 'Bones_shadow2_10.png', 'Bones_shadow2_11.png', 'Bones_shadow2_12.png',
-    'Bones_shadow2_13.png', 'Bones_shadow2_15.png', 'Bones_shadow2_16.png', 'Bones_shadow2_17.png',
-    'Bones_shadow2_18.png',
-    'Bones_shadow3_1.png', 'Bones_shadow3_2.png', 'Bones_shadow3_3.png', 'Bones_shadow3_4.png',
-    'Bones_shadow3_5.png', 'Bones_shadow3_6.png', 'Bones_shadow3_7.png', 'Bones_shadow3_8.png',
-    'Bones_shadow3_9.png', 'Bones_shadow3_10.png', 'Bones_shadow3_11.png', 'Bones_shadow3_12.png',
-    'Bones_shadow3_13.png', 'Bones_shadow3_14.png', 'Bones_shadow3_15.png', 'Bones_shadow3_16.png',
-    'Bones_shadow3_17.png', 'Bones_shadow3_18.png',
-];
-const CAT_CO_PLANTS = [
-    'Plant_shadow1_1.png', 'Plant_shadow1_2.png', 'Plant_shadow1_3.png', 'Plant_shadow1_4.png', 'Plant_shadow1_5.png',
-    'Plant__shadow2_1.png', 'Plant__shadow2_2.png', 'Plant__shadow2_3.png', 'Plant__shadow2_4.png', 'Plant__shadow2_5.png',
-    'Plant_shadow3_1.png', 'Plant_shadow3_2.png', 'Plant_shadow3_3.png', 'Plant_shadow3_4.png', 'Plant_shadow3_5.png',
-    'Thorn_palnt_shadow2_1.png', 'Thorn_palnt_shadow2_2.png', 'Thorn_palnt_shadow2_3.png',
-    'Thorn_palnt_shadow2_4.png', 'Thorn_palnt_shadow2_5.png', 'Thorn_palnt_shadow2_6.png',
-];
-const CAT_CO_STRUCTURES = [
-    'Ruin_shadow1_1.png', 'Ruin_shadow1_2.png', 'Ruin_shadow1_3.png', 'Ruin_shadow2_1.png',
-    'Grave_shadow1_1.png', 'Grave_shadow1_2.png', 'Grave_shadow1_3.png', 'Grave_shadow2_1.png',
-    'Crystal_shadow1_1.png', 'Crystal_shadow1_2.png', 'Crystal_shadow2_1.png', 'Crystal_shadow2_2.png',
-    'Rock_shadow1_1.png', 'Rock_shadow1_2.png', 'Rock_shadow2_1.png',
-    'Pile_sculls_shadow1.png', 'Pile_sculls_shadow2.png', 'Pile_sculls_shadow3.png',
-];
-
-// Combat arena zone: rough box around the whole clearing (incl. mouth bulges).
-export const catacombsArenaRect = { x: 15 * TILE, y: 6 * TILE, w: 16 * TILE, h: 12 * TILE };
-// Inner arena clearing + spawn plaza: kept 100% free of decor and obstacles.
-const CATACOMBS_FREE_RECT = { x: 17 * TILE, y: 8 * TILE, w: 12 * TILE, h: 8 * TILE };
-const CATACOMBS_SPAWN_RECT = { x: 0, y: 10 * TILE, w: 9 * TILE, h: 5 * TILE };
-
-export function catacombsDecor(layout, tile) {
-    const dec = [];
-    const rows = layout.length;
-    const cols = layout[0].length;
-    const walk = CATACOMBS_WALKABLE;
-    const rockAt = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && !walk.has(layout[r][c]);
-    const floorAt = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && walk.has(layout[r][c]);
-    const touchesFloor = (r, c) =>
-        floorAt(r, c - 1) || floorAt(r, c + 1) || floorAt(r - 1, c) || floorAt(r + 1, c);
-
-    const overlaps = (x, y, s, rect) => x < rect.x + rect.w && x + s > rect.x && y < rect.y + rect.h && y + s > rect.y;
-    const clear = (x, y, s) =>
-        !overlaps(x, y, s, CATACOMBS_FREE_RECT) &&
-        !overlaps(x, y, s, CATACOMBS_SPAWN_RECT) &&
-        x >= 0 && y >= 0 && x + s <= cols * tile && y + s <= rows * tile;
-
-    const pxUsed = new Set();
-    const cellUsed = new Set();
-    const placed = [];
-    const add = (x, y, sprite, layer = 'back', size = tile) => {
-        x = Math.round(x);
-        y = Math.round(y);
-        const key = `${x},${y}`;
-        if (pxUsed.has(key) || !clear(x, y, size)) return;
-        pxUsed.add(key);
-        dec.push({ x, y, sprite: undeadSprite(sprite), kind: 'undead-decor', layer });
-    };
-    const poolPick = (pool, h) => pool[Math.floor(h * pool.length)];
-
-    // Regiões com mais grupos: boca oeste, rim da arena, gargalo e salão final.
-    const regionWeight = (c, r) => {
-        if (c >= 34) return 1.5; // salão final
-        if (c >= 30 && c <= 33) return 1.35; // gargalo
-        if (c >= 15 && c <= 30 && r >= 5 && r <= 16) return 1.2; // rim da arena
-        if (c <= 8 && r >= 5) return 1.25; // boca/corredor oeste
-        return 1.0;
-    };
-
-    // Grupos naturais de 2..5 plantas/ossos caminhando pela fronteira
-    // rocha/chão — SOMENTE em rocha que encosta no chão. Função da continuidade
-    // vem do deslocamento ao longo da parede; cada membro usa a pool correta.
-    for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-            const cellKey = `${r},${c}`;
-            if (walk.has(layout[r][c]) || cellUsed.has(cellKey)) continue;
-            if (!touchesFloor(r, c)) continue;
-            const w = regionWeight(c, r);
-            if (chi(c * 7 + 11, r * 13 + 5) > 0.16 / w) continue;
-            // Caminha pela fronteira rocha/chão marcando a cadeia inteira antes
-            // de desenhar: grupo só nasce com 2..5 elementos (pontas sem
-            // continuação são descartadas). Nas esquinas a caminhada vira.
-            const chain = [];
-            let cr = r;
-            let cc = c;
-            const gLen = 2 + Math.floor(chi(c * 3, r * 9) * 4); // 2..5
-            const dirs = (() => {
-                const forward = chi(cc + 5, cr + 5) < 0.55 ? [[0, 1], [1, 0]] : [[1, 0], [0, 1]];
-                return [...forward, [-1, 0], [0, -1]];
-            })();
-            while (chain.length < gLen && chain.length < 5) {
-                const k = `${cr},${cc}`;
-                if (cellUsed.has(k) || !rockAt(cr, cc) || !touchesFloor(cr, cc)) break;
-                chain.push([cr, cc]);
-                cellUsed.add(k);
-                let moved = false;
-                for (const [dr, dc] of dirs) {
-                    const nr = cr + dr;
-                    const nc = cc + dc;
-                    if (rockAt(nr, nc) && touchesFloor(nr, nc) && !cellUsed.has(`${nr},${nc}`)) {
-                        cr = nr;
-                        cc = nc;
-                        moved = true;
-                        break;
-                    }
-                }
-                if (!moved) break;
-            }
-            if (chain.length < 2) {
-                for (const [pr, pc] of chain) cellUsed.delete(`${pr},${pc}`);
-                continue;
-            }
-            // Publica só um prefixo contíguo que passe no clear() (rects
-            // livres/bordas) e não encoste em grupo já publicado (espaçamento
-            // mínimo de 1 célula). Se sobrar menos de 2, a cadeia inteira é
-            // devolvida para outra semente aproveitar.
-            const commit = [];
-            for (const [pr, pc] of chain) {
-                const size = commit.length === 0 ? tile : tile - 16;
-                const x = pc * tile + chi(pr, pc * 7) * tile * 0.6;
-                const y = pr * tile + chi(pc * 3, pr * 11) * tile * 0.6;
-                const near = placed.filter(([pr0, pc0]) => Math.abs(pr0 - pr) <= 1 && Math.abs(pc0 - pc) <= 1);
-                if (!clear(x, y, size) || near.length) break;
-                commit.push([pr, pc, x, y, size]);
-            }
-            if (commit.length < 2) {
-                for (const [pr, pc] of chain) cellUsed.delete(`${pr},${pc}`);
-                continue;
-            }
-            for (const [pr, pc, x, y, size] of commit) {
-                placed.push([pr, pc]);
-                const roll = chi(pc * 13 + 3, pr * 7 + 5);
-                const pool = roll < 0.45 ? CAT_CO_BONES : roll < 0.75 ? CAT_CO_PLANTS : CAT_CO_STRUCTURES;
-                add(x, y, poolPick(pool, chi(pc, pr)), 'back', size);
-            }
-        }
-    }
-
-    // Elementos de destaque: Lichs (256×256) sobre as paredes de rocha (fora da passagem do jogador)
-    dec.push({
-        x: 37 * tile,
-        y: 3 * tile,
-        sprite: undeadSprite('Lich_shadow1.png'),
-        kind: 'undead-decor',
-        layer: 'back',
-        scale: 0.8,
-    });
-    dec.push({
-        x: 20 * tile,
-        y: 1 * tile,
-        sprite: undeadSprite('Lich_shadow2.png'),
-        kind: 'undead-decor',
-        layer: 'back',
-        scale: 0.8,
-    });
-    dec.push({
-        x: 31 * tile,
-        y: 15 * tile,
-        sprite: undeadSprite('Lich_shadow3.png'),
-        kind: 'undead-decor',
-        layer: 'back',
-        scale: 0.75,
-    });
-
-    return dec;
-}
-
-/* ─────────────── Núcleo de Marte ─────────────── */
-
 export const marsCoreMap = {
     id: MAP_IDS.MARS_CORE,
-    type: 'cave',
-    width: 2000,
-    height: 1400,
+    type: 'sprite-cavern',
+    width: 1536,
+    height: 1024,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 200, y: 700 },
+    spawn: { x: 368, y: 496 },
     spawnPoints: {
-        'core-entry': { x: 200, y: 700 },
+        'core-entry': { x: 368, y: 496 },
     },
-    obstacles: [
-        ...border4(2000, 1400, 140, 'cave-wall'),
-        // Low-density: a handful of solid rocks flanking the route to the item
-        // (north/south bands), keeping the central passage always walkable.
-        { x: 470, y: 380, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_1.png') },
-        { x: 720, y: 1000, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_2.png') },
-        { x: 960, y: 360, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_2.png') },
-        { x: 1200, y: 1010, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_1.png') },
-        { x: 1440, y: 400, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_1.png') },
-        { x: 1660, y: 1020, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_3.png') },
-        // All remaining Rock_shadow variants (all 15 in the tileset): north +
-        // south bands, never inside the central walkable lane (y ~550..820).
-        { x: 520, y: 470, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_4.png') },
-        { x: 840, y: 470, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow1_5.png') },
-        { x: 1120, y: 470, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_3.png') },
-        { x: 1520, y: 470, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_4.png') },
-        { x: 360, y: 980, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow2_5.png') },
-        { x: 560, y: 1060, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_2.png') },
-        { x: 900, y: 1080, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_3.png') },
-        { x: 1500, y: 990, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_4.png') },
-        { x: 1800, y: 1040, w: 64, h: 64, kind: 'undead-rock', sprite: undeadSprite('Rock_shadow3_5.png') },
-    ],
+    // Walkability mask + generated AABBs (collision-only; never rendered).
+    terrainMask: NUCLEO_MASK,
+    maskCell: CAVERN_CELL,
+    obstacles: cavernObstacles(NUCLEO_MASK, CAVERN_CELL, 1536, 1024),
     exits: [
         {
             id: 'core-return',
-            label: 'SAIR DO NUCLEO',
+            label: 'SAIR DO NÚCLEO',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'cave-return',
-            x: 290,
-            y: 700,
-            radius: 62,
-        },
-    ],
-    decorations: [
-        // Energy/"núcleo" flavour only — no skulls/graves here, by request.
-        { x: 1200, y: 470, sprite: undeadSprite('Crystal_shadow2_1.png'), kind: 'undead-decor' },
-        { x: 1050, y: 990, sprite: undeadSprite('Crystal_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 1640, y: 620, sprite: undeadSprite('Crystal_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 1700, y: 760, sprite: undeadSprite('Crystal_shadow1_2.png'), kind: 'undead-decor' },
-        // End-of-route visual item marker (sprite only, no collision/interaction).
-        { x: 1760, y: 644, sprite: undeadSprite('Crystal_shadow3_1.png'), kind: 'undead-decor' },
-        // All Plant_shadow* herbs (15/15 in the tileset), framing the margins
-        // and the space between the rock bands (decor, no collision).
-        { x: 220, y: 180, sprite: undeadSprite('Plant_shadow1_1.png'), kind: 'undead-decor' },
-        { x: 520, y: 200, sprite: undeadSprite('Plant_shadow1_2.png'), kind: 'undead-decor' },
-        { x: 880, y: 180, sprite: undeadSprite('Plant_shadow1_3.png'), kind: 'undead-decor' },
-        { x: 1240, y: 200, sprite: undeadSprite('Plant_shadow1_4.png'), kind: 'undead-decor' },
-        { x: 1620, y: 200, sprite: undeadSprite('Plant_shadow1_5.png'), kind: 'undead-decor' },
-        { x: 220, y: 1100, sprite: undeadSprite('Plant__shadow2_1.png'), kind: 'undead-decor' },
-        { x: 520, y: 1160, sprite: undeadSprite('Plant__shadow2_2.png'), kind: 'undead-decor' },
-        { x: 880, y: 1120, sprite: undeadSprite('Plant__shadow2_3.png'), kind: 'undead-decor' },
-        { x: 1240, y: 1160, sprite: undeadSprite('Plant__shadow2_4.png'), kind: 'undead-decor' },
-        { x: 1660, y: 1160, sprite: undeadSprite('Plant__shadow2_5.png'), kind: 'undead-decor' },
-        { x: 1020, y: 460, sprite: undeadSprite('Plant_shadow3_1.png'), kind: 'undead-decor' },
-        { x: 1380, y: 480, sprite: undeadSprite('Plant_shadow3_2.png'), kind: 'undead-decor' },
-        { x: 560, y: 980, sprite: undeadSprite('Plant_shadow3_3.png'), kind: 'undead-decor' },
-        { x: 1720, y: 240, sprite: undeadSprite('Plant_shadow3_4.png'), kind: 'undead-decor' },
-        { x: 1720, y: 1080, sprite: undeadSprite('Plant_shadow3_5.png'), kind: 'undead-decor' },
-        // Animated water pool right below the end-of-route item (both frames
-        // share the same position/size, alternating ~every 0.45s; decor only,
-        // no collision). Drawn last so it reads on top of the floor.
-        {
-            x: 1720,
-            y: 700,
-            frames: [undeadPng('water_detilazation.png'), undeadPng('water_detilazation_v2.png')],
-            kind: 'undead-decor-anim',
-            interval: 0.45,
-            scale: 0.37,
+            x: 240,
+            y: 496,
+            radius: 48,
+            promptY: 481,
         },
     ],
     structures: [],
+    decorations: [],
 };
-
-/* ─────────────── Catacumbas Marcianas ─────────────── */
 
 export const marsCatacombsMap = {
     id: MAP_IDS.MARS_CATACOMBS,
-    type: 'cave',
-    width: 44 * TILE, // 2816
-    height: 22 * TILE, // 1408 — exact 2:1, tile-aligned
+    type: 'sprite-cavern',
+    width: 1254,
+    height: 1254,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 110, y: 752 },
+    spawn: { x: 360, y: 592 },
     spawnPoints: {
-        'catacombs-entry': { x: 110, y: 752 },
+        'catacombs-entry': { x: 360, y: 592 },
     },
-    // Walkability mask shared by renderer/collisions (cells are 64px).
-    terrainMask: catacombsLayout,
-    // Reserved open combat arena in the MIDDLE of the route, crossed on the
-    // way in AND on the way back (corridor → arena → corridor). Kept 100% free
-    // (no obstacle, no decoration inside) by both generation rules below.
-    arenaCombatArea: { ...catacombsArenaRect },
-    obstacles: [
-        // Solid rock masses originate from the terrain mask (one AABB per
-        // contiguous rock run per row) — collision only (no sprite).
-        ...catacombsRockRects(catacombsLayout, TILE),
-    ],
+    terrainMask: CATACOMBS_MASK,
+    maskCell: CAVERN_CELL,
+    obstacles: cavernObstacles(CATACOMBS_MASK, CAVERN_CELL, 1254, 1254),
     exits: [
         {
             id: 'catacombs-return',
             label: 'SAIR DAS CATACUMBAS',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'cave-return',
-            x: 110,
-            y: 802,
-            radius: 64,
+            x: 91,
+            y: 573,
+            radius: 48,
+            promptY: 588,
         },
     ],
     structures: [],
-    // Decorações removidas por pedido: catacumbas sem plantas/ossos. Spawn,
-    // arena e caminho permanecem livres.
     decorations: [],
 };
 

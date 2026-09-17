@@ -97,8 +97,8 @@ function _buildDOM() {
             <div class="pause-panel__stage">
                 <div class="pause-panel__body" data-pause-view="main">
                     <button type="button" data-action="options"   class="pause-panel__btn">OPÇÕES</button>
-                    <button type="button" data-action="main-menu" class="pause-panel__btn">VOLTAR AO MENU</button>
                     <button type="button" data-action="save"      class="pause-panel__btn">SALVAR</button>
+                    <button type="button" data-action="main-menu" class="pause-panel__btn">VOLTAR AO MENU</button>
                 </div>
 
                 <div class="pause-panel__options-layer" data-pause-view="options" hidden></div>

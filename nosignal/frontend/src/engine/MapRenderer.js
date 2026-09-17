@@ -48,6 +48,16 @@ const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale
 // path relative to this base).
 const SPRITE_BASE = './src/assets/sprites/';
 
+// ── Sprite-cavern maps (Núcleo + Catacumbas) ─────────────────────────────
+// Each of these maps is a single pre-composed PNG (pure black background +
+// the whole cave artwork). It is drawn 1:1 at world (0,0), once, with no
+// scaling/repetition/texture; collisions live in the map data (separate
+// walkability mask), never derived from the pixels at render time.
+const CAVERN_SPRITE_PATHS = {
+    'mars-core': './src/assets/sprites/Cavern/map_nucle.png',
+    'mars-catacombs': './src/assets/sprites/Cavern/map_catacombs.png',
+};
+
 // Ground texture (tileable PNG), loaded once and used as a CanvasPattern in
 // _drawSurfaceGroundCell when available; otherwise procedural ground fallback.
 const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.png';
@@ -57,100 +67,8 @@ const MAP_SURFACE_PATTERN_SCALE = 0.5; // pattern.setTransform scale (texture ce
 // ground it replaces was ~100); never applied per frame.
 const SURFACE_PATTERN_FILTER = 'brightness(1.15) saturate(1.1)';
 
-// Real rock floor for the Undead maps (mars-core). Ground 1:1 from
-// Ground_rocks.png as a 32x32 crop (its tileset uses 16px tiles, so this is a
-// 2x2 block) — chosen programmatically: fully opaque, textured (sd≈19) and with
-// the best outer-edge continuity. Tiled with pattern.setTransform scale 2 so
-// each cell is 64 world px (same grid as the legacy cave LOGICAL_TILE).
-// When the texture is still loading or fails, the maps fall back to the
-// procedural cave floor (no change for mars-surface / mars-cave / castle).
-// As Catacumbas (mars-catacombs) NÃO usam este pattern — terreno procedural.
-const UNDEAD_GROUND_PATH = './src/assets/sprites/UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/Ground_rocks.png';
-const UNDEAD_GROUND_CROP = { sx: 96, sy: 32, sw: 32, sh: 32 };
-const UNDEAD_GROUND_SCALE = 2; // pattern.setTransform scale (crop cell = 32 world px → 64)
-const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core']);
-
-// ── Catacombs terrain (mars-catacombs) ─────────────────────────────────
-// Terreno das Catacumbas: máscara 44×22 (2816×1408) com rochas sólidas (#)
-// e chão caminhável (.). O chão recebe a textura map_surface.png
-// e as paredes mantêm cores distintas e sólidas com colisão física.
-const CATACOMBS_ID = 'mars-catacombs';
-const CATACOMBS_WALKABLE = new Set(['.']);
-const CATACOMBS_FLOOR = [118, 46, 26];
-const CATACOMBS_ROCK = [68, 27, 15];
-const MAP_CATACOMBS_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.png';
-const MAP_CATACOMBS_SURFACE_SCALE = 0.5;
-
-// ── Catacombs walls: continuous base & modular rock piece library ──────────
-// Entire '#' mass is filled with continuous mars_catacombs_surface2.jpg anchored
-// to world coordinates (0.5 scale = 128px native -> 64px cell).
-// On top of this base, modular rock pieces extracted from EdgeSprites (edge1-6)
-// are composed: interior fills, directional faces (N, S, W, E), convex corners,
-// concave inner corners and caps.
-const CATACOMBS_WALL_TEXTURE_PATH = './src/assets/sprites/mars_catacombs_surface2.jpg';
-const CATACOMBS_WALL_SCALE = 0.5;
-const CATACOMBS_EDGE_DIR = './src/assets/sprites/EdgeSprites/';
-const CATACOMBS_EDGE_SCALE = 0.5;
-
-export const CATACOMBS_WALL_PIECES = {
-    fill: [
-        { file: 'edge1.png', sx: 100, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 260, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 420, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 580, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge2.png', sx: 160, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge2.png', sx: 320, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge2.png', sx: 460, sy: 320, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge4.png', sx: 980, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge4.png', sx: 1130, sy: 40, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge6.png', sx: 940, sy: 580, sw: 128, sh: 128, orientation: 'none', scale: 0.5, anchor: 'top-left' },
-    ],
-    top: [
-        { file: 'edge1.png', sx: 100, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 260, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 420, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge1.png', sx: 580, sy: 20, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge4.png', sx: 1140, sy: 25, sw: 128, sh: 128, orientation: 'top', scale: 0.5, anchor: 'top-left' },
-    ],
-    bottom: [
-        { file: 'edge1.png', sx: 100, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
-        { file: 'edge1.png', sx: 260, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
-        { file: 'edge1.png', sx: 420, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
-        { file: 'edge1.png', sx: 580, sy: 72, sw: 128, sh: 128, orientation: 'bottom', scale: 0.5, anchor: 'bottom-left' },
-    ],
-    left: [
-        { file: 'edge5.png', sx: 1145, sy: 390, sw: 130, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge5.png', sx: 1145, sy: 540, sw: 130, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge2.png', sx: 75, sy: 350, sw: 128, sh: 128, orientation: 'left', scale: 0.5, anchor: 'top-left' },
-    ],
-    right: [
-        { file: 'edge3.png', sx: 823, sy: 35, sw: 74, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
-        { file: 'edge4.png', sx: 1180, sy: 160, sw: 128, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
-        { file: 'edge2.png', sx: 640, sy: 500, sw: 128, sh: 128, orientation: 'right', scale: 0.5, anchor: 'top-right' },
-    ],
-    innerCorner: [
-        { file: 'edge2.png', sx: 480, sy: 440, sw: 128, sh: 128, orientation: 'innerCorner', scale: 0.5, anchor: 'center' },
-        { file: 'edge4.png', sx: 1050, sy: 150, sw: 128, sh: 128, orientation: 'innerCorner', scale: 0.5, anchor: 'center' },
-    ],
-    outerCorner: [
-        { file: 'edge2.png', sx: 80, sy: 280, sw: 128, sh: 128, orientation: 'NW', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'NW', scale: 0.5, anchor: 'top-left' },
-        { file: 'edge2.png', sx: 630, sy: 280, sw: 128, sh: 128, orientation: 'NE', scale: 0.5, anchor: 'top-right' },
-        { file: 'edge2.png', sx: 80, sy: 280, sw: 128, sh: 128, orientation: 'SW', scale: 0.5, anchor: 'bottom-left', flipV: true },
-        { file: 'edge4.png', sx: 960, sy: 25, sw: 128, sh: 128, orientation: 'SW', scale: 0.5, anchor: 'bottom-left', flipV: true },
-        { file: 'edge2.png', sx: 630, sy: 580, sw: 128, sh: 128, orientation: 'SE', scale: 0.5, anchor: 'bottom-right' },
-        { file: 'edge4.png', sx: 1180, sy: 220, sw: 128, sh: 128, orientation: 'SE', scale: 0.5, anchor: 'bottom-right' },
-    ],
-    end: [
-        { file: 'edge6.png', sx: 940, sy: 580, sw: 128, sh: 128, orientation: 'end', scale: 0.5, anchor: 'center' },
-        { file: 'edge3.png', sx: 823, sy: 35, sw: 74, sh: 128, orientation: 'end', scale: 0.5, anchor: 'center' },
-    ],
-    detail: [
-        { file: 'edge6.png', sx: 980, sy: 600, sw: 90, sh: 90, orientation: 'detail', scale: 0.5, anchor: 'center' },
-        { file: 'edge4.png', sx: 1050, sy: 80, sw: 90, sh: 90, orientation: 'detail', scale: 0.5, anchor: 'center' },
-    ],
-};
+/* The old Catacombs/Núcleo procedural terrain + wall/edge texture system was
+ * removed: both maps are now rendered by the `sprite-cavern` pipeline. */
 
 // ── Small deterministic hash (same pattern every run) ──
 function hash2(x, y) {
@@ -200,28 +118,14 @@ export class MapRenderer {
         this._mapSurfacePattern = null;
         this._mapSurfaceRequested = false;
         this._mapSurfaceWarned = false;
-        // Undead rock floor (see UNDEAD_GROUND_* above). Same lazy Pattern:
-        // image loads once, pattern is baked/cached on first ground draw.
-        this.undeadGroundTexture = null;
-        this._undeadGroundPattern = null;
-        this._undeadGroundRequested = false;
-        this._undeadGroundWarned = false;
-        // Catacombs ground texture pattern (map_catacombs_surface.jpeg)
-        this.mapCatacombsSurfaceTexture = null;
-        this._mapCatacombsSurfacePattern = null;
-        this._mapCatacombsSurfaceRequested = false;
-        this._mapCatacombsSurfaceWarned = false;
-        // Catacombs wall texture (mars_catacombs_surface2.jpg) — world-anchored
-        // pattern over every `#` cell, plus the precomputed rim-plate plan.
-        this.mapCatacombsWallTexture = null;
-        this._mapCatacombsWallPattern = null;
-        this._mapCatacombsWallRequested = false;
-        this._mapCatacombsWallWarned = false;
-        this._catacombsWallCanvas = null;
-        this._catacombEdgeImages = new Map();
-        // Generic individual-sprite cache (undead props: rocks, skulls, graves,
-        // ruins, crystals). key = full URL; value = Image once ready, null while
-        // loading or after a failed load.
+        // Sprite-cavern full-map PNGs (mars-core / mars-catacombs): cached per
+        // map id, requested once, never reloaded per frame or per map swap.
+        this.cavernSprites = new Map();
+        this._cavernSpriteRequested = new Set();
+        this._cavernSpriteWarned = new Set();
+        // Generic individual-sprite cache shared by surface props and the shop
+        // NPC (key = full URL; value = Image once ready, null while loading or
+        // after a failed load). `_undeadWarned` de-dupes the console warnings.
         this._spriteCache = new Map();
         this._undeadWarned = new Set();
     }
@@ -238,6 +142,9 @@ export class MapRenderer {
         if (map.type === 'surface') {
             // Surface uses the layered micro-tile pipeline (no precomputed grid).
             this.tiles = [];
+        } else if (map.type === 'sprite-cavern') {
+            // Single pre-composed PNG: no terrain grid, no tiles, no pattern.
+            this.tiles = [];
         } else {
             // Cave/castle keep the legacy procedural path (migrated next stage).
             this._generateTerrain(map);
@@ -249,17 +156,40 @@ export class MapRenderer {
             this.dustParticles = [];
         }
 
+        if (map.type === 'sprite-cavern') {
+            // Only the full-map artwork is needed; nothing else is drawn over it.
+            this.loadCavernMapSprite(map.id);
+            return;
+        }
+
         this.loadCastleSprite();
         this.loadCaveEntranceSprite();
         this.loadMapSurfaceTexture();
-        if (UNDEAD_GROUND_MAP_IDS.has(map.id)) this.loadUndeadGroundTexture();
-        if (map.id === CATACOMBS_ID) {
-            // Catacomb complete wall canvas built once when assets ready.
-            this._catacombsWallCanvas = null;
-            this.loadCatacombsSurfaceTexture();
-            this.loadCatacombsWallTexture();
-            this.loadCatacombEdges();
-        }
+    }
+
+    /**
+     * Loads the full-map PNG of a sprite-cavern map exactly once (cached per
+     * map id). While it is loading/failed the map stays pure black — there is
+     * NO procedural fallback texture for these maps.
+     */
+    loadCavernMapSprite(mapId) {
+        if (!CAVERN_SPRITE_PATHS[mapId]) return;
+        if (this.cavernSprites.has(mapId) || this._cavernSpriteRequested.has(mapId)) return;
+        this._cavernSpriteRequested.add(mapId);
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.cavernSprites.set(mapId, img);
+        };
+        img.onerror = () => {
+            if (!this._cavernSpriteWarned.has(mapId)) {
+                this._cavernSpriteWarned.add(mapId);
+                console.warn(
+                    `[MapRenderer] ${CAVERN_SPRITE_PATHS[mapId]} não carregou — mapa de caverna permanece preto.`
+                );
+            }
+        };
+        img.src = CAVERN_SPRITE_PATHS[mapId];
     }
 
     /**
@@ -346,57 +276,6 @@ export class MapRenderer {
         img.src = MAP_SURFACE_TEXTURE_PATH;
     }
 
-    // Catacombs ground texture (map_surface.png).
-    loadCatacombsSurfaceTexture() {
-        if (this.mapCatacombsSurfaceTexture || this._mapCatacombsSurfaceRequested) return;
-        this._mapCatacombsSurfaceRequested = true;
-        if (typeof Image === 'undefined') return; // non-browser (tests)
-        const img = new Image();
-        img.onload = () => {
-            this.mapCatacombsSurfaceTexture = img;
-            this._mapCatacombsSurfacePattern = null;
-        };
-        img.onerror = () => {
-            const fallback = new Image();
-            fallback.onload = () => {
-                this.mapCatacombsSurfaceTexture = fallback;
-                this._mapCatacombsSurfacePattern = null;
-            };
-            fallback.onerror = () => {
-                if (!this._mapCatacombsSurfaceWarned) {
-                    this._mapCatacombsSurfaceWarned = true;
-                    console.warn(
-                        `[MapRenderer] ${MAP_CATACOMBS_SURFACE_TEXTURE_PATH} não carregou — usando chão procedural.`
-                    );
-                }
-            };
-            fallback.src = './src/assets/sprites/Map/map_surface.jpeg';
-        };
-        img.src = MAP_CATACOMBS_SURFACE_TEXTURE_PATH;
-    }
-
-    // Undead rock floor texture (Ground_rocks.png). Loaded exactly once, only
-    // when the current map is one of the Undead maps (mars-core/mars-catacombs).
-    // The floor pattern uses an unfiltered 32x32 crop (see UNDEAD_GROUND_*).
-    loadUndeadGroundTexture() {
-        if (this.undeadGroundTexture || this._undeadGroundRequested) return;
-        this._undeadGroundRequested = true;
-        if (typeof Image === 'undefined') return; // non-browser (tests)
-        const img = new Image();
-        img.onload = () => {
-            this.undeadGroundTexture = img;
-        };
-        img.onerror = () => {
-            if (!this._undeadGroundWarned) {
-                this._undeadGroundWarned = true;
-                console.warn(
-                    `[MapRenderer] ${UNDEAD_GROUND_PATH} não carregou — usando chão procedural dos mapas Undead.`
-                );
-            }
-        };
-        img.src = UNDEAD_GROUND_PATH;
-    }
-
     /**
      * Loads a generic individual sprite exactly once and caches it by `key`
      * (internal Map, e.g. this._spriteCache). Guards against reloading the
@@ -434,7 +313,12 @@ export class MapRenderer {
         if (!img || !img.complete || img.naturalWidth === 0) return;
         const x = Math.round(o.x + offset.x);
         const y = Math.round(o.y + offset.y);
-        if (o.w && o.h) {
+        if (o.source) {
+            const s = o.source;
+            const w = o.w || s.w;
+            const h = o.h || s.h;
+            ctx.drawImage(img, s.x, s.y, s.w, s.h, x, y, w, h);
+        } else if (o.w && o.h) {
             ctx.drawImage(img, x, y, o.w, o.h);
         } else if (o.scale) {
             ctx.drawImage(img, x, y, Math.round(img.naturalWidth * o.scale), Math.round(img.naturalHeight * o.scale));
@@ -487,287 +371,6 @@ export class MapRenderer {
             this._mapSurfacePattern = null;
         }
         return this._mapSurfacePattern;
-    }
-
-    // Lazy CanvasPattern for the Undead rock floor: crops the 32x32 block once
-    // into an offscreen canvas and patterns from it (no per-frame filter/crop).
-    // Returns null while the image is loading or after a failure — the caller
-    // then falls back to the procedural cave floor.
-    _ensureUndeadGroundPattern(ctx) {
-        if (this._undeadGroundPattern) return this._undeadGroundPattern;
-        if (!this.undeadGroundTexture || this.undeadGroundTexture.naturalWidth === 0) return null;
-        try {
-            const c = UNDEAD_GROUND_CROP;
-            const bake = document.createElement('canvas');
-            bake.width = c.sw;
-            bake.height = c.sh;
-            const bctx = bake.getContext('2d');
-            bctx.drawImage(this.undeadGroundTexture, c.sx, c.sy, c.sw, c.sh, 0, 0, c.sw, c.sh);
-            const pattern = ctx.createPattern(bake, 'repeat');
-            if (pattern) {
-                pattern.setTransform(new DOMMatrix().scale(UNDEAD_GROUND_SCALE));
-                this._undeadGroundPattern = pattern;
-            }
-        } catch (e) {
-            this._undeadGroundPattern = null;
-        }
-        return this._undeadGroundPattern;
-    }
-
-    // Lazy CanvasPattern for the Catacombs floor (map_surface.png):
-    // Loads the image once and patterns from it with world offset alignment.
-    _ensureCatacombsSurfacePattern(ctx) {
-        if (this._mapCatacombsSurfacePattern) return this._mapCatacombsSurfacePattern;
-        this.loadCatacombsSurfaceTexture();
-        const texture = (this.mapCatacombsSurfaceTexture && this.mapCatacombsSurfaceTexture.naturalWidth > 0)
-            ? this.mapCatacombsSurfaceTexture
-            : (this.mapSurfaceTexture && this.mapSurfaceTexture.naturalWidth > 0 ? this.mapSurfaceTexture : null);
-        if (!texture) {
-            return null;
-        }
-        try {
-            const pattern = ctx.createPattern(texture, 'repeat');
-            if (pattern) {
-                this._mapCatacombsSurfacePattern = pattern;
-            }
-        } catch (e) {
-            this._mapCatacombsSurfacePattern = null;
-        }
-        return this._mapCatacombsSurfacePattern;
-    }
-
-    // ── Catacombs wall texture & rim-plate system ────────────────────────
-    // Loads mars_catacombs_surface2.jpg once; the world-anchored pattern is
-    // applied to every `#` cell so the rock looks continuous across cell
-    // boundaries (identical technique to the floor pattern).
-    loadCatacombsWallTexture() {
-        if (this.mapCatacombsWallTexture || this._mapCatacombsWallRequested) return;
-        this._mapCatacombsWallRequested = true;
-        if (typeof Image === 'undefined') return;
-        const img = new Image();
-        img.onload = () => {
-            this.mapCatacombsWallTexture = img;
-            this._catacombsWallCanvas = null;
-        };
-        img.onerror = () => {
-            if (!this._mapCatacombsWallWarned) {
-                this._mapCatacombsWallWarned = true;
-                console.warn('[MapRenderer] Falha ao carregar textura de parede das Catacumbas:', CATACOMBS_WALL_TEXTURE_PATH);
-            }
-        };
-        img.src = CATACOMBS_WALL_TEXTURE_PATH;
-    }
-
-    // Eagerly requests all six edge sprite images the first time the catacomb
-    // map is used.
-    loadCatacombEdges() {
-        if (this._catacombsEdgesReady()) return;
-        const files = ['edge1.png','edge2.png','edge3.png','edge4.png','edge5.png','edge6.png'];
-        for (const f of files) {
-            if (this._catacombEdgeImages.has(f)) continue;
-            if (typeof Image === 'undefined') { this._catacombEdgeImages.set(f, null); continue; }
-            const img = new Image();
-            img.onload = () => {
-                this._catacombEdgeImages.set(f, img);
-                this._catacombsWallCanvas = null;
-            };
-            img.onerror = () => { this._catacombEdgeImages.set(f, null); };
-            img.src = CATACOMBS_EDGE_DIR + f;
-            this._catacombEdgeImages.set(f, undefined);
-        }
-    }
-
-    // True once every edge sprite has finished (loaded or failed).
-    _catacombsEdgesReady() {
-        for (const f of ['edge1.png','edge2.png','edge3.png','edge4.png','edge5.png','edge6.png']) {
-            if (!this._catacombEdgeImages.has(f)) return false;
-            if (this._catacombEdgeImages.get(f) === undefined) return false;
-        }
-        return true;
-    }
-
-    _catacombsEdgeImage(file) {
-        const v = this._catacombEdgeImages.get(file);
-        return (v && v.complete && v.naturalWidth > 0) ? v : null;
-    }
-
-    // Draws a single piece from CATACOMBS_WALL_PIECES onto the target context.
-    _drawWallPiece(ctx, p, dx, dy, dw, dh, alpha = 1.0) {
-        if (!p) return;
-        const img = this._catacombsEdgeImage(p.file);
-        if (!img) return;
-        ctx.save();
-        if (alpha < 1.0) ctx.globalAlpha = alpha;
-        if (p.flipH || p.flipV) {
-            const cx = dx + dw * 0.5;
-            const cy = dy + dh * 0.5;
-            ctx.translate(cx, cy);
-            ctx.scale(p.flipH ? -1 : 1, p.flipV ? -1 : 1);
-            ctx.translate(-cx, -cy);
-        }
-        ctx.drawImage(img, p.sx, p.sy, p.sw, p.sh, dx, dy, dw, dh);
-        ctx.restore();
-    }
-
-    // Bakes the complete catacombs wall mass into an offscreen canvas (2816x1408)
-    // exactly once when all wall assets are loaded.
-    // 1. Continuous world-anchored mars_catacombs_surface2.jpg base on all '#' cells
-    // 2. Interior rock overlay composition from edge1-6
-    // 3. Faces, transitions, convex and concave corners touching floor
-    // 4. Subtle contact depth rim on boundaries
-    // 5. Strict destination-in clipping to guarantee 0 bleeding onto floor '.' cells
-    _buildCatacombsWallCanvas() {
-        if (!this.map || this.mapId !== CATACOMBS_ID) return null;
-        const mask = this.map.terrainMask;
-        if (!mask || mask.length === 0) return null;
-        if (!this.mapCatacombsWallTexture || !this.mapCatacombsWallTexture.complete || this.mapCatacombsWallTexture.naturalWidth === 0) return null;
-        if (typeof document === 'undefined') return null;
-
-        const rows = mask.length;
-        const cols = mask[0].length;
-        const cell = LOGICAL_TILE;
-        const w = cols * cell;
-        const h = rows * cell;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-
-        // 1. Base contínua: mars_catacombs_surface2.jpg ancorada ao mundo em todas as células '#'
-        const baseImg = this.mapCatacombsWallTexture;
-        const bw = Math.round(baseImg.naturalWidth * CATACOMBS_WALL_SCALE);
-        const bh = Math.round(baseImg.naturalHeight * CATACOMBS_WALL_SCALE);
-        const baseCanvas = document.createElement('canvas');
-        baseCanvas.width = bw;
-        baseCanvas.height = bh;
-        const bctx = baseCanvas.getContext('2d');
-        bctx.imageSmoothingEnabled = false;
-        bctx.drawImage(baseImg, 0, 0, bw, bh);
-
-        let basePattern = null;
-        try {
-            basePattern = ctx.createPattern(baseCanvas, 'repeat');
-        } catch (e) {
-            basePattern = null;
-        }
-
-        const wallSolid = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
-        ctx.fillStyle = wallSolid;
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (mask[r][c] !== '.') {
-                    ctx.fillRect(c * cell, r * cell, cell, cell);
-                }
-            }
-        }
-        if (basePattern) {
-            ctx.fillStyle = basePattern;
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    if (mask[r][c] !== '.') {
-                        ctx.fillRect(c * cell, r * cell, cell, cell);
-                    }
-                }
-            }
-        }
-
-        // 2. Bordas/edges removidas por pedido: nenhuma peça dos EdgeSprites
-        //    (fill/detail/faces/cantos) nem sombreamento de borda é desenhado.
-        //    A parede é apenas a base contínua recortada pela máscara.
-
-        // 3. Garantia matemática: clip estrito na máscara de parede '#'
-        // Impede rigorosamente qualquer vazamento de pixel para as células de chão '.'
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-in';
-        ctx.beginPath();
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (mask[r][c] !== '.') {
-                    ctx.rect(c * cell, r * cell, cell, cell);
-                }
-            }
-        }
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.restore();
-
-        this._catacombsWallCanvas = canvas;
-        return canvas;
-    }
-
-    _ensureCatacombsWallCanvas() {
-        if (this._catacombsWallCanvas) return this._catacombsWallCanvas;
-        return this._buildCatacombsWallCanvas();
-    }
-
-    // Catacomb terrain:
-    // 1. Chão com textura aprovada (map_catacombs_surface.jpeg) — 100% PRESERVADO
-    // 2. Massa completa de paredes a partir da camada pré-composta offscreen (mars_catacombs_surface2 + EdgeSprites)
-    _renderCatacombsTerrain(ctx, offset, viewW, viewH) {
-        if (this.mapId !== CATACOMBS_ID) return;
-        const mask = this.map.terrainMask;
-        if (!mask || mask.length === 0) return;
-        const cell = LOGICAL_TILE;
-        const cols = mask[0].length;
-        const rows = mask.length;
-        const minCol = Math.max(0, Math.floor(-offset.x / cell));
-        const maxCol = Math.min(cols - 1, Math.ceil((viewW - offset.x) / cell));
-        const minRow = Math.max(0, Math.floor(-offset.y / cell));
-        const maxRow = Math.min(rows - 1, Math.ceil((viewH - offset.y) / cell));
-
-        const walkable = CATACOMBS_WALKABLE;
-        const floor = `rgb(${CATACOMBS_FLOOR[0]}, ${CATACOMBS_FLOOR[1]}, ${CATACOMBS_FLOOR[2]})`;
-
-        // 1. Chão aprovado — SEM NENHUMA ALTERAÇÃO
-        const floorPattern = this._ensureCatacombsSurfacePattern(ctx);
-        if (floorPattern && typeof DOMMatrix !== 'undefined') {
-            floorPattern.setTransform(
-                new DOMMatrix()
-                    .translate(Math.round(offset.x), Math.round(offset.y))
-                    .scale(MAP_CATACOMBS_SURFACE_SCALE)
-            );
-        }
-
-        for (let r = minRow; r <= maxRow; r++) {
-            for (let c = minCol; c <= maxCol; c++) {
-                if (walkable.has(mask[r][c])) {
-                    const sx = Math.round(c * cell + offset.x);
-                    const sy = Math.round(r * cell + offset.y);
-                    ctx.fillStyle = floor;
-                    ctx.fillRect(sx, sy, cell, cell);
-                    if (floorPattern) {
-                        ctx.fillStyle = floorPattern;
-                        ctx.fillRect(sx, sy, cell, cell);
-                    }
-                }
-            }
-        }
-
-        // 2. Paredes completas: camada pré-composta offscreen (ou fallback enquanto assets carregam)
-        const wallCanvas = this._ensureCatacombsWallCanvas();
-        if (wallCanvas) {
-            const sx = Math.max(0, minCol * cell);
-            const sy = Math.max(0, minRow * cell);
-            const sw = Math.min(wallCanvas.width - sx, (maxCol - minCol + 1) * cell);
-            const sh = Math.min(wallCanvas.height - sy, (maxRow - minRow + 1) * cell);
-            const dx = Math.round(sx + offset.x);
-            const dy = Math.round(sy + offset.y);
-            ctx.drawImage(wallCanvas, sx, sy, sw, sh, dx, dy, sw, sh);
-        } else {
-            const wallSolid = `rgb(${CATACOMBS_ROCK[0]}, ${CATACOMBS_ROCK[1]}, ${CATACOMBS_ROCK[2]})`;
-            for (let r = minRow; r <= maxRow; r++) {
-                for (let c = minCol; c <= maxCol; c++) {
-                    if (!walkable.has(mask[r][c])) {
-                        const sx = Math.round(c * cell + offset.x);
-                        const sy = Math.round(r * cell + offset.y);
-                        ctx.fillStyle = wallSolid;
-                        ctx.fillRect(sx, sy, cell, cell);
-                    }
-                }
-            }
-        }
     }
 
     // True only after the cave sprite has actually finished decoding, so we
@@ -1290,11 +893,36 @@ export class MapRenderer {
     }
 
     render(ctx, camera) {
-        if (this.map.type === 'surface') {
+        if (this.map.type === 'sprite-cavern') {
+            this._renderSpriteCavern(ctx, camera);
+        } else if (this.map.type === 'surface') {
             this._renderSurface(ctx, camera);
         } else {
             this._renderLegacy(ctx, camera);
         }
+    }
+
+    /**
+     * Sprite-cavern pipeline: pure black viewport + the whole map PNG drawn
+     * once at world origin (1:1, pixel-snapped, no smoothing, no stretch, no
+     * repetition). Camera scrolls by shifting the draw origin. Nothing else is
+     * painted here — entities, bullets, HUD and prompts are drawn by the engine
+     * on top.
+     */
+    _renderSpriteCavern(ctx, camera) {
+        const viewW = camera.viewportWidth;
+        const viewH = camera.viewportHeight;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        const img = this.cavernSprites.get(this.mapId);
+        if (!img) return; // still loading / failed: keep black
+
+        const offset = camera.getRenderOffset();
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, Math.round(offset.x), Math.round(offset.y));
+        ctx.imageSmoothingEnabled = prevSmoothing;
     }
 
     _renderLegacy(ctx, camera) {
@@ -1308,45 +936,23 @@ export class MapRenderer {
         const minRow = Math.max(0, Math.floor(-offset.y / tile));
         const maxRow = Math.min(this.rows - 1, Math.ceil((viewH - offset.y) / tile));
 
-        // Undead maps swap the procedural cave floor for the real Ground_rocks
-        // texture (world-anchored pattern, like the surface pipeline). While the
-        // texture is loading/failed we keep the old procedural tiles untouched.
-        // EXCEÇÃO: as Catacumbas são 100% procedurais — NUNCA usam CanvasPattern
-        // global nem tiles; o próprio terreno pinta cada célula opaca.
-        const catacombs = this.mapId === CATACOMBS_ID;
-        const undeadFloor = !catacombs && UNDEAD_GROUND_MAP_IDS.has(this.mapId)
-            ? this._ensureUndeadGroundPattern(ctx)
-            : null;
-        if (undeadFloor) {
-            if (typeof DOMMatrix !== 'undefined') {
-                undeadFloor.setTransform(
-                    new DOMMatrix()
-                        .translate(Math.round(offset.x), Math.round(offset.y))
-                        .scale(UNDEAD_GROUND_SCALE)
-                );
-            }
-            ctx.fillStyle = undeadFloor;
-            ctx.fillRect(Math.round(offset.x), Math.round(offset.y), Math.round(this.map.width), Math.round(this.map.height));
-        } else if (!catacombs) {
-            for (let r = minRow; r <= maxRow; r++) {
-                for (let c = minCol; c <= maxCol; c++) {
-                    const sx = Math.round(c * tile + offset.x);
-                    const sy = Math.round(r * tile + offset.y);
-                    this._drawTile(ctx, sx, sy, this.tiles[r][c]);
-                }
+        // Cave/castle procedural terrain (surface and sprite-cavern maps never
+        // reach this path — see setMap/render).
+        for (let r = minRow; r <= maxRow; r++) {
+            for (let c = minCol; c <= maxCol; c++) {
+                const sx = Math.round(c * tile + offset.x);
+                const sy = Math.round(r * tile + offset.y);
+                this._drawTile(ctx, sx, sy, this.tiles[r][c]);
             }
         }
 
-        // Catacombs: draw the mask-driven textured floor/rock terrain.
         // Layer order: terrain → [back decor] → [obstacles] → [structures] → [front decor].
-        this._renderCatacombsTerrain(ctx, offset, viewW, viewH);
-
-        if (!catacombs) this._drawLandingPad(ctx, offset);
+        this._drawLandingPad(ctx, offset);
         this._drawDecorations(ctx, offset, 'back');
-        if (!catacombs) this._drawObstacles(ctx, offset);
+        this._drawObstacles(ctx, offset);
         this._drawStructures(ctx, offset);
         this._drawDecorations(ctx, offset, 'front');
-        if (!catacombs) this._drawExits(ctx, offset);
+        this._drawExits(ctx, offset);
     }
 
     _renderSurface(ctx, camera) {

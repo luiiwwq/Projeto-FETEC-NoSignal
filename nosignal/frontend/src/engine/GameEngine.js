@@ -252,7 +252,7 @@ export class GameEngine {
             this.actors.push(ally);
         }
 
-        if (roles.enemy) {
+        if (map.id === MAP_IDS.MARS_SURFACE && roles.enemy) {
             const spawn = CHARACTER_ENEMY_SPAWNS[roles.enemy];
             if (spawn) {
                 const enemy = new CharacterActor({

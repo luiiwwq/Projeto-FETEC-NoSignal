@@ -31,9 +31,17 @@ export class CharacterActor extends Player {
         this.isActor = true;
         this.blocksPlayer = false;
 
-        // NPC combat ranges (only meaningful for enemies)
-        this.engageRange = role === ActorRole.ENEMY ? 460 : 0;
-        this.attackRange = role === ActorRole.ENEMY ? 300 : 0;
+        // NPC combat ranges (only meaningful for enemies). Kept short so the
+        // enemy must actually be approached instead of rushing the player from
+        // across the map.
+        this.engageRange = role === ActorRole.ENEMY ? 320 : 0;
+        this.attackRange = role === ActorRole.ENEMY ? 220 : 0;
+
+        // Post position: the enemy leashes back here when the player leaves
+        // its engage range instead of chasing forever.
+        this.homeX = x;
+        this.homeY = y;
+        this.homeTolerance = 6;
 
         // Removal lifecycle after death
         this.shouldRemove = false;
@@ -58,13 +66,33 @@ export class CharacterActor extends Player {
         const dist = Math.hypot(dx, dy) || 1;
         const angle = Math.atan2(dy, dx);
 
-        this.updateDirectionFromAngle(angle);
-
         if (this.state === PlayerState.HURT) {
             this.vx = 0;
             this.vy = 0;
             return;
         }
+
+        // Player is outside the engage range: walk back to the post and wait.
+        // This keeps the enemy near its ship instead of chasing across the map.
+        if (dist > this.engageRange) {
+            const hx = this.homeX - this.x;
+            const hy = this.homeY - this.y;
+            const hd = Math.hypot(hx, hy);
+            if (hd > this.homeTolerance) {
+                const speed = this.baseSpeed * 0.6;
+                this.vx = (hx / hd) * speed;
+                this.vy = (hy / hd) * speed;
+                this.updateDirectionFromAngle(Math.atan2(hy, hx));
+                this.setState(PlayerState.RUNNING);
+            } else {
+                this.vx = 0;
+                this.vy = 0;
+                this.setState(PlayerState.IDLE);
+            }
+            return;
+        }
+
+        this.updateDirectionFromAngle(angle);
 
         if (dist > this.attackRange) {
             const speed = this.baseSpeed;
@@ -75,7 +103,7 @@ export class CharacterActor extends Player {
             this.vx = 0;
             this.vy = 0;
             this.setState(PlayerState.IDLE);
-            if (this.shootCooldown <= 0 && dist <= this.engageRange && this.state !== PlayerState.SHOOTING) {
+            if (this.shootCooldown <= 0 && this.state !== PlayerState.SHOOTING) {
                 this.shoot(angle, engine);
             }
         }
