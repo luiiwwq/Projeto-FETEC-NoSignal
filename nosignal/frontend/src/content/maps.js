@@ -414,14 +414,6 @@ const CATACOMBS_OBJECTS_DIR =
 const CATACOMBS_NORTHWEST_ARMS = [
     // zona superior próxima ao Lich
     {
-        x: 656,
-        y: 208,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
         x: 592,
         y: 240,
         sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
@@ -430,14 +422,6 @@ const CATACOMBS_NORTHWEST_ARMS = [
         scale: 1,
     },
     // zona intermediária superior
-    {
-        x: 560,
-        y: 272,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
     {
         x: 496,
         y: 304,
@@ -485,98 +469,13 @@ const CATACOMBS_NORTHWEST_ARMS = [
 // ── Segunda área de decoração: Lich inferior invertido, objetos ao seu
 //     redor e pilhas de crânios na lateral direita isolada. ──
 const CATACOMBS_LOWER_AND_SIDE_OBJECTS = [
-    // Lich invertido na área inferior esquerda, apoiado na parede
-    {
-        x: 592,
-        y: 1008,
-        sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        flipV: true,
-        scale: 1,
-    },
-    // ── Grupo esquerdo do Lich ──
-    {
-        x: 528,
-        y: 972,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 512,
-        y: 988,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 560,
-        y: 972,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_1.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    // ── Grupo direito do Lich ──
-    {
-        x: 600,
-        y: 1044,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 592,
-        y: 1044,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 600,
-        y: 1052,
-        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_2.png`,
-        layer: 'back',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    // ── Pile skulls na lateral direita isolada ──
-    {
-        x: 1232,
-        y: 992,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 1232,
-        y: 1056,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
-    {
-        x: 1232,
-        y: 1120,
-        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
-        layer: 'front',
-        anchor: 'bottom-center',
-        scale: 1,
-    },
 ];
 
 const catacombsObjects = [
     // Lich — área superior central, encostado à parede norte.
     {
-        x: 700,
-        y: 186,
+        x: 656,
+        y: 208,
         sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
         layer: 'back',
         anchor: 'bottom-center',
@@ -609,16 +508,16 @@ const catacombsObjects = [
         scale: 1,
     },
     {
-        x: 572,
-        y: 270,
+        x: 560,
+        y: 272,
         sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
         layer: 'front',
         anchor: 'bottom-center',
         scale: 1,
     },
     {
-        x: 625,
-        y: 220,
+        x: 592,
+        y: 224,
         sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_1.png`,
         layer: 'back',
         anchor: 'bottom-center',
