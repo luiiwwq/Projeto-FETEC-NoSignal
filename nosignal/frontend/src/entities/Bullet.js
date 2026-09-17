@@ -5,7 +5,7 @@
  */
 
 export class Bullet {
-    constructor(x, y, angle, speed = 650, profile = null) {
+    constructor(x, y, angle, speed = 650, profile = null, opts = {}) {
         this.x = x;
         this.y = y;
         this.angle = angle;
@@ -20,6 +20,11 @@ export class Bullet {
         this.glow = profile?.glow ?? '#ffaa33';
         this.core = profile?.core ?? '#fffae6';
         this.trail = profile?.trail ?? '#e07228';
+
+        // Ownership & team determine who this projectile may damage.
+        this.team = opts.team || 'player';
+        this.owner = opts.owner || null;
+        this.damage = opts.damage ?? profile?.damage ?? 15;
     }
 
     update(dt) {

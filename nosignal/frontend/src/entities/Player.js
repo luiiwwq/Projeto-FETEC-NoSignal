@@ -30,17 +30,24 @@ export const PlayerState = {
 };
 
 export class Player {
-    constructor(x = 0, y = 0, name = 'ARES-1') {
+    constructor(x = 0, y = 0, name = 'ARES-1', characterId = null) {
         this.name = name;
         this.x = x;
         this.y = y;
         this.vx = 0;
         this.vy = 0;
 
-        // Character profile (native size, animation map, weapon profile)
-        this.character = getCharacter(gameState.selectedCharacter);
+        // Character profile (native size, animation map, weapon profile).
+        // The entity always knows which character it belongs to so multiple
+        // characters (player, ally, enemy) can coexist.
+        this.character = getCharacter(characterId || gameState.selectedCharacter);
+        this.characterId = this.character.id;
         this.animMap = this.character.animations;
         this.weapon = this.character.weapon;
+
+        // Combat alignment (overridden by CharacterActor for NPCs)
+        this.team = 'player';
+        this.role = 'player';
 
         // Cached direction resolution for clips that lack diagonal frames
         // (e.g., Ocstronaut metadata only ships the 4 cardinal directions)
@@ -68,6 +75,7 @@ export class Player {
         // Health & combat stats
         this.maxHp = 100;
         this.hp = 100;
+        this.bulletDamage = 15;
         this.invulnerableTimer = 0;
         this.isDead = false;
 
@@ -114,8 +122,8 @@ export class Player {
 
         let resolved = direction;
         const candidates = DIAGONAL_FALLBACK[direction];
-        if (candidates && assetLoader.getFrameCount(clipName, direction) === 0) {
-            resolved = candidates.find((d) => assetLoader.getFrameCount(clipName, d) > 0) || candidates[0];
+        if (candidates && assetLoader.getFrameCount(clipName, direction, this.characterId) === 0) {
+            resolved = candidates.find((d) => assetLoader.getFrameCount(clipName, d, this.characterId) > 0) || candidates[0];
         }
 
         this._dirCache.set(cacheKey, resolved);
@@ -125,7 +133,7 @@ export class Player {
     _animFrameCount(state) {
         const clipName = this._animName(state);
         const dir = this._resolveSpriteDir(clipName, this.direction);
-        const realCount = assetLoader.getFrameCount(clipName, dir);
+        const realCount = assetLoader.getFrameCount(clipName, dir, this.characterId);
         if (realCount > 0) return realCount;
         return this.animConfig[state]?.frames || 1;
     }
@@ -280,16 +288,22 @@ export class Player {
             const spawnX = this.x + Math.cos(aimAngle) * spawnDist;
             const spawnY = this.y + Math.sin(aimAngle) * spawnDist - 8; // near chest height
 
+            const bulletOpts = {
+                team: this.team,
+                owner: this,
+                damage: this.bulletDamage
+            };
+
             if (weapon.type === 'shotgun') {
                 const pellets = weapon.pellets || 5;
                 const spread = weapon.spread || 0;
                 const step = pellets > 1 ? spread / (pellets - 1) : 0;
                 for (let i = 0; i < pellets; i++) {
                     const offsetAngle = aimAngle - spread / 2 + step * i;
-                    bulletManager.addBullet(new Bullet(spawnX, spawnY, offsetAngle, weapon.speed, weapon));
+                    bulletManager.addBullet(new Bullet(spawnX, spawnY, offsetAngle, weapon.speed, weapon, bulletOpts));
                 }
             } else {
-                bulletManager.addBullet(new Bullet(spawnX, spawnY, aimAngle, weapon.speed, weapon));
+                bulletManager.addBullet(new Bullet(spawnX, spawnY, aimAngle, weapon.speed, weapon, bulletOpts));
             }
         }
     }
@@ -438,7 +452,7 @@ export class Player {
         // Fetch sprite frame from AssetLoader
         const clipName = this._animName(this.state);
         const spriteDir = this._resolveSpriteDir(clipName, this.direction);
-        const frameImg = assetLoader.getFrame(clipName, spriteDir, this.currentFrame);
+        const frameImg = assetLoader.getFrame(clipName, spriteDir, this.currentFrame, this.characterId);
 
         // Visual flash during invulnerability i-frames
         if (this.invulnerableTimer > 0 && Math.floor(this.invulnerableTimer * 20) % 2 === 0) {

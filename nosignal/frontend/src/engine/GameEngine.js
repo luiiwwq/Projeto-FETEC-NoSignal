@@ -7,8 +7,11 @@
 import { Camera } from './Camera.js';
 import { MapRenderer } from './MapRenderer.js';
 import { Player, PlayerState } from '../entities/Player.js';
+import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
+import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
+import { CHARACTER_ALLY_SHOP_POSITION, CHARACTER_ENEMY_SPAWNS, resolveCharacterRoles } from '../content/characterRoles.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
@@ -74,6 +77,10 @@ export class GameEngine {
         this.player = null;
         this.bullets = [];
         this.particles = [];
+
+        // Non-player characters (ally/enemy) derived from the selected character
+        this.actors = [];
+        this.characterRoles = { ally: null, enemy: null };
 
         // Map state
         this.currentMapId = MAP_IDS.MARS_SURFACE;
@@ -191,14 +198,7 @@ export class GameEngine {
 
         this.player.setPosition(spawn.x, spawn.y);
         this.player.setCollisionResolver(
-            (px, py, dx, dy) => resolveSlide(
-                px, py,
-                this.player.colliderHalfW,
-                this.player.colliderHalfH,
-                dx, dy,
-                buildCollisionObstacles(map, this.player.colliderHalfW, this.player.colliderHalfH),
-                { minX: 0, minY: 0, maxX: map.width, maxY: map.height }
-            )
+            this._buildCollisionResolver(map, this.player.colliderHalfW, this.player.colliderHalfH)
         );
         this.player.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
 
@@ -210,7 +210,63 @@ export class GameEngine {
         this.mapTransitionCooldown = 0.4;
         this.interactableExit = null;
 
+        // (Re)create non-player characters for this map
+        this._setupCharacterRoles(map);
+
         gameState.currentMap = mapId;
+    }
+
+    _buildCollisionResolver(map, halfW, halfH) {
+        const obstacles = buildCollisionObstacles(map, halfW, halfH);
+        return (px, py, dx, dy) => resolveSlide(
+            px, py, halfW, halfH, dx, dy, obstacles,
+            { minX: 0, minY: 0, maxX: map.width, maxY: map.height }
+        );
+    }
+
+    /**
+     * Derive the ally/enemy characters from the selection and (re)spawn them.
+     * The ally only appears on the surface; the enemy only spawns once a
+     * position is configured in CHARACTER_ENEMY_SPAWNS.
+     */
+    _setupCharacterRoles(map) {
+        this.actors = [];
+
+        const selectedId = CHARACTERS[gameState.selectedCharacter]
+            ? gameState.selectedCharacter
+            : DEFAULT_CHARACTER_ID;
+        const roles = resolveCharacterRoles(selectedId);
+        this.characterRoles = roles;
+        gameState.characterRoles = roles;
+
+        if (map.id === MAP_IDS.MARS_SURFACE && roles.ally) {
+            const ally = new CharacterActor({
+                x: CHARACTER_ALLY_SHOP_POSITION.x,
+                y: CHARACTER_ALLY_SHOP_POSITION.y,
+                characterId: roles.ally,
+                team: 'ally',
+                role: ActorRole.ALLY
+            });
+            ally.setCollisionResolver(this._buildCollisionResolver(map, ally.colliderHalfW, ally.colliderHalfH));
+            ally.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+            this.actors.push(ally);
+        }
+
+        if (roles.enemy) {
+            const spawn = CHARACTER_ENEMY_SPAWNS[roles.enemy];
+            if (spawn) {
+                const enemy = new CharacterActor({
+                    x: spawn.x,
+                    y: spawn.y,
+                    characterId: roles.enemy,
+                    team: 'enemy',
+                    role: ActorRole.ENEMY
+                });
+                enemy.setCollisionResolver(this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH));
+                enemy.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+                this.actors.push(enemy);
+            }
+        }
     }
 
     changeMap(targetMapId, spawnId) {
@@ -357,6 +413,21 @@ export class GameEngine {
         this.bullets.push(bullet);
     }
 
+    // Team damage rules:
+    //  - player bullets hit enemies only
+    //  - enemy bullets hit the player only (the ally is immune)
+    //  - ally bullets hit enemies only
+    //  - an entity is never damaged by its own projectile
+    _bulletCanDamage(bullet, targetTeam, target) {
+        if (target === bullet.owner) return false;
+        const attackerTeam = bullet.team || 'player';
+        if (targetTeam === attackerTeam) return false;
+        if (attackerTeam === 'player') return targetTeam === 'enemy';
+        if (attackerTeam === 'enemy') return targetTeam === 'player';
+        if (attackerTeam === 'ally') return targetTeam === 'enemy';
+        return false;
+    }
+
     _spawnHitSparks(x, y) {
         for (let i = 0; i < 12; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -410,6 +481,15 @@ export class GameEngine {
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
 
+        // Update non-player characters (allies idle, enemies pursue & fire)
+        for (const actor of this.actors) {
+            actor.updateAi(dt, this);
+            actor.update(dt);
+        }
+        if (this.actors.some((a) => a.shouldRemove)) {
+            this.actors = this.actors.filter((a) => !a.shouldRemove);
+        }
+
         // Map transition interaction detection
         this.mapTransitionCooldown = Math.max(0, this.mapTransitionCooldown - dt);
         this.interactableExit = null;
@@ -447,14 +527,57 @@ export class GameEngine {
                 this.bullets.splice(i, 1);
                 continue;
             }
-            // Bullets stop against solid obstacles (walls, rocks, towers)
+
             const bRect = { x: bullet.x - 4, y: bullet.y - 4, w: 8, h: 8 };
+            let consumed = false;
+
+            // Bullets stop against solid obstacles (walls, rocks, towers)
             for (const o of this.currentMap.obstacles) {
                 if (rectsOverlap(o, bRect)) {
-                    this._spawnHitSparks(bullet.x, bullet.y);
-                    this.bullets.splice(i, 1);
+                    consumed = true;
                     break;
                 }
+            }
+
+            // Bullets damage valid targets based on team alignment
+            if (!consumed) {
+                for (const actor of this.actors) {
+                    if (actor.isDead) continue;
+                    const aRect = {
+                        x: actor.x - actor.colliderHalfW,
+                        y: actor.y - actor.colliderHalfH,
+                        w: actor.colliderHalfW * 2,
+                        h: actor.colliderHalfH * 2
+                    };
+                    if (rectsOverlap(aRect, bRect)) {
+                        if (this._bulletCanDamage(bullet, actor.team, actor)) {
+                            actor.takeDamage(bullet.damage, bullet.x, bullet.y);
+                        }
+                        consumed = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!consumed && !this.player.isDead) {
+                const p = this.player;
+                const pRect = {
+                    x: p.x - p.colliderHalfW,
+                    y: p.y - p.colliderHalfH,
+                    w: p.colliderHalfW * 2,
+                    h: p.colliderHalfH * 2
+                };
+                if (rectsOverlap(pRect, bRect)) {
+                    if (this._bulletCanDamage(bullet, 'player', p)) {
+                        p.takeDamage(bullet.damage, bullet.x, bullet.y);
+                    }
+                    consumed = true;
+                }
+            }
+
+            if (consumed) {
+                this._spawnHitSparks(bullet.x, bullet.y);
+                this.bullets.splice(i, 1);
             }
         }
 
@@ -481,36 +604,41 @@ export class GameEngine {
         // 1. Render Martian Map and Terrain
         this.mapRenderer.render(ctx, this.camera);
 
-        // 2. Render Bullets
+        // 2. Render non-player characters (NPCs / enemies)
+        for (const actor of this.actors) {
+            actor.render(ctx, this.camera);
+        }
+
+        // 3. Render Bullets
         for (const bullet of this.bullets) {
             bullet.render(ctx, this.camera);
         }
 
-        // 3. Render Particles
+        // 4. Render Particles
         for (const p of this.particles) {
             const screen = this.camera.worldToScreen(p.x, p.y);
             ctx.fillStyle = p.color;
             ctx.fillRect(Math.round(screen.x), Math.round(screen.y), p.size, p.size);
         }
 
-        // 4. Render Player
+        // 5. Render Player
         this.player.render(ctx, this.camera);
 
-        // 5. Render Martian Dust Weather
+        // 6. Render Martian Dust Weather
         this.mapRenderer.renderAtmosphericDust(ctx, this.width, this.height);
 
-        // 6. Render Sci-Fi HUD
+        // 7. Render Sci-Fi HUD
         this._renderHUD(ctx);
 
-        // 7. Render Aim Crosshair
+        // 8. Render Aim Crosshair
         this._renderCrosshair(ctx);
 
-        // 8. Render Death Screen Overlay if dead
+        // 9. Render Death Screen Overlay if dead
         if (this.player.state === PlayerState.DEAD) {
             this._renderDeathOverlay(ctx);
         }
 
-        // 9. Render Map Transition Prompt ([E]) when near a doorway
+        // 10. Render Map Transition Prompt ([E]) when near a doorway
         if (this.interactableExit && this.mapTransitionCooldown <= 0) {
             this._renderExitPrompt(ctx, this.interactableExit);
         }
