@@ -56,29 +56,29 @@ const caveEntranceLip = { x: 1570, y: 1108, w: 50, h: 195, kind: 'cave-wall' };
 const caveRockRight = { x: 1781, y: 1260, w: 30, h: 100, kind: 'cave-wall' };
 const caveSolarPanel = { x: 1648, y: 1290, w: 37, h: 13, kind: 'cave-wall' };
 
-// Distant castle — visual facade comes from castle-sprite.png (see MapRenderer).
-// SOLID collision covering the facade:
-// - Outer rock rubble tips: castle-rubble-left (x3385..3450) and castle-rubble-right (x3850..3920)
-// - Left tower/wall block: castle-tower-left (x3450..3518) and castle-pillar-left (x3517..3584), y600..929
-// - Right tower/wall block: castle-pillar-right (x3715..3783) and castle-tower-right (x3782..3850), y600..929
-// - Central dome & upper facade: castle-keep-top (x3570..3730, y547..808), ending at door lintel
-// - Central door opening (x3584..3715) remains open for access corridor down to spawn (y960)
-// - Door leaves barrier: castle-door-block (x3584..3715, y816..830) stopping player at interaction zone.
-const castleRubbleLeft = { id: 'castle-rubble-left', x: 3385, y: 845, w: 65, h: 84, kind: 'castle-wall' };
-const castleTowerLeft = { id: 'castle-tower-left', x: 3450, y: 600, w: 68, h: 329, kind: 'castle-wall' };
-const castlePillarLeft = { id: 'castle-pillar-left', x: 3517, y: 600, w: 67, h: 329, kind: 'castle-wall' };
-const castleKeepTop = { id: 'castle-keep-top', x: 3570, y: 547, w: 160, h: 261, kind: 'castle-wall' };
-const castlePillarRight = { id: 'castle-pillar-right', x: 3715, y: 600, w: 68, h: 329, kind: 'castle-wall' };
-const castleTowerRight = { id: 'castle-tower-right', x: 3782, y: 600, w: 68, h: 329, kind: 'castle-wall' };
-const castleRubbleRight = { id: 'castle-rubble-right', x: 3850, y: 835, w: 70, h: 94, kind: 'castle-wall' };
+// Distant castle — visual facade comes from castle_sprite.png (see MapRenderer).
+// SOLID collision covering the castle facade tightly on the sprite (scale 0.90):
+const castleTowerLeft = { id: 'castle-tower-left', x: 3241, y: 71, w: 172, h: 432, kind: 'castle-wall' };
+const castleTowerRight = { id: 'castle-tower-right', x: 3884, y: 71, w: 172, h: 432, kind: 'castle-wall' };
+const castleKeepTop = { id: 'castle-keep-top', x: 3413, y: 141, w: 472, h: 362, kind: 'castle-wall' };
+const castleTurretLeft = { id: 'castle-turret-left', x: 3209, y: 505, w: 178, h: 285, kind: 'castle-wall' };
+const castleTurretRight = { id: 'castle-turret-right', x: 3908, y: 505, w: 178, h: 285, kind: 'castle-wall' };
+const castlePillarLeft = { id: 'castle-pillar-left', x: 3387, y: 505, w: 198, h: 345, kind: 'castle-wall' };
+const castlePillarRight = { id: 'castle-pillar-right', x: 3713, y: 505, w: 198, h: 345, kind: 'castle-wall' };
+const castleStairPostLeft = { id: 'castle-stair-post-left', x: 3515, y: 855, w: 58, h: 64, kind: 'castle-wall' };
+const castleStairPostRight = { id: 'castle-stair-post-right', x: 3724, y: 855, w: 58, h: 64, kind: 'castle-wall' };
+const castleDoorBlock = { id: 'castle-door-block', x: 3595, y: 830, w: 110, h: 20, kind: 'castle-wall' };
+const castleCliffBottomLeft = { id: 'castle-cliff-bottom-left', x: 3170, y: 915, w: 350, h: 105, kind: 'castle-wall' };
+const castleCliffBottomRight = { id: 'castle-cliff-bottom-right', x: 3725, y: 915, w: 380, h: 105, kind: 'castle-wall' };
+const castleMoundShelfLeft = { id: 'castle-mound-shelf-left', x: 3160, y: 780, w: 360, h: 135, kind: 'castle-wall' };
+const castleMoundShelfRight = { id: 'castle-mound-shelf-right', x: 3725, y: 780, w: 390, h: 135, kind: 'castle-wall' };
+const castleFlankTopLeft = { id: 'castle-flank-top-left', x: 3110, y: 570, w: 100, h: 160, kind: 'castle-wall' };
+const castleFlankMidLeft = { id: 'castle-flank-mid-left', x: 3050, y: 710, w: 120, h: 170, kind: 'castle-wall' };
+const castleFlankBotLeft = { id: 'castle-flank-bot-left', x: 3010, y: 830, w: 170, h: 185, kind: 'castle-wall' };
+const castleFlankTopRight = { id: 'castle-flank-top-right', x: 4085, y: 570, w: 100, h: 160, kind: 'castle-wall' };
+const castleFlankMidRight = { id: 'castle-flank-mid-right', x: 4125, y: 710, w: 120, h: 170, kind: 'castle-wall' };
+const castleFlankBotRight = { id: 'castle-flank-bot-right', x: 4115, y: 830, w: 175, h: 185, kind: 'castle-wall' };
 
-// Thin collision strip across the door opening — prevents the player from
-// visually walking through the closed door leaves. Its bottom edge (the one
-// facing the player approaching from below) is pushed a little further down,
-// inside the top of the interaction trigger, so the player stops a bit before
-// the door: blocked at centerY = 830 + halfH, i.e. ~22px below the old stop
-// point, while the "[E] ENTRAR" prompt is still visible.
-const castleDoorBlock = { id: 'castle-door-block', x: 3584, y: 816, w: 131, h: 14, kind: 'castle-wall' };
 
 // Border rocks framing the world edges (visual + collision)
 const surfaceBorderRocks = [
@@ -87,6 +87,20 @@ const surfaceBorderRocks = [
     { x: 0, y: 0, w: 60, h: 3200, kind: 'edge-rock' },
     { x: 4740, y: 0, w: 60, h: 3200, kind: 'edge-rock' },
 ];
+
+// Shop NPC — static merchant facade (Map/shop_npc.png) near (1951, 218).
+// The sprite is drawn on this obstacle's world rect and the AABB below is its
+// solid collision box, so the player (and bullets) cannot walk through it.
+const shopNpc = {
+    id: 'shop-npc',
+    kind: 'npc',
+    x: 1951,
+    y: 120,
+    w: 320,
+    h: 288,
+    sprite: 'Map/shop_npc.png',
+};
+
 
 export const marsSurfaceMap = {
     id: MAP_IDS.MARS_SURFACE,
@@ -99,7 +113,7 @@ export const marsSurfaceMap = {
     spawnPoints: {
         'mars-start': { x: 420, y: 700 },
         'cave-return': { x: 1615, y: 1500 },
-        'castle-return': { x: 3660, y: 960 },
+        'castle-return': { x: 3650, y: 895 },
     },
     // Free-movement bands: the rectangle is excavated from every obstacle that
     // crosses it (expanded by the player's half-size so the whole body passes
@@ -108,6 +122,7 @@ export const marsSurfaceMap = {
     freeMoveZones: [{ x: 1425, y: 1354, w: 406, h: 28 }],
     obstacles: [
         ...surfaceBorderRocks,
+        shopNpc,
         caveRockOuterLeft,
         cavePillarLeft,
         caveArchTop,
@@ -116,14 +131,26 @@ export const marsSurfaceMap = {
         caveEntranceLip,
         caveSolarPanel,
         caveRockRight,
-        castleRubbleLeft,
         castleTowerLeft,
-        castlePillarLeft,
-        castleKeepTop,
-        castlePillarRight,
         castleTowerRight,
-        castleRubbleRight,
+        castleKeepTop,
+        castleTurretLeft,
+        castleTurretRight,
+        castlePillarLeft,
+        castlePillarRight,
+        castleStairPostLeft,
+        castleStairPostRight,
         castleDoorBlock,
+        castleCliffBottomLeft,
+        castleCliffBottomRight,
+        castleMoundShelfLeft,
+        castleMoundShelfRight,
+        castleFlankTopLeft,
+        castleFlankMidLeft,
+        castleFlankBotLeft,
+        castleFlankTopRight,
+        castleFlankMidRight,
+        castleFlankBotRight,
     ],
     exits: [
         {
@@ -133,10 +160,6 @@ export const marsSurfaceMap = {
             targetSpawn: 'cave-entry',
             // Rectangular trigger aligned with the dark cave-mouth opening of
             // cavern_entrance.png (world x1567..1667 from the corridor, y1200..1380).
-            // Overlap only (rectsOverlap), no radial detection. Its bottom (1380)
-            // stays ~120px above the cave-return spawn (y1500) so the prompt does
-            // NOT appear right after coming back from the cave — same rule applied
-            // to the castle-gate trigger.
             area: { x: 1567, y: 1200, w: 100, h: 180 },
         },
         {
@@ -144,18 +167,12 @@ export const marsSurfaceMap = {
             label: 'ENTRAR NO CASTELO',
             targetMap: MAP_IDS.CASTLE_HALL,
             targetSpawn: 'hall-entry',
-            x: 3660,
-            y: 760,
-            radius: 72,
-            // Rectangular trigger as a THIN HORIZONTAL STRIP at the door lintel
-            // height (y808), centered on the door opening (x3580..3720). Overlap
-            // only (rectsOverlap). The bottom (y848) stays well above the
-            // castle-return spawn (960) so the prompt does NOT appear on spawn.
-            // The castle-door-block collision sits at y816..830, inside the top
-            // of this trigger, so the player is stopped a bit further from the
-            // door leaves while still overlapping the zone (~18px of standing
-            // room below the barrier) with the prompt visible.
-            area: { x: 3580, y: 808, w: 140, h: 40 },
+            x: 3650,
+            y: 865,
+            radius: 75,
+            area: { x: 3570, y: 840, w: 160, h: 75 },
+            promptX: 3650,
+            promptY: 790,
         },
     ],
     structures: [
@@ -596,18 +613,15 @@ export const marsCatacombsMap = {
             label: 'SAIR DAS CATACUMBAS',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'cave-return',
-            x: 96,
-            y: 765,
-            radius: 62,
+            x: 110,
+            y: 802,
+            radius: 64,
         },
     ],
     structures: [],
-    // Grupos de plantas e ossos na fronteira rocha/chão (boca, curvas da
-    // arena, gargalo e câmara final) — ver catacombsDecor(). Nada além disso:
-    // spawn, arena e caminho permanecem livres.
-    decorations: [
-        ...catacombsDecor(catacombsLayout, TILE),
-    ],
+    // Decorações removidas por pedido: catacumbas sem plantas/ossos. Spawn,
+    // arena e caminho permanecem livres.
+    decorations: [],
 };
 
 /* ─────────────── Castle interior maps ─────────────── */

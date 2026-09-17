@@ -28,13 +28,11 @@ import { tileAtlas } from './tileAtlas.js';
 
 const P = SURFACE_PALETTE;
 
-// Visual facade of the distant castle. Loaded once and cached; the sprite is
-// drawn as a world object (moves with the camera), anchored bottom-center on
-// the ground line of the collision parts defined in content/maps.js. scale 0.15
-// keeps the 4000x3124 facade at ~600x469 world px — a few times taller than the
-// 128px astronaut, without covering the playable area.
-const CASTLE_SPRITE_PATH = './src/assets/sprites/Castle/castle-sprite.png';
-const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 940, originX: 0.5, originY: 1.0, scale: 0.15 };
+// Visual facade of the distant castle (scale 0.90 = ~2x original / 1.5x reduced from 1.35).
+// Anchored at x: 3650, y: 1037 so the top of the 977px building sits
+// comfortably below the northern border rocks at y: 60.
+const CASTLE_SPRITE_PATH = './src/assets/sprites/Castle/castle_sprite.png?v=4';
+const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 1037, originX: 0.5, originY: 1.0, scale: 0.90 };
 
 // Cave entrance sprite (single monolithic rock with a dark mouth in its
 // centre). Anchored bottom-center on the same ground line the cave-wall
@@ -50,9 +48,9 @@ const CAVE_SPRITE_ANCHOR = { x: 1620, y: 1410, originX: 0.5, originY: 1.0, scale
 // path relative to this base).
 const SPRITE_BASE = './src/assets/sprites/';
 
-// Ground texture (tileable JPEG), loaded once and used as a CanvasPattern in
+// Ground texture (tileable PNG), loaded once and used as a CanvasPattern in
 // _drawSurfaceGroundCell when available; otherwise procedural ground fallback.
-const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.jpeg';
+const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.png';
 const MAP_SURFACE_PATTERN_SCALE = 0.5; // pattern.setTransform scale (texture cell = 512px)
 // The photo texture (~84 avg luminance with the current art) is brightened +
 // saturated ONCE when it is baked into the offscreen canvas (the procedural
@@ -74,13 +72,13 @@ const UNDEAD_GROUND_MAP_IDS = new Set(['mars-core']);
 
 // ── Catacombs terrain (mars-catacombs) ─────────────────────────────────
 // Terreno das Catacumbas: máscara 44×22 (2816×1408) com rochas sólidas (#)
-// e chão caminhável (.). O chão recebe a textura map_catacombs_surface.jpeg
+// e chão caminhável (.). O chão recebe a textura map_surface.png
 // e as paredes mantêm cores distintas e sólidas com colisão física.
 const CATACOMBS_ID = 'mars-catacombs';
 const CATACOMBS_WALKABLE = new Set(['.']);
 const CATACOMBS_FLOOR = [118, 46, 26];
 const CATACOMBS_ROCK = [68, 27, 15];
-const MAP_CATACOMBS_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_catacombs_surface.jpeg';
+const MAP_CATACOMBS_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface.png';
 const MAP_CATACOMBS_SURFACE_SCALE = 0.5;
 
 // ── Catacombs walls: continuous base & modular rock piece library ──────────
@@ -258,6 +256,7 @@ export class MapRenderer {
         if (map.id === CATACOMBS_ID) {
             // Catacomb complete wall canvas built once when assets ready.
             this._catacombsWallCanvas = null;
+            this.loadCatacombsSurfaceTexture();
             this.loadCatacombsWallTexture();
             this.loadCatacombEdges();
         }
@@ -277,12 +276,19 @@ export class MapRenderer {
             this.castleSprite = img;
         };
         img.onerror = () => {
-            if (!this._castleSpriteWarned) {
-                this._castleSpriteWarned = true;
-                console.warn(
-                    `[MapRenderer] ${CASTLE_SPRITE_PATH} não carregou — usando fallback procedural para o castelo.`
-                );
-            }
+            const fallback = new Image();
+            fallback.onload = () => {
+                this.castleSprite = fallback;
+            };
+            fallback.onerror = () => {
+                if (!this._castleSpriteWarned) {
+                    this._castleSpriteWarned = true;
+                    console.warn(
+                        `[MapRenderer] ${CASTLE_SPRITE_PATH} não carregou — usando fallback procedural para o castelo.`
+                    );
+                }
+            };
+            fallback.src = './src/assets/sprites/Castle/castle-sprite.png?v=4';
         };
         img.src = CASTLE_SPRITE_PATH;
     }
@@ -323,14 +329,50 @@ export class MapRenderer {
             this.mapSurfaceTexture = img;
         };
         img.onerror = () => {
-            if (!this._mapSurfaceWarned) {
-                this._mapSurfaceWarned = true;
-                console.warn(
-                    `[MapRenderer] ${MAP_SURFACE_TEXTURE_PATH} não carregou — usando chão procedural.`
-                );
-            }
+            const fallback = new Image();
+            fallback.onload = () => {
+                this.mapSurfaceTexture = fallback;
+            };
+            fallback.onerror = () => {
+                if (!this._mapSurfaceWarned) {
+                    this._mapSurfaceWarned = true;
+                    console.warn(
+                        `[MapRenderer] ${MAP_SURFACE_TEXTURE_PATH} não carregou — usando chão procedural.`
+                    );
+                }
+            };
+            fallback.src = './src/assets/sprites/Map/map_surface.jpeg';
         };
         img.src = MAP_SURFACE_TEXTURE_PATH;
+    }
+
+    // Catacombs ground texture (map_surface.png).
+    loadCatacombsSurfaceTexture() {
+        if (this.mapCatacombsSurfaceTexture || this._mapCatacombsSurfaceRequested) return;
+        this._mapCatacombsSurfaceRequested = true;
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.mapCatacombsSurfaceTexture = img;
+            this._mapCatacombsSurfacePattern = null;
+        };
+        img.onerror = () => {
+            const fallback = new Image();
+            fallback.onload = () => {
+                this.mapCatacombsSurfaceTexture = fallback;
+                this._mapCatacombsSurfacePattern = null;
+            };
+            fallback.onerror = () => {
+                if (!this._mapCatacombsSurfaceWarned) {
+                    this._mapCatacombsSurfaceWarned = true;
+                    console.warn(
+                        `[MapRenderer] ${MAP_CATACOMBS_SURFACE_TEXTURE_PATH} não carregou — usando chão procedural.`
+                    );
+                }
+            };
+            fallback.src = './src/assets/sprites/Map/map_surface.jpeg';
+        };
+        img.src = MAP_CATACOMBS_SURFACE_TEXTURE_PATH;
     }
 
     // Undead rock floor texture (Ground_rocks.png). Loaded exactly once, only
@@ -472,36 +514,19 @@ export class MapRenderer {
         return this._undeadGroundPattern;
     }
 
-    // Lazy CanvasPattern for the Catacombs floor (map_catacombs_surface.jpeg):
+    // Lazy CanvasPattern for the Catacombs floor (map_surface.png):
     // Loads the image once and patterns from it with world offset alignment.
     _ensureCatacombsSurfacePattern(ctx) {
         if (this._mapCatacombsSurfacePattern) return this._mapCatacombsSurfacePattern;
-        if (!this._mapCatacombsSurfaceRequested) {
-            this._mapCatacombsSurfaceRequested = true;
-            const img = new Image();
-            img.src = MAP_CATACOMBS_SURFACE_TEXTURE_PATH;
-            img.onload = () => {
-                this.mapCatacombsSurfaceTexture = img;
-            };
-            img.onerror = () => {
-                const fallback = new Image();
-                fallback.src = './src/assets/sprites/Map/maps_catacombs_surface.jpeg';
-                fallback.onload = () => {
-                    this.mapCatacombsSurfaceTexture = fallback;
-                };
-                fallback.onerror = () => {
-                    if (!this._mapCatacombsSurfaceWarned) {
-                        this._mapCatacombsSurfaceWarned = true;
-                        console.warn('[MapRenderer] Falha ao carregar textura do chão das Catacumbas:', MAP_CATACOMBS_SURFACE_TEXTURE_PATH);
-                    }
-                };
-            };
-        }
-        if (!this.mapCatacombsSurfaceTexture || this.mapCatacombsSurfaceTexture.naturalWidth === 0) {
+        this.loadCatacombsSurfaceTexture();
+        const texture = (this.mapCatacombsSurfaceTexture && this.mapCatacombsSurfaceTexture.naturalWidth > 0)
+            ? this.mapCatacombsSurfaceTexture
+            : (this.mapSurfaceTexture && this.mapSurfaceTexture.naturalWidth > 0 ? this.mapSurfaceTexture : null);
+        if (!texture) {
             return null;
         }
         try {
-            const pattern = ctx.createPattern(this.mapCatacombsSurfaceTexture, 'repeat');
+            const pattern = ctx.createPattern(texture, 'repeat');
             if (pattern) {
                 this._mapCatacombsSurfacePattern = pattern;
             }
@@ -596,7 +621,6 @@ export class MapRenderer {
         const mask = this.map.terrainMask;
         if (!mask || mask.length === 0) return null;
         if (!this.mapCatacombsWallTexture || !this.mapCatacombsWallTexture.complete || this.mapCatacombsWallTexture.naturalWidth === 0) return null;
-        if (!this._catacombsEdgesReady()) return null;
         if (typeof document === 'undefined') return null;
 
         const rows = mask.length;
@@ -649,118 +673,11 @@ export class MapRenderer {
             }
         }
 
-        // 2. Composição interna de rocha usando crops dos edge sprites
-        const fillPieces = CATACOMBS_WALL_PIECES.fill;
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (mask[r][c] === '.') continue;
-                const hVal = hash2(c * 17 + 3, r * 29 + 7);
-                if (hVal < 0.85) {
-                    const pidx = Math.floor(hash2(c * 31, r * 47) * fillPieces.length) % fillPieces.length;
-                    this._drawWallPiece(ctx, fillPieces[pidx], c * cell, r * cell, cell, cell, 0.75);
-                }
-                if (hash2(c * 53 + 1, r * 37 + 9) < 0.25) {
-                    const didx = Math.floor(hash2(c * 11, r * 19) * CATACOMBS_WALL_PIECES.detail.length) % CATACOMBS_WALL_PIECES.detail.length;
-                    this._drawWallPiece(ctx, CATACOMBS_WALL_PIECES.detail[didx], c * cell, r * cell, cell, cell, 0.6);
-                }
-            }
-        }
+        // 2. Bordas/edges removidas por pedido: nenhuma peça dos EdgeSprites
+        //    (fill/detail/faces/cantos) nem sombreamento de borda é desenhado.
+        //    A parede é apenas a base contínua recortada pela máscara.
 
-        // 3. Faces, cantos e transições em contato com o chão
-        const isFloor = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && mask[r][c] === '.';
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (mask[r][c] === '.') continue;
-                const fN = isFloor(r - 1, c);
-                const fS = isFloor(r + 1, c);
-                const fW = isFloor(r, c - 1);
-                const fE = isFloor(r, c + 1);
-                const ortho = (fN ? 1 : 0) + (fS ? 1 : 0) + (fW ? 1 : 0) + (fE ? 1 : 0);
-
-                const diagNW = isFloor(r - 1, c - 1) && !fN && !fW;
-                const diagNE = isFloor(r - 1, c + 1) && !fN && !fE;
-                const diagSW = isFloor(r + 1, c - 1) && !fS && !fW;
-                const diagSE = isFloor(r + 1, c + 1) && !fS && !fE;
-
-                const dx = c * cell;
-                const dy = r * cell;
-                const hVal = hash2(c * 13 + 5, r * 19 + 11);
-
-                if (ortho >= 3) {
-                    const list = CATACOMBS_WALL_PIECES.end;
-                    const p = list[Math.floor(hVal * list.length) % list.length];
-                    this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                } else if (ortho === 2) {
-                    if (fN && fW) {
-                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'NW');
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fN && fE) {
-                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'NE');
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fS && fW) {
-                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'SW');
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fS && fE) {
-                        const list = CATACOMBS_WALL_PIECES.outerCorner.filter(p => p.orientation === 'SE');
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fN && fS) {
-                        const topP = CATACOMBS_WALL_PIECES.top[Math.floor(hVal * CATACOMBS_WALL_PIECES.top.length) % CATACOMBS_WALL_PIECES.top.length];
-                        const botP = CATACOMBS_WALL_PIECES.bottom[Math.floor((1 - hVal) * CATACOMBS_WALL_PIECES.bottom.length) % CATACOMBS_WALL_PIECES.bottom.length];
-                        this._drawWallPiece(ctx, topP, dx, dy, cell, cell, 1.0);
-                        this._drawWallPiece(ctx, botP, dx, dy, cell, cell, 0.9);
-                    } else if (fW && fE) {
-                        const leftP = CATACOMBS_WALL_PIECES.left[Math.floor(hVal * CATACOMBS_WALL_PIECES.left.length) % CATACOMBS_WALL_PIECES.left.length];
-                        const rightP = CATACOMBS_WALL_PIECES.right[Math.floor((1 - hVal) * CATACOMBS_WALL_PIECES.right.length) % CATACOMBS_WALL_PIECES.right.length];
-                        this._drawWallPiece(ctx, leftP, dx, dy, cell, cell, 1.0);
-                        this._drawWallPiece(ctx, rightP, dx, dy, cell, cell, 0.9);
-                    }
-                } else if (ortho === 1) {
-                    if (fN) {
-                        const list = CATACOMBS_WALL_PIECES.top;
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fS) {
-                        const list = CATACOMBS_WALL_PIECES.bottom;
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fW) {
-                        const list = CATACOMBS_WALL_PIECES.left;
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    } else if (fE) {
-                        const list = CATACOMBS_WALL_PIECES.right;
-                        const p = list[Math.floor(hVal * list.length) % list.length];
-                        this._drawWallPiece(ctx, p, dx, dy, cell, cell, 1.0);
-                    }
-                } else if (diagNW || diagNE || diagSW || diagSE) {
-                    const list = CATACOMBS_WALL_PIECES.innerCorner;
-                    const p = list[Math.floor(hVal * list.length) % list.length];
-                    this._drawWallPiece(ctx, p, dx, dy, cell, cell, 0.9);
-                }
-            }
-        }
-
-        // 4. Sombreamento sutil de profundidade nas bordas internas voltadas para o chão
-        ctx.fillStyle = 'rgba(25, 8, 4, 0.35)';
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if (mask[r][c] === '.') continue;
-                const fN = isFloor(r - 1, c);
-                const fS = isFloor(r + 1, c);
-                const fW = isFloor(r, c - 1);
-                const fE = isFloor(r, c + 1);
-                if (fN) ctx.fillRect(c * cell, r * cell, cell, 4);
-                if (fS) ctx.fillRect(c * cell, (r + 1) * cell - 5, cell, 5);
-                if (fW) ctx.fillRect(c * cell, r * cell, 4, cell);
-                if (fE) ctx.fillRect((c + 1) * cell - 4, r * cell, 4, cell);
-            }
-        }
-
-        // 5. Garantia matemática: clip estrito na máscara de parede '#'
+        // 3. Garantia matemática: clip estrito na máscara de parede '#'
         // Impede rigorosamente qualquer vazamento de pixel para as células de chão '.'
         ctx.save();
         ctx.globalCompositeOperation = 'destination-in';
@@ -886,8 +803,8 @@ export class MapRenderer {
     // Screen-space rect of the castle facade on the current frame (world object).
     _castleSpriteRect(offset) {
         const a = CASTLE_SPRITE_ANCHOR;
-        let cw = 4000;
-        let ch = 3124;
+        let cw = 1448;
+        let ch = 1086;
         if (this.castleSprite && this.castleSprite.naturalWidth > 0) {
             cw = this.castleSprite.naturalWidth;
             ch = this.castleSprite.naturalHeight;
@@ -913,8 +830,8 @@ export class MapRenderer {
     }
 
     _macroAt(lc, lr) {
-        const h = hash2(lc, lr);
-        if (h > 0.86) return 'iron';
+        // The dark 'iron' macro (collisionless rock clusters scattered over the
+        // surface) was removed by request: every logical tile is dune terrain.
         return 'dune';
     }
 
@@ -1001,24 +918,15 @@ export class MapRenderer {
 
         const macro = this._macroAt(lc, lr);
         if (macro === 'iron') {
-            ctx.fillStyle = P.ironDark;
-            ctx.beginPath();
-            ctx.moveTo(cx + 12, cy + 48);
-            ctx.lineTo(cx + 24, cy + 16);
-            ctx.lineTo(cx + 44, cy + 12);
-            ctx.lineTo(cx + 52, cy + 36);
-            ctx.lineTo(cx + 40, cy + 54);
-            ctx.closePath();
-            ctx.fill();
-            ctx.fillStyle = P.ironLight;
-            ctx.fillRect(cx + 24, cy + 16, 6, 4);
-        } else {
-            const tone = this._duneTone(x + s / 2, y + s / 2);
-            if (tone.kind === 'dark' || tone.kind === 'orange') {
-                const h = hash2(lc, lr);
-                ctx.fillStyle = 'rgba(30, 12, 6, 0.35)';
-                ctx.fillRect(cx + 6, cy + Math.floor(h * s * 0.6) + 4, Math.floor(s * 0.7), 2);
-            }
+            // Dark collisionless rock clusters removed by request. Kept as a
+            // guard so no iron rock is ever drawn even if _macroAt changes.
+            return;
+        }
+        const tone = this._duneTone(x + s / 2, y + s / 2);
+        if (tone.kind === 'dark' || tone.kind === 'orange') {
+            const h = hash2(lc, lr);
+            ctx.fillStyle = 'rgba(30, 12, 6, 0.35)';
+            ctx.fillRect(cx + 6, cy + Math.floor(h * s * 0.6) + 4, Math.floor(s * 0.7), 2);
         }
     }
 
@@ -1082,6 +990,8 @@ export class MapRenderer {
                 }
             } else if (o.kind === 'edge-rock') {
                 this._drawEdgeRiff(ctx, sx, sy, o, seed);
+            } else if (o.kind === 'npc') {
+                this._drawUndeadSprite(ctx, o, offset);
             } else {
                 this._drawBlock(ctx, sx, sy, o.w, o.h, o.kind);
             }

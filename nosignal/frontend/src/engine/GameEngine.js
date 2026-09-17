@@ -521,8 +521,8 @@ export class GameEngine {
         // text at the center of that area (shifted slightly down) so it appears
         // right over the interaction zone — closer to the actual door. Exits
         // without an area keep the legacy position (centered above the exit).
-        const promptX = exit.area ? exit.area.x + exit.area.w / 2 : exit.x;
-        const promptY = exit.area ? exit.area.y + exit.area.h / 2 + 10 : exit.y - 70;
+        const promptX = exit.promptX !== undefined ? exit.promptX : (exit.area ? exit.area.x + exit.area.w / 2 : exit.x);
+        const promptY = exit.promptY !== undefined ? exit.promptY : (exit.area ? exit.area.y + exit.area.h / 2 + 10 : exit.y - 70);
         const screen = this.camera.worldToScreen(promptX, promptY);
         const label = exit.label || 'ENTRAR';
 
