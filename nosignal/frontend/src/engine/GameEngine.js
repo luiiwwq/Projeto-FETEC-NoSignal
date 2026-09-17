@@ -8,14 +8,21 @@ import { Camera } from './Camera.js';
 import { MapRenderer } from './MapRenderer.js';
 import { Player, PlayerState } from '../entities/Player.js';
 import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
+import { Golem, GOLEM_WAVE_SPAWNS, GOLEM_COLLIDER_HALF_W, GOLEM_COLLIDER_HALF_H, preloadGolemSprites } from '../entities/Golem.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
 import { CHARACTER_ALLY_SHOP_POSITION, CHARACTER_ENEMY_SPAWNS, resolveCharacterRoles } from '../content/characterRoles.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
+import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_THIRD_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
 import { loadSettings } from '../state/stateStorage.js';
+
+const DAY_NIGHT_ICON_PATH = {
+    [DAY_NIGHT_PERIOD.DAY]: './src/assets/sprites/Night_Day_System/sun_sprite.png',
+    [DAY_NIGHT_PERIOD.NIGHT]: './src/assets/sprites/Night_Day_System/moon_sprite.png'
+};
 
 const MAP_LABELS = {
     [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE MARTE',
@@ -82,6 +89,18 @@ export class GameEngine {
         this.actors = [];
         this.characterRoles = { ally: null, enemy: null };
 
+        // Golem wave + day/night cycle
+        this.golems = [];
+        this.dayNight = new DayNightSystem();
+        this._golemWavePendingNight = 0; // night that must still be paid out
+        this._lastGolemWaveNight = 0;    // guard against a double spawn
+        this._golemWaveCount = 0;
+        this._nightBannerTimer = 0;
+        this._nightBannerText = '';
+        this._nightFlashTimer = 0;
+        this._nightBlend = 0; // 0 = full day, 1 = full night tint
+        this._dayNightIcons = { cached: new Map(), requested: false };
+
         // Map state
         this.currentMapId = MAP_IDS.MARS_SURFACE;
         this.currentMap = MAPS[this.currentMapId];
@@ -140,6 +159,10 @@ export class GameEngine {
 
         // Aplica configurações persistidas (ex.: brilho ajustado na tela inicial)
         this._applyStoredSettings();
+
+        // Warm the golem + day/night sprite caches once for the whole session.
+        preloadGolemSprites();
+        this._loadDayNightIcons();
 
         // Initialize Player with state name
         const astronautName = gameState.playerName || 'ARES-1';
@@ -212,8 +235,144 @@ export class GameEngine {
 
         // (Re)create non-player characters for this map
         this._setupCharacterRoles(map);
+        this.golems = [];
+
+        // A wave scheduled while the player was away is paid out as soon as
+        // they set foot back on the allowed map (never lost, never doubled).
+        if (mapId === MAP_IDS.MARS_SURFACE && this._golemWavePendingNight > 0) {
+            this._spawnGolemWave(mapId, this._golemWavePendingNight);
+        }
 
         gameState.currentMap = mapId;
+    }
+
+    /* ── Day / night cycle ──────────────────────────────── */
+    _updateDayNight(dt) {
+        const event = this.dayNight.update(dt);
+
+        if (event && event.type === 'night-start') {
+            this._nightBannerText = `NOITE ${event.nightCount}`;
+            this._nightBannerTimer = 3.0;
+            this._nightFlashTimer = 0.45;
+            this._startNight();
+        }
+
+        if (this._nightBannerTimer > 0) this._nightBannerTimer -= dt;
+        if (this._nightFlashTimer > 0) this._nightFlashTimer -= dt;
+
+        const target = this.dayNight.period === DAY_NIGHT_PERIOD.NIGHT ? 1 : 0;
+        const step = Math.min(1, dt / 1.2);
+        this._nightBlend += (target - this._nightBlend) * step;
+
+        gameState.dayNight = this.dayNight.getHudState();
+        gameState.dayNight.waveCount = this._golemWaveCount;
+    }
+
+    _startNight() {
+        if (SPAWN_WAVE_EVERY_THIRD_NIGHT && this.dayNight.nightCount % 3 === 0) {
+            this._queueGolemWave(this.dayNight.nightCount);
+        }
+    }
+
+    // Schedule the wave; spawn now if allowed, otherwise remember the night so
+    // it is created when the player returns to the surface.
+    _queueGolemWave(night) {
+        if (night <= this._lastGolemWaveNight) return;
+        if (this.currentMapId === MAP_IDS.MARS_SURFACE) {
+            this._spawnGolemWave(MAP_IDS.MARS_SURFACE, night);
+        } else {
+            this._golemWavePendingNight = night;
+        }
+    }
+
+    _spawnGolemWave(mapId, night) {
+        const map = MAPS[mapId];
+        if (!map) return 0;
+
+        const positions = [
+            ...GOLEM_WAVE_SPAWNS.bottom,
+            ...GOLEM_WAVE_SPAWNS.top,
+            ...GOLEM_WAVE_SPAWNS.front
+        ];
+
+        let spawned = 0;
+        for (const pos of positions) {
+            const free = this._findFreeGolemSpawn(map, pos.x, pos.y);
+            if (!free) continue;
+
+            const golem = new Golem(free.x, free.y);
+            golem.setCollisionResolver(
+                this._buildCollisionResolver(map, golem.colliderHalfW, golem.colliderHalfH)
+            );
+            golem.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+            this.actors.push(golem);
+            this.golems.push(golem);
+            spawned += 1;
+        }
+
+        this._lastGolemWaveNight = night;
+        this._golemWavePendingNight = 0;
+        if (spawned > 0) this._golemWaveCount += 1;
+        return spawned;
+    }
+
+    // Returns a free {x,y} for a golem box, nudging outward from the requested
+    // spot when it overlaps an obstacle, the player or another actor.
+    _findFreeGolemSpawn(map, x, y) {
+        const hw = GOLEM_COLLIDER_HALF_W;
+        const hh = GOLEM_COLLIDER_HALF_H;
+
+        const isBlocked = (cx, cy) => {
+            const rect = { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+            if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > map.width || rect.y + rect.h > map.height) {
+                return true;
+            }
+            for (const o of map.obstacles) {
+                if (rectsOverlap(o, rect)) return true;
+            }
+            const p = this.player;
+            if (p && !p.isDead) {
+                const pr = {
+                    x: p.x - p.colliderHalfW,
+                    y: p.y - p.colliderHalfH,
+                    w: p.colliderHalfW * 2,
+                    h: p.colliderHalfH * 2
+                };
+                if (rectsOverlap(pr, rect)) return true;
+            }
+            for (const actor of this.actors) {
+                const ar = {
+                    x: actor.x - actor.colliderHalfW,
+                    y: actor.y - actor.colliderHalfH,
+                    w: actor.colliderHalfW * 2,
+                    h: actor.colliderHalfH * 2
+                };
+                if (rectsOverlap(ar, rect)) return true;
+            }
+            return false;
+        };
+
+        if (!isBlocked(x, y)) return { x, y };
+
+        const step = 48;
+        for (let radius = step; radius <= 480; radius += step) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+                const cx = x + Math.cos(a) * radius;
+                const cy = y + Math.sin(a) * radius;
+                if (!isBlocked(cx, cy)) return { x: Math.round(cx), y: Math.round(cy) };
+            }
+        }
+        return null;
+    }
+
+    _loadDayNightIcons() {
+        if (this._dayNightIcons.requested || typeof Image === 'undefined') return;
+        this._dayNightIcons.requested = true;
+        for (const period of Object.keys(DAY_NIGHT_ICON_PATH)) {
+            const img = new Image();
+            img.src = DAY_NIGHT_ICON_PATH[period];
+            this._dayNightIcons.cached.set(period, img);
+        }
     }
 
     _buildCollisionResolver(map, halfW, halfH) {
@@ -355,13 +514,8 @@ export class GameEngine {
             return;
         }
 
-        // Test hotkeys for quick state testing
-        if (e.code === 'KeyH') {
-            this.player.takeDamage(25);
-            this._spawnHitSparks(this.player.x, this.player.y);
-        } else if (e.code === 'KeyK') {
-            this.player.die();
-        } else if (e.code === 'KeyF') {
+        // State-testing hotkeys
+        if (e.code === 'KeyF') {
             if (this.player.state === PlayerState.FLOATING) {
                 this.player.setState(PlayerState.IDLE, true);
             } else {
@@ -477,17 +631,23 @@ export class GameEngine {
     }
 
     update(dt) {
+        // Advance the day/night clock first so a wave spawned on a night
+        // transition is simulated in the same frame.
+        this._updateDayNight(dt);
+
         // Update player input and logic
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
 
-        // Update non-player characters (allies idle, enemies pursue & fire)
+        // Update non-player characters (allies idle, enemies pursue & fire,
+        // golems pursue & melee)
         for (const actor of this.actors) {
             actor.updateAi(dt, this);
             actor.update(dt);
         }
         if (this.actors.some((a) => a.shouldRemove)) {
             this.actors = this.actors.filter((a) => !a.shouldRemove);
+            this.golems = this.golems.filter((g) => !g.shouldRemove);
         }
 
         // Map transition interaction detection
@@ -627,8 +787,14 @@ export class GameEngine {
         // 6. Render Martian Dust Weather
         this.mapRenderer.renderAtmosphericDust(ctx, this.width, this.height);
 
+        // 6.5 Night tint + transition flash (below the HUD so it stays readable)
+        this._renderDayNightOverlay(ctx);
+
         // 7. Render Sci-Fi HUD
         this._renderHUD(ctx);
+
+        // 7.5 Temporary "NOITE N" banner on top of everything
+        this._renderNightBanner(ctx);
 
         // 8. Render Aim Crosshair
         this._renderCrosshair(ctx);
@@ -734,6 +900,10 @@ export class GameEngine {
         ctx.fillText(areaText, hudX + 16, hudY + 98);
         ctx.fillText(stateText, hudX + 16, hudY + 116);
 
+        // DAY / NIGHT INDICATOR — directly below the vitals panel so it never
+        // covers the health bar
+        this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
+
         // TOP-RIGHT: Coordinates & Telemetry
         const trX = this.width - 240;
         const trY = 24;
@@ -762,11 +932,97 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'center';
         ctx.fillText(
-            '[WASD] Mover  [SHIFT] Correr  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [ESC] Menu  [H] Dano  [K] Morte  [R] Reiniciar',
+            '[WASD] Mover  [SHIFT] Correr  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [ESC] Menu',
             this.width / 2,
             barBottomY + 23
         );
 
+        ctx.restore();
+    }
+
+    _renderDayNightIndicator(ctx, x, y) {
+        const w = 168;
+        const h = 40;
+        const isNight = this.dayNight.period === DAY_NIGHT_PERIOD.NIGHT;
+
+        // Frame
+        ctx.save();
+        ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = isNight ? '#5f7fd8' : '#e07228';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+        // Icon (sun / moon), kept at its natural aspect ratio and pixelated
+        const icon = this._dayNightIcons.cached.get(this.dayNight.period);
+        const box = 26;
+        const iconX = x + 12;
+        const iconY = y + (h - box) / 2;
+        if (icon && icon.complete && icon.naturalWidth > 0) {
+            const ratio = icon.naturalWidth / icon.naturalHeight;
+            const iw = Math.round(box * ratio);
+            const ih = box;
+            ctx.drawImage(icon, iconX + Math.round((box - iw) / 2), iconY, iw, ih);
+        } else {
+            ctx.fillStyle = isNight ? '#cdd6ff' : '#ffd46b';
+            ctx.beginPath();
+            ctx.arc(iconX + box / 2, iconY + box / 2, box / 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Label + countdown MM:SS
+        ctx.textAlign = 'left';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = isNight ? '#9fb4ff' : '#e07228';
+        ctx.fillText(isNight ? `NOITE ${this.dayNight.nightCount}` : 'DIA', x + 48, y + 16);
+
+        ctx.font = '12px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(formatDayNightTime(this.dayNight.getRemainingSeconds()), x + 48, y + 33);
+        ctx.restore();
+    }
+
+    _renderDayNightOverlay(ctx) {
+        const alpha = 0.32 * this._nightBlend;
+        if (alpha > 0.002) {
+            ctx.save();
+            ctx.fillStyle = `rgba(12, 16, 48, ${alpha.toFixed(3)})`;
+            ctx.fillRect(0, 0, this.width, this.height);
+            ctx.restore();
+        }
+
+        if (this._nightFlashTimer > 0) {
+            const a = 0.20 * (this._nightFlashTimer / 0.45);
+            ctx.save();
+            ctx.fillStyle = `rgba(200, 220, 255, ${a.toFixed(3)})`;
+            ctx.fillRect(0, 0, this.width, this.height);
+            ctx.restore();
+        }
+    }
+
+    _renderNightBanner(ctx) {
+        if (this._nightBannerTimer <= 0) return;
+
+        const t = this._nightBannerTimer;
+        const alpha = Math.min(1, (3.0 - t) / 0.3, t / 0.6);
+        if (alpha <= 0) return;
+
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+        ctx.textAlign = 'center';
+
+        const text = this._nightBannerText;
+        ctx.font = '20px "Press Start 2P", monospace';
+        const textW = ctx.measureText(text).width;
+
+        ctx.fillStyle = 'rgba(5, 5, 18, 0.8)';
+        ctx.fillRect(this.width / 2 - textW / 2 - 20, this.height / 2 - 70, textW + 40, 40);
+        ctx.strokeStyle = '#5f7fd8';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.width / 2 - textW / 2 - 20, this.height / 2 - 70, textW + 40, 40);
+
+        ctx.fillStyle = '#cdd6ff';
+        ctx.fillText(text, this.width / 2, this.height / 2 - 40);
         ctx.restore();
     }
 

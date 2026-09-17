@@ -406,6 +406,105 @@ export const marsCoreMap = {
     decorations: [],
 };
 
+const CATACOMBS_OBJECTS_DIR =
+    './Cavern/Catacombs Objects/';
+
+const catacombsObjects = [
+    // Lich — área superior central, encostado à parede norte.
+    {
+        x: 700,
+        y: 155,
+        sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+
+    // ── Grupo esquerdo (x: 535–625, y: 170–270) ──
+    {
+        x: 555,
+        y: 205,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 595,
+        y: 235,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 535,
+        y: 255,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 580,
+        y: 270,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 625,
+        y: 220,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_1.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+
+    // ── Grupo direito (x: 800–890, y: 170–270) ──
+    {
+        x: 825,
+        y: 205,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 865,
+        y: 240,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_3.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 805,
+        y: 260,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Dead_arm_1.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 850,
+        y: 275,
+        sprite: `${CATACOMBS_OBJECTS_DIR}pile_skulls.png`,
+        layer: 'front',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+    {
+        x: 895,
+        y: 215,
+        sprite: `${CATACOMBS_OBJECTS_DIR}Thorn_plant_2.png`,
+        layer: 'back',
+        anchor: 'bottom-center',
+        scale: 1,
+    },
+];
+
 export const marsCatacombsMap = {
     id: MAP_IDS.MARS_CATACOMBS,
     type: 'sprite-cavern',
@@ -433,7 +532,7 @@ export const marsCatacombsMap = {
         },
     ],
     structures: [],
-    decorations: [],
+    decorations: catacombsObjects,
 };
 
 /* ─────────────── Castle interior maps ─────────────── */

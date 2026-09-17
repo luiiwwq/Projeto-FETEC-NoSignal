@@ -75,7 +75,7 @@ export class Player {
         // Health & combat stats
         this.maxHp = 100;
         this.hp = 100;
-        this.bulletDamage = 15;
+        this.bulletDamage = 14;
         this.invulnerableTimer = 0;
         this.isDead = false;
 
@@ -286,7 +286,9 @@ export class Player {
         if (bulletManager) {
             const spawnDist = 24;
             const spawnX = this.x + Math.cos(aimAngle) * spawnDist;
-            const spawnY = this.y + Math.sin(aimAngle) * spawnDist - 8; // near chest height
+            // Spawn from the upper body so south-facing bullets never
+            // clip into the ground/collision box on the first frame.
+            const spawnY = this.y - 20 + Math.sin(aimAngle) * spawnDist * 0.35;
 
             const bulletOpts = {
                 team: this.team,

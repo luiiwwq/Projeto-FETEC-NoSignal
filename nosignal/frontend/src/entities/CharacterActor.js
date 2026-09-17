@@ -31,11 +31,11 @@ export class CharacterActor extends Player {
         this.isActor = true;
         this.blocksPlayer = false;
 
-        // NPC combat ranges (only meaningful for enemies). Kept short so the
-        // enemy must actually be approached instead of rushing the player from
-        // across the map.
-        this.engageRange = role === ActorRole.ENEMY ? 320 : 0;
-        this.attackRange = role === ActorRole.ENEMY ? 220 : 0;
+        // NPC combat ranges (only meaningful for enemies). Kept long enough
+        // that enemies can shoot from a safer distance without rushing the
+        // player from across the map.
+        this.engageRange = role === ActorRole.ENEMY ? 400 : 0;
+        this.attackRange = role === ActorRole.ENEMY ? 340 : 0;
 
         // Post position: the enemy leashes back here when the player leaves
         // its engage range instead of chasing forever.

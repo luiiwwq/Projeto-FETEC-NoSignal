@@ -304,26 +304,43 @@ export class MapRenderer {
 
     // Draws one full individual sprite (no sub-rect crop — each file is a
     // complete sprite already) at the obstacle/decoration's world position.
-    // Returns without drawing if the sprite is still loading or failed, so a
-    // missing asset never breaks a frame.
+    // Supports `anchor: 'bottom-center'` so the sprite's base sits exactly
+    // on the world coordinate (y = base, x = center).
+    // Returns without drawing if the sprite is still loading or failed.
     _drawUndeadSprite(ctx, o, offset) {
         if (!o.sprite) return;
         const path = `${SPRITE_BASE}${o.sprite}`;
         const img = this._loadSpriteOnce(path, path);
         if (!img || !img.complete || img.naturalWidth === 0) return;
-        const x = Math.round(o.x + offset.x);
-        const y = Math.round(o.y + offset.y);
+        const baseX = Math.round(o.x + offset.x);
+        const baseY = Math.round(o.y + offset.y);
+        let drawX, drawY, drawW, drawH;
         if (o.source) {
             const s = o.source;
-            const w = o.w || s.w;
-            const h = o.h || s.h;
-            ctx.drawImage(img, s.x, s.y, s.w, s.h, x, y, w, h);
+            drawW = o.w || s.w;
+            drawH = o.h || s.h;
         } else if (o.w && o.h) {
-            ctx.drawImage(img, x, y, o.w, o.h);
+            drawW = o.w;
+            drawH = o.h;
         } else if (o.scale) {
-            ctx.drawImage(img, x, y, Math.round(img.naturalWidth * o.scale), Math.round(img.naturalHeight * o.scale));
+            drawW = Math.round(img.naturalWidth * o.scale);
+            drawH = Math.round(img.naturalHeight * o.scale);
         } else {
-            ctx.drawImage(img, x, y);
+            drawW = img.naturalWidth;
+            drawH = img.naturalHeight;
+        }
+        if (o.anchor === 'bottom-center') {
+            drawX = baseX - drawW / 2;
+            drawY = baseY - drawH;
+        } else {
+            drawX = baseX;
+            drawY = baseY;
+        }
+        if (o.source) {
+            const s = o.source;
+            ctx.drawImage(img, s.x, s.y, s.w, s.h, drawX, drawY, drawW, drawH);
+        } else {
+            ctx.drawImage(img, drawX, drawY, drawW, drawH);
         }
     }
 
@@ -903,11 +920,12 @@ export class MapRenderer {
     }
 
     /**
-     * Sprite-cavern pipeline: pure black viewport + the whole map PNG drawn
-     * once at world origin (1:1, pixel-snapped, no smoothing, no stretch, no
-     * repetition). Camera scrolls by shifting the draw origin. Nothing else is
-     * painted here — entities, bullets, HUD and prompts are drawn by the engine
-     * on top.
+     * Sprite-cavern pipeline: pure black viewport + the whole map PNG
+     * drawn once at world origin (1:1, pixel-snapped, no smoothing, no
+     * stretch, no repetition). Camera scrolls by shifting the draw
+     * origin. Floor-level decorations (back then front) are painted
+     * directly on top of the base sprite; entities, bullets and the HUD
+     * are drawn by the engine on top.
      */
     _renderSpriteCavern(ctx, camera) {
         const viewW = camera.viewportWidth;
@@ -923,6 +941,12 @@ export class MapRenderer {
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(img, Math.round(offset.x), Math.round(offset.y));
         ctx.imageSmoothingEnabled = prevSmoothing;
+
+        // Floor-level decorations drawn on the base sprite.
+        // 'back' items first (integrated into the wall), then 'front'
+        // items (skulls, arms, plants clearly on top of the floor).
+        this._drawDecorations(ctx, offset, 'back');
+        this._drawDecorations(ctx, offset, 'front');
     }
 
     _renderLegacy(ctx, camera) {
