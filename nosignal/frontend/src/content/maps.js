@@ -474,8 +474,8 @@ const CATACOMBS_LOWER_AND_SIDE_OBJECTS = [
 const catacombsObjects = [
     // Lich — área superior central, encostado à parede norte.
     {
-        x: 656,
-        y: 208,
+        x: 800,
+        y: 224,
         sprite: `${CATACOMBS_OBJECTS_DIR}lich.png`,
         layer: 'back',
         anchor: 'bottom-center',
