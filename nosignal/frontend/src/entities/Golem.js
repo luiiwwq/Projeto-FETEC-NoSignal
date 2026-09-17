@@ -20,12 +20,12 @@ import { rectsOverlap } from '../systems/collisionSystem.js';
 export const GOLEM_ATTACK_DAMAGE = 11;   // +5% vs the original 10
 export const GOLEM_ATTACK_COOLDOWN = 1.0;   // seconds between swings
 export const GOLEM_ATTACK_RANGE = 52;       // centre-to-centre melee reach
-export const GOLEM_MAX_HP = 50;
+export const GOLEM_MAX_HP = 120;
 
 /* ── AI tuning ───────────────────────────────────────────── */
 export const GOLEM_ENGAGE_RANGE = 520;      // starts chasing inside this radius
 export const GOLEM_HOME_TOLERANCE = 12;     // snap distance back at its post
-export const GOLEM_SPEED = 72;              // px/sec (slower than the player)
+export const GOLEM_SPEED = 74;              // px/sec (3% mais rápido que o base 72)
 
 /* ── Hitbox & rendering ──────────────────────────────────── */
 export const GOLEM_COLLIDER_HALF_W = 26;
