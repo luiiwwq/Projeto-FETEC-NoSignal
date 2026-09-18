@@ -367,7 +367,7 @@ function cavernObstacles(mask, cell, mapWidth, mapHeight) {
             const y = r * cell;
             const y2 = r === rows - 1 ? mapHeight : (r + 1) * cell;
             rects.push({ x, y, w: x2 - x, h: y2 - y, kind: 'undead-rock' });
-            c = c2;
+c = c2;
         }
     }
     return rects;
@@ -673,11 +673,6 @@ export const marsCatacombsMap = {
  * MASK_CELL = 32 → mask grid ~56×28 cells.
  * '.' = walkable floor, '#' = solid wall/obstacle.
  * Doors are walkable areas in the mask.
- *
- * DOOR SPRITES: Scull_door_shadow*.png files are not yet present
- * in the project at the expected path:
- *   nosignal/frontend/src/assets/sprites/Map/UndeadMars/...
- * The code is prepared to load them when they are added.
  * ─────────────────────────────────────────────────────── */
 
 const MASK_CELL = 32;
@@ -771,36 +766,8 @@ function castleObstacles(mask, cell, mapWidth, mapHeight) {
             c = c2;
         }
     }
-    return rects;
+return rects;
 }
-
-// Door sprites — NOT yet present in the project. Paths prepared
-// for when Scull_door_shadow*.png files are added.
-// Sprite paths are relative to SPRITE_BASE = './src/assets/sprites/'
-const DOOR_SPRITE_DIR = 'Map/UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/Objects_separately/';
-const CASTLE_DOOR_DECORATIONS = [
-    {
-        x: 1500, y: 400,
-        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow1.png`,
-        anchor: 'bottom-center',
-        scale: 1,
-        layer: 'front',
-    },
-    {
-        x: 300, y: 400,
-        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow2.png`,
-        anchor: 'bottom-center',
-        scale: 1,
-        layer: 'front',
-    },
-    {
-        x: 100, y: 440,
-        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow3.png`,
-        anchor: 'bottom-center',
-        scale: 1,
-        layer: 'front',
-    },
-];
 
 export const castlePrincipalRoomMap = {
     id: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
@@ -836,7 +803,7 @@ export const castlePrincipalRoomMap = {
         },
     ],
     structures: [],
-    decorations: [...CASTLE_DOOR_DECORATIONS],
+    decorations: [],
 };
 
 export const castleKingRoomMap = {
@@ -864,7 +831,7 @@ export const castleKingRoomMap = {
         },
     ],
     structures: [],
-    decorations: [...CASTLE_DOOR_DECORATIONS],
+    decorations: [],
 };
 
 export const MAPS = {

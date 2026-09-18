@@ -61,8 +61,6 @@ const CAVERN_SPRITE_PATHS = {
 // ── Sprite-castle maps (Sala Principal + Sala do Rei) ─────────────
 // Each map is a single pre-composed PNG (1790×879). Drawn 1:1 at world
 // (0,0). Collisions are defined by a walkability mask in maps.js.
-// DOOR SPRITES: Scull_door_shadow*.png files are not yet present in
-// the project. The code is prepared to load them when added.
 const SPRITE_CASTLE_PATHS = {
     'castle-principal-room': './src/assets/sprites/Castle/map_principal_room.png',
     'castle-king-room': './src/assets/sprites/Castle/map_king_room.png',
@@ -931,9 +929,6 @@ export class MapRenderer {
      * origin. Floor-level decorations (back then front) are painted
      * directly on top of the base sprite; entities, bullets and the HUD
      * are drawn by the engine on top.
-     *
-     * Door sprites (Scull_door_shadow*.png) are loaded via the generic
-     * _loadSpriteOnce cache when they are present in the project.
      */
     _renderSpriteCastle(ctx, camera) {
         const viewW = camera.viewportWidth;
