@@ -1,6 +1,7 @@
 import { renderTitleScreen } from './ui/titleScreen.js';
 import { initMainMenu } from './ui/screens.js';
 import { preloadClickButtonSound, bindGlobalClickSound } from './audio/uiClickSound.js';
+import { startMenuMusic } from './audio/menuMusic.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // ─── Som de clique dos botões ───
@@ -103,6 +104,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Conecta os event listeners do protótipo aos botões renderizados
         initMainMenu();
+
+        // Música do menu principal: respeita o bloqueio de autoplay do
+        // navegador e só toca após a primeira interação permitida.
+        startMenuMusic();
 
         console.log('[No Signal] Aplicação inicializada com sucesso.');
     }

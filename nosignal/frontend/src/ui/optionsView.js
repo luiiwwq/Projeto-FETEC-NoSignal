@@ -8,6 +8,7 @@
  */
 
 import { loadSettings, saveSettings } from '../state/stateStorage.js';
+import { setMenuMusicVolume } from '../audio/menuMusic.js';
 
 const RANGES = [
     { setting: 'musicVolume', label: 'VOLUME DA MÚSICA', min: 0, max: 100 },
@@ -199,6 +200,10 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
             if (label) label.textContent = value + '%';
             saveSettings({ [slider.dataset.setting]: value });
             applyBrightness(containerRef);
+            // Volume da música do menu segue ao vivo, sem reiniciar a música.
+            if (slider.dataset.setting === 'musicVolume') {
+                setMenuMusicVolume();
+            }
         });
     });
 

@@ -11,6 +11,7 @@
 import { showToast } from './titleScreen.js';
 import { gameState } from '../state/gameState.js';
 import { createOptionsContent, syncOptionsUI } from './optionsView.js';
+import { startMenuMusic } from '../audio/menuMusic.js';
 
 let menuElement = null;
 let isOpen = false;
@@ -253,6 +254,9 @@ function _returnToMainMenu() {
             initMainMenu();
         });
     });
+
+    // Ao voltar ao menu, retoma a música do menu uma única vez.
+    startMenuMusic();
 }
 
 function _updateMainMenuButton(armed) {

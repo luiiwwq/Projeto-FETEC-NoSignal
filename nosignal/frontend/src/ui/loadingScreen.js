@@ -7,8 +7,12 @@
 import { assetLoader } from '../engine/AssetLoader.js';
 import { GameEngine } from '../engine/GameEngine.js';
 import { gameState } from '../state/gameState.js';
+import { stopMenuMusic } from '../audio/menuMusic.js';
 
 export function renderLoadingScreen(container) {
+    // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
+    stopMenuMusic();
+
     container.innerHTML = `
         <div class="loading-screen-wrapper">
             <div class="mars-grid-overlay"></div>
