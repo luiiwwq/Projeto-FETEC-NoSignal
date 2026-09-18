@@ -8,6 +8,7 @@ import { gameState } from '../state/gameState.js';
 import { CHARACTERS, CHARACTER_IDS, DEFAULT_CHARACTER_ID, getCharacterRotationPaths } from '../content/characters.js';
 import { renderLoadingScreen } from './loadingScreen.js';
 import { renderNameScreen } from './nameScreen.js';
+import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 export function renderCharacterSelectScreen(container) {
     container.innerHTML = `
@@ -142,9 +143,13 @@ export function renderCharacterSelectScreen(container) {
         if (e.key === 'Enter') {
             e.preventDefault();
             cleanup();
+            // Enter confirma a seleção (nenhum `click` nativo é gerado aqui,
+            // pois o keydown é interceptado com preventDefault).
+            playClickButtonSound();
             handleConfirm();
         } else if (e.key === 'Escape') {
             cleanup();
+            playClickButtonSound();
             handleBack();
         }
     };

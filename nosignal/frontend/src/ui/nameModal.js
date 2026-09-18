@@ -7,6 +7,7 @@
 
 import { gameState } from '../state/gameState.js';
 import { renderLoadingScreen } from './loadingScreen.js';
+import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 // ─────────────────────────────────────────────────────────
 //  Estado compartilhado do jogador
@@ -132,9 +133,13 @@ function _bindModalEvents(overlay) {
     input?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
+            // Som de confirmação apenas quando a ação será executada
+            // (nome válido) — o erro não toca som.
+            if (input.value.trim()) playClickButtonSound();
             _confirmName(input, errorMsg);
         }
         if (e.key === 'Escape') {
+            playClickButtonSound();
             closeNameModal();
         }
     });

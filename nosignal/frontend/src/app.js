@@ -1,7 +1,14 @@
 import { renderTitleScreen } from './ui/titleScreen.js';
 import { initMainMenu } from './ui/screens.js';
+import { preloadClickButtonSound, bindGlobalClickSound } from './audio/uiClickSound.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // ─── Som de clique dos botões ───
+    // Pré-carrega o click_button.mp3 (sem tocar antes da 1ª interação) e
+    // instala a delegação global: qualquer botão tocado/disparado por
+    // Enter/Espaço (que gera `click`) emite o som de ativação.
+    preloadClickButtonSound();
+    bindGlobalClickSound();
     // ─── Prevenir Zoom Acidental do Navegador ───
     // Bloqueia Ctrl + Scroll do Mouse
     window.addEventListener('wheel', (e) => {

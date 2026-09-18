@@ -7,6 +7,7 @@ import { gameState } from '../state/gameState.js';
 import { renderCharacterSelectScreen } from './characterSelectScreen.js';
 import { renderTitleScreen } from './titleScreen.js';
 import { initMainMenu } from './screens.js';
+import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 export function renderNameScreen(container) {
     container.innerHTML = `
@@ -93,6 +94,9 @@ export function renderNameScreen(container) {
 
     input?.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            // Enter no campo de nome é a "confirmação" equivalente ao botão
+            // INICIAR A JORNADA (o navegador não gera `click` aqui).
+            playClickButtonSound();
             handleConfirm();
         }
     });

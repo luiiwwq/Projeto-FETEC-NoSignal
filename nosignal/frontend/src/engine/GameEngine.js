@@ -17,6 +17,7 @@ import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionS
 import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
+import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings } from '../state/stateStorage.js';
 
 const DAY_NIGHT_ICON_PATH = {
@@ -526,6 +527,9 @@ export class GameEngine {
         // Map transition interaction ([E] on a doorway/portal)
         if (e.code === 'KeyE' && this.interactableExit && this.mapTransitionCooldown <= 0) {
             const exit = this.interactableExit;
+            // Som de confirmação: toca SOMENTE quando E realmente ativa a
+            // interação (porta/portal) — nunca ao entrar na área do prompt.
+            playClickButtonSound();
             // The cave entrance opens the cave CHOICE screen instead of
             // transitioning directly; the map change happens only after the
             // player picks "Núcleo de Marte" or "Catacumbas Marcianas".

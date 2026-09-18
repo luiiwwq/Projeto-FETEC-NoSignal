@@ -4,6 +4,8 @@
  * O bloco sobe lentamente da parte de baixo e para centralizado na tela.
  */
 
+import { playClickButtonSound } from '../audio/uiClickSound.js';
+
 const CREDITS_HTML = `
     <div class="credits-track">
         <div class="credits-block">
@@ -70,6 +72,8 @@ export function renderCreditsScreen(container) {
         if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
+            // ESC volta ao menu, equivalente ao botão VOLTAR (toca o som).
+            playClickButtonSound();
             closeCreditsScreen();
         }
     });

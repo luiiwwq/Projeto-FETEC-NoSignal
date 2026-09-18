@@ -6,6 +6,7 @@
  */
 
 import { createOptionsContent, syncOptionsUI } from './optionsView.js';
+import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 let overlay = null;
 
@@ -55,6 +56,8 @@ export function openOptionsScreen(container) {
         if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
+            // ESC fecha as opções, equivalente ao botão VOLTAR (toca o som).
+            playClickButtonSound();
             closeOptionsScreen();
         }
     });
