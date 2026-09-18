@@ -42,7 +42,7 @@ function refreshFullscreenButtons() {
         btn.textContent = document.fullscreenElement ? 'TELA CHEIA: LIGADO' : 'TELA CHEIA: DESLIGADO';
     });
     const settings = loadSettings();
-    settings.fullscreen = !!document.fullscreenElement;
+    settings.fullscreen = !!document.fullscreenElement || fsKeepRequested;
     saveSettings(settings);
 }
 
@@ -108,10 +108,12 @@ function toggleFullscreen(containerRef) {
     if (document.fullscreenElement) {
         fsKeepRequested = false;
         fsManualExit = true;
+        window.__noSignalKeepFullscreen = false;
         exitFullscreen();
     } else {
         fsKeepRequested = true;
         fsManualExit = false;
+        window.__noSignalKeepFullscreen = true;
         enterFullscreen(target);
     }
 }

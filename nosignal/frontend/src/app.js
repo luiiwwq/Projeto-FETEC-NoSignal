@@ -30,13 +30,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // recarregar, etc.) em todo o jogo, exceto em campos de texto, para
     // preservar colar/ditar no campo de nome do astronauta.
     window.addEventListener('contextmenu', (e) => {
-        const target = e.target;
-        if (target instanceof HTMLElement && (
-            target.matches('input, textarea') || target.isContentEditable
-        )) {
-            return;
-        }
+      const target = e.target;
+      if (target instanceof HTMLElement && (
+        target.matches('input, textarea') || target.isContentEditable
+      )) {
+        return;
+      }
+      e.preventDefault();
+    });
+
+    // Bloqueia clique direito (botão 2) para evitar que o navegador feche
+    // o jogo ou abra menus de contexto em tela cheia
+    window.addEventListener('mousedown', (e) => {
+      if (e.button === 2) {
         e.preventDefault();
+      }
+    });
+
+    // Bloqueia o menu de contexto no documento inteiro
+    document.addEventListener('contextmenu', (e) => {
+      const target = e.target;
+      if (target instanceof HTMLElement && (
+        target.matches('input, textarea') || target.isContentEditable
+      )) {
+        return;
+      }
+      e.preventDefault();
     });
 
     const appContainer = document.getElementById('app');

@@ -124,6 +124,18 @@ export class GameEngine {
         this._onMouseDown = this._handleMouseDown.bind(this);
         this._onMouseUp = this._handleMouseUp.bind(this);
         this._onContextMenu = (e) => e.preventDefault();
+        this._onFullscreenChange = () => {
+            if (!this.isRunning) return;
+            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            if (window.__noSignalKeepFullscreen) {
+                const target = document.documentElement;
+                if (target.requestFullscreen) {
+                    try { target.requestFullscreen(); } catch (err) { /* ignora */ }
+                } else if (target.webkitRequestFullscreen) {
+                    try { target.webkitRequestFullscreen(); } catch (err) { /* ignora */ }
+                }
+            }
+        };
         this._onResize = this._handleResize.bind(this);
     }
 
@@ -181,6 +193,8 @@ export class GameEngine {
         this.canvas.addEventListener('mousedown', this._onMouseDown);
         window.addEventListener('mouseup', this._onMouseUp);
         this.canvas.addEventListener('contextmenu', this._onContextMenu);
+        document.addEventListener('fullscreenchange', this._onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', this._onFullscreenChange);
 
         this._handleResize();
         this.start();
@@ -205,6 +219,8 @@ export class GameEngine {
         window.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener('mouseup', this._onMouseUp);
+        document.removeEventListener('fullscreenchange', this._onFullscreenChange);
+        document.removeEventListener('webkitfullscreenchange', this._onFullscreenChange);
     }
 
     _loadMap(mapId, spawnId) {
@@ -481,6 +497,11 @@ export class GameEngine {
         // ESC toggles the pause menu
         if (e.code === 'Escape') {
             e.preventDefault();
+            // Impede que o navegador saia da tela cheia ao apertar ESC
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                window.__noSignalKeepFullscreen = true;
+                e.preventDefault();
+            }
             // Cave choice screen intercepts its own ESC while focused, but this
             // branch is a safety net (e.g. focus outside the overlay).
             if (isCaveChoiceOpen()) {
