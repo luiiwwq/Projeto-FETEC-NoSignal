@@ -58,6 +58,16 @@ const CAVERN_SPRITE_PATHS = {
     'mars-catacombs': './src/assets/sprites/Cavern/cave_catacomb_map2.png',
 };
 
+// ── Sprite-castle maps (Sala Principal + Sala do Rei) ─────────────
+// Each map is a single pre-composed PNG (1790×879). Drawn 1:1 at world
+// (0,0). Collisions are defined by a walkability mask in maps.js.
+// DOOR SPRITES: Scull_door_shadow*.png files are not yet present in
+// the project. The code is prepared to load them when added.
+const SPRITE_CASTLE_PATHS = {
+    'castle-principal-room': './src/assets/sprites/Castle/map_principal_room.png',
+    'castle-king-room': './src/assets/sprites/Castle/map_king_room.png',
+};
+
 // Ground texture (tileable PNG), loaded once and used as a CanvasPattern in
 // _drawSurfaceGroundCell when available; otherwise procedural ground fallback.
 const MAP_SURFACE_TEXTURE_PATH = './src/assets/sprites/Map/map_surface2.png';
@@ -123,6 +133,10 @@ export class MapRenderer {
         this.cavernSprites = new Map();
         this._cavernSpriteRequested = new Set();
         this._cavernSpriteWarned = new Set();
+        // Sprite-castle full-map PNGs (castle-principal-room / castle-king-room)
+        this.castleMapSprites = new Map();
+        this._castleMapSpriteRequested = new Set();
+        this._castleMapSpriteWarned = new Set();
         // Generic individual-sprite cache shared by surface props and the shop
         // NPC (key = full URL; value = Image once ready, null while loading or
         // after a failed load). `_undeadWarned` de-dupes the console warnings.
@@ -142,7 +156,7 @@ export class MapRenderer {
         if (map.type === 'surface') {
             // Surface uses the layered micro-tile pipeline (no precomputed grid).
             this.tiles = [];
-        } else if (map.type === 'sprite-cavern') {
+        } else if (map.type === 'sprite-cavern' || map.type === 'sprite-castle') {
             // Single pre-composed PNG: no terrain grid, no tiles, no pattern.
             this.tiles = [];
         } else {
@@ -159,6 +173,11 @@ export class MapRenderer {
         if (map.type === 'sprite-cavern') {
             // Only the full-map artwork is needed; nothing else is drawn over it.
             this.loadCavernMapSprite(map.id);
+            return;
+        }
+
+        if (map.type === 'sprite-castle') {
+            this.loadSpriteCastleMapSprite(map.id);
             return;
         }
 
@@ -190,6 +209,31 @@ export class MapRenderer {
             }
         };
         img.src = CAVERN_SPRITE_PATHS[mapId];
+    }
+
+    /**
+     * Loads the full-map PNG of a sprite-castle map exactly once (cached per
+     * map id). While it is loading/failed the map stays pure black — there is
+     * NO procedural fallback texture for these maps.
+     */
+    loadSpriteCastleMapSprite(mapId) {
+        if (!SPRITE_CASTLE_PATHS[mapId]) return;
+        if (this.castleMapSprites.has(mapId) || this._castleMapSpriteRequested.has(mapId)) return;
+        this._castleMapSpriteRequested.add(mapId);
+        if (typeof Image === 'undefined') return; // non-browser (tests)
+        const img = new Image();
+        img.onload = () => {
+            this.castleMapSprites.set(mapId, img);
+        };
+        img.onerror = () => {
+            if (!this._castleMapSpriteWarned.has(mapId)) {
+                this._castleMapSpriteWarned.add(mapId);
+                console.warn(
+                    `[MapRenderer] ${SPRITE_CASTLE_PATHS[mapId]} não carregou — mapa do castelo permanece preto.`
+                );
+            }
+        };
+        img.src = SPRITE_CASTLE_PATHS[mapId];
     }
 
     /**
@@ -869,13 +913,46 @@ export class MapRenderer {
     }
 
     render(ctx, camera) {
-        if (this.map.type === 'sprite-cavern') {
+        if (this.map.type === 'sprite-castle') {
+            this._renderSpriteCastle(ctx, camera);
+        } else if (this.map.type === 'sprite-cavern') {
             this._renderSpriteCavern(ctx, camera);
         } else if (this.map.type === 'surface') {
             this._renderSurface(ctx, camera);
         } else {
             this._renderLegacy(ctx, camera);
         }
+    }
+
+    /**
+     * Sprite-castle pipeline: pure black viewport + the whole map PNG
+     * drawn once at world origin (1:1, pixel-snapped, no smoothing, no
+     * stretch, no repetition). Camera scrolls by shifting the draw
+     * origin. Floor-level decorations (back then front) are painted
+     * directly on top of the base sprite; entities, bullets and the HUD
+     * are drawn by the engine on top.
+     *
+     * Door sprites (Scull_door_shadow*.png) are loaded via the generic
+     * _loadSpriteOnce cache when they are present in the project.
+     */
+    _renderSpriteCastle(ctx, camera) {
+        const viewW = camera.viewportWidth;
+        const viewH = camera.viewportHeight;
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        const img = this.castleMapSprites.get(this.mapId);
+        if (!img) return; // still loading / failed: keep black
+
+        const offset = camera.getRenderOffset();
+        const prevSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, Math.round(offset.x), Math.round(offset.y));
+        ctx.imageSmoothingEnabled = prevSmoothing;
+
+        // Door/decoration sprites: back layer first, then front.
+        this._drawDecorations(ctx, offset, 'back');
+        this._drawDecorations(ctx, offset, 'front');
     }
 
     /**

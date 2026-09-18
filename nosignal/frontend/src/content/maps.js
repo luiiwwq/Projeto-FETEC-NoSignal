@@ -13,10 +13,8 @@ export const MAP_IDS = {
     MARS_CAVE: 'mars-cave',
     MARS_CORE: 'mars-core',
     MARS_CATACOMBS: 'mars-catacombs',
-    CASTLE_HALL: 'castle-hall',
-    CASTLE_SIDE_ROOM: 'castle-side-room',
-    CASTLE_LOWER_AREA: 'castle-lower-area',
-    CASTLE_BOSS_ARENA: 'castle-boss-arena',
+    CASTLE_PRINCIPAL_ROOM: 'castle-principal-room',
+    CASTLE_KING_ROOM: 'castle-king-room',
 };
 
 const TILE = 64;
@@ -181,8 +179,8 @@ export const marsSurfaceMap = {
         {
             id: 'castle-gate',
             label: 'ENTRAR NO CASTELO',
-            targetMap: MAP_IDS.CASTLE_HALL,
-            targetSpawn: 'hall-entry',
+            targetMap: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
+            targetSpawn: 'castle-principal-entry',
             x: 3650,
             y: 865,
             radius: 75,
@@ -666,194 +664,207 @@ export const marsCatacombsMap = {
     ],
 };
 
-/* ─────────────── Castle interior maps ─────────────── */
+/* ─────────────── Sprite-based Castle maps ───────────────
+ * Each map is a single pre-composed PNG (sprite-castle type).
+ * The sprite is drawn 1:1 at world origin by MapRenderer.
+ * Collisions are defined separately via walkability masks.
+ *
+ * Sprite dimensions: 1790x879 pixels.
+ * MASK_CELL = 32 → mask grid ~56×28 cells.
+ * '.' = walkable floor, '#' = solid wall/obstacle.
+ * Doors are walkable areas in the mask.
+ *
+ * DOOR SPRITES: Scull_door_shadow*.png files are not yet present
+ * in the project at the expected path:
+ *   nosignal/frontend/src/assets/sprites/Map/UndeadMars/...
+ * The code is prepared to load them when they are added.
+ * ─────────────────────────────────────────────────────── */
 
-export const castleHallMap = {
-    id: MAP_IDS.CASTLE_HALL,
-    type: 'castle',
-    width: 1600,
-    height: 1200,
+const MASK_CELL = 32;
+
+// map_principal_room.png (1790×879 → 56×28 cells).
+// Walkable floor in the center; walls on the edges.
+// Door openings on the east (to king room) and west (return to surface).
+const PRINCIPAL_MASK = [
+    '####################################################',
+    '####################################################',
+    '#######################........................#######',
+    '######################.......................#######',
+    '######################.......................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '####################################################',
+];
+
+// map_king_room.png (1790×879 → 56×28 cells).
+// Walkable floor in the center; walls on the edges.
+// Door opening on the west (back to principal room).
+const KING_MASK = [
+    '####################################################',
+    '####################################################',
+    '#######################........................#######',
+    '######################.......................#######',
+    '######################.......................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '######################........................#######',
+    '####################################################',
+];
+
+function castleObstacles(mask, cell, mapWidth, mapHeight) {
+    const rects = [];
+    const rows = mask.length;
+    const cols = mask[0].length;
+    for (let r = 0; r < rows; r++) {
+        let c = 0;
+        while (c < cols) {
+            if (mask[r][c] === '.') {
+                c++;
+                continue;
+            }
+            let c2 = c;
+            while (c2 < cols && mask[r][c2] !== '.') c2++;
+            const x = c * cell;
+            const x2 = c2 >= cols ? mapWidth : c2 * cell;
+            const y = r * cell;
+            const y2 = r === rows - 1 ? mapHeight : (r + 1) * cell;
+            rects.push({ x, y, w: x2 - x, h: y2 - y, kind: 'castle-wall' });
+            c = c2;
+        }
+    }
+    return rects;
+}
+
+// Door sprites — NOT yet present in the project. Paths prepared
+// for when Scull_door_shadow*.png files are added.
+// Sprite paths are relative to SPRITE_BASE = './src/assets/sprites/'
+const DOOR_SPRITE_DIR = 'Map/UndeadMars/undead-tileset-mars-palette/undead_tileset_mars/PNG/Objects_separately/';
+const CASTLE_DOOR_DECORATIONS = [
+    {
+        x: 1500, y: 400,
+        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow1.png`,
+        anchor: 'bottom-center',
+        scale: 1,
+        layer: 'front',
+    },
+    {
+        x: 300, y: 400,
+        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow2.png`,
+        anchor: 'bottom-center',
+        scale: 1,
+        layer: 'front',
+    },
+    {
+        x: 100, y: 440,
+        sprite: `${DOOR_SPRITE_DIR}Scull_door_shadow3.png`,
+        anchor: 'bottom-center',
+        scale: 1,
+        layer: 'front',
+    },
+];
+
+export const castlePrincipalRoomMap = {
+    id: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
+    type: 'sprite-castle',
+    width: 1790,
+    height: 879,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 300, y: 600 },
+    spawn: { x: 900, y: 440 },
     spawnPoints: {
-        'hall-entry': { x: 300, y: 600 },
-        'hall-side-door': { x: 1518, y: 520 },
-        'hall-lower-door': { x: 760, y: 250 },
+        'castle-principal-entry': { x: 900, y: 440 },
+        'castle-return': { x: 100, y: 440 },
     },
-    obstacles: [
-        // Border with 3 openings: west return door, east side room door, north stairs door
-        { x: 0, y: 0, w: 1600, h: 140, kind: 'castle-wall' },
-        { x: 0, y: 1060, w: 1600, h: 140, kind: 'castle-wall' },
-        { x: 0, y: 0, w: 140, h: 480, kind: 'castle-wall' },
-        { x: 0, y: 640, w: 140, h: 560, kind: 'castle-wall' },
-        { x: 1460, y: 0, w: 140, h: 440, kind: 'castle-wall' },
-        { x: 1460, y: 560, w: 140, h: 640, kind: 'castle-wall' },
-        { x: 140, y: 0, w: 540, h: 140, kind: 'castle-wall' },
-        { x: 860, y: 0, w: 600, h: 140, kind: 'castle-wall' },
-        // Pillars
-        { x: 420, y: 430, w: 72, h: 72, kind: 'column' },
-        { x: 720, y: 720, w: 72, h: 72, kind: 'column' },
-        { x: 1060, y: 430, w: 72, h: 72, kind: 'column' },
-        // Altar / debris
-        { x: 720, y: 620, w: 72, h: 40, kind: 'crate' },
-    ],
+    terrainMask: PRINCIPAL_MASK,
+    maskCell: MASK_CELL,
+    obstacles: castleObstacles(PRINCIPAL_MASK, MASK_CELL, 1790, 879),
     exits: [
         {
-            id: 'hall-return',
-            label: 'VOLTAR A SUPERFICIE',
+            id: 'principal-to-king',
+            label: 'ENTRAR NA SALA DO REI',
+            targetMap: MAP_IDS.CASTLE_KING_ROOM,
+            targetSpawn: 'castle-king-entry',
+            x: 1500, y: 400, radius: 60,
+            promptX: 1500, promptY: 340,
+        },
+        {
+            id: 'principal-to-surface',
+            label: 'SAIR DO CASTELO',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'castle-return',
-            x: 110,
-            y: 600,
-            radius: 62,
-        },
-        {
-            id: 'hall-side',
-            label: 'SALA LATERAL',
-            targetMap: MAP_IDS.CASTLE_SIDE_ROOM,
-            targetSpawn: 'side-entry',
-            x: 1518,
-            y: 500,
-            radius: 58,
-        },
-        {
-            id: 'hall-lower',
-            label: 'AREA INFERIOR',
-            targetMap: MAP_IDS.CASTLE_LOWER_AREA,
-            targetSpawn: 'lower-entry',
-            x: 760,
-            y: 90,
-            radius: 58,
+            x: 100, y: 440, radius: 62,
+            promptX: 100, promptY: 380,
         },
     ],
     structures: [],
+    decorations: [...CASTLE_DOOR_DECORATIONS],
 };
 
-export const castleSideRoomMap = {
-    id: MAP_IDS.CASTLE_SIDE_ROOM,
-    type: 'castle',
-    width: 1280,
-    height: 800,
+export const castleKingRoomMap = {
+    id: MAP_IDS.CASTLE_KING_ROOM,
+    type: 'sprite-castle',
+    width: 1790,
+    height: 879,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 240, y: 500 },
+    spawn: { x: 1000, y: 440 },
     spawnPoints: {
-        'side-entry': { x: 240, y: 500 },
+        'castle-king-entry': { x: 1000, y: 440 },
     },
-    obstacles: [
-        { x: 0, y: 0, w: 1280, h: 130, kind: 'castle-wall' },
-        { x: 0, y: 670, w: 1280, h: 130, kind: 'castle-wall' },
-        { x: 0, y: 0, w: 130, h: 420, kind: 'castle-wall' },
-        { x: 0, y: 540, w: 130, h: 260, kind: 'castle-wall' },
-        { x: 1150, y: 0, w: 130, h: 800, kind: 'castle-wall' },
-        // Crates / debris
-        { x: 360, y: 330, w: 74, h: 74, kind: 'crate' },
-        { x: 520, y: 480, w: 90, h: 90, kind: 'crate' },
-        { x: 660, y: 300, w: 64, h: 64, kind: 'crate' },
-    ],
+    terrainMask: KING_MASK,
+    maskCell: MASK_CELL,
+    obstacles: castleObstacles(KING_MASK, MASK_CELL, 1790, 879),
     exits: [
         {
-            id: 'side-return',
-            label: 'VOLTAR AO SALAO',
-            targetMap: MAP_IDS.CASTLE_HALL,
-            targetSpawn: 'hall-side-door',
-            x: 100,
-            y: 500,
-            radius: 56,
+            id: 'king-to-principal',
+            label: 'VOLTAR À SALA PRINCIPAL',
+            targetMap: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
+            targetSpawn: 'castle-principal-entry',
+            x: 300, y: 400, radius: 60,
+            promptX: 300, promptY: 340,
         },
     ],
     structures: [],
-};
-
-export const castleLowerAreaMap = {
-    id: MAP_IDS.CASTLE_LOWER_AREA,
-    type: 'castle',
-    width: 1400,
-    height: 1000,
-    tileSize: TILE,
-    dust: false,
-    spawn: { x: 760, y: 300 },
-    spawnPoints: {
-        'lower-entry': { x: 760, y: 300 },
-        'lower-arena-return': { x: 700, y: 250 },
-    },
-    obstacles: [
-        { x: 0, y: 0, w: 1400, h: 140, kind: 'castle-wall' },
-        { x: 0, y: 860, w: 1400, h: 140, kind: 'castle-wall' },
-        { x: 0, y: 0, w: 140, h: 1000, kind: 'castle-wall' },
-        { x: 1260, y: 0, w: 140, h: 1000, kind: 'castle-wall' },
-        // South door gap (return to hall) -> split south wall
-        // North door gap (to arena) -> split north wall
-        { x: 0, y: 0, w: 660, h: 140, kind: 'castle-wall' },
-        { x: 780, y: 0, w: 620, h: 140, kind: 'castle-wall' },
-        { x: 0, y: 860, w: 700, h: 140, kind: 'castle-wall' },
-        { x: 820, y: 860, w: 580, h: 140, kind: 'castle-wall' },
-        // Columns
-        { x: 400, y: 500, w: 84, h: 84, kind: 'column' },
-        { x: 950, y: 500, w: 84, h: 84, kind: 'column' },
-        { x: 640, y: 640, w: 90, h: 90, kind: 'crate' },
-        { x: 320, y: 220, w: 70, h: 70, kind: 'crate' },
-    ],
-    exits: [
-        {
-            id: 'lower-hall',
-            label: 'VOLTAR AO SALAO',
-            targetMap: MAP_IDS.CASTLE_HALL,
-            targetSpawn: 'hall-lower-door',
-            x: 760,
-            y: 908,
-            radius: 56,
-        },
-        {
-            id: 'lower-arena',
-            label: 'ARENA DO BOSS',
-            targetMap: MAP_IDS.CASTLE_BOSS_ARENA,
-            targetSpawn: 'arena-player',
-            x: 720,
-            y: 90,
-            radius: 58,
-        },
-    ],
-    structures: [],
-};
-
-export const castleBossArenaMap = {
-    id: MAP_IDS.CASTLE_BOSS_ARENA,
-    type: 'castle',
-    width: 1800,
-    height: 1200,
-    tileSize: TILE,
-    dust: false,
-    spawn: { x: 300, y: 600 },
-    spawnPoints: {
-        'arena-player': { x: 300, y: 600 },
-        'arena-boss': { x: 1500, y: 600 },
-    },
-    obstacles: [
-        { x: 0, y: 0, w: 1800, h: 150, kind: 'castle-wall' },
-        { x: 0, y: 1050, w: 1800, h: 150, kind: 'castle-wall' },
-        { x: 0, y: 0, w: 150, h: 1200, kind: 'castle-wall' },
-        { x: 1650, y: 0, w: 150, h: 1200, kind: 'castle-wall' },
-        // South wall split to keep a controlled exit door
-        { x: 150, y: 1050, w: 680, h: 150, kind: 'castle-wall' },
-        { x: 1040, y: 1050, w: 610, h: 150, kind: 'castle-wall' },
-        // Two side pillars, floor mostly open for combat
-        { x: 420, y: 300, w: 72, h: 72, kind: 'column' },
-        { x: 1310, y: 800, w: 72, h: 72, kind: 'column' },
-    ],
-    exits: [
-        {
-            id: 'arena-exit',
-            label: 'VOLTAR A AREA INFERIOR',
-            targetMap: MAP_IDS.CASTLE_LOWER_AREA,
-            targetSpawn: 'lower-arena-return',
-            x: 900,
-            y: 1090,
-            radius: 80,
-        },
-    ],
-    structures: [],
+    decorations: [...CASTLE_DOOR_DECORATIONS],
 };
 
 export const MAPS = {
@@ -861,8 +872,6 @@ export const MAPS = {
     [MAP_IDS.MARS_CAVE]: marsCaveMap,
     [MAP_IDS.MARS_CORE]: marsCoreMap,
     [MAP_IDS.MARS_CATACOMBS]: marsCatacombsMap,
-    [MAP_IDS.CASTLE_HALL]: castleHallMap,
-    [MAP_IDS.CASTLE_SIDE_ROOM]: castleSideRoomMap,
-    [MAP_IDS.CASTLE_LOWER_AREA]: castleLowerAreaMap,
-    [MAP_IDS.CASTLE_BOSS_ARENA]: castleBossArenaMap,
+    [MAP_IDS.CASTLE_PRINCIPAL_ROOM]: castlePrincipalRoomMap,
+    [MAP_IDS.CASTLE_KING_ROOM]: castleKingRoomMap,
 };
