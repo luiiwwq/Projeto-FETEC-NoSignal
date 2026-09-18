@@ -12,6 +12,7 @@ html, body {
     color: var(--text-cream);
     font-family: var(--font-pixel);
     overflow: hidden;
+    overscroll-behavior: none;
     display: flex;
     justify-content: center;
     align-items: center;

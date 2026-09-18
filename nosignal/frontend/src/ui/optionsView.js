@@ -48,13 +48,38 @@ function refreshFullscreenButtons() {
 
 /* ── Tela cheia estável: ESC do navegador não derruba mais ──
  * O navegador encerra a tela cheia ao apertar ESC e isso não pode ser
- * cancelado com preventDefault(). A solução é reentrar imediatamente em
+ * cancelado com preventDefault().
+ *
+ * Solução moderna: Keyboard Lock API. Sem ela, o Chrome CONSUME a tecla
+ * ESC no fullscreen — nem chega a entregar o keydown para a página (por
+ * isso o alerta/teste anterior nunca disparava). Com a trava ativa, o ESC
+ * continua chegando ao GameEngine, que chama preventDefault() e mantém a
+ * tela cheia. Como fallback (navegadores sem suporte), reentramos em
  * fullscreen quando ele é perdido sem ter sido uma saída manual (ex.:
  * usuário clicou novamente no botão "TELA CHEIA").
  */
 let fsKeepRequested = false; // intenção do jogo: manter tela cheia ligada
 let fsManualExit = false;    // saída manual em andamento (via botão)
 let fsTarget = null;         // último elemento alvo da tela cheia
+
+function supportsKeyboardLock() {
+    return typeof navigator !== 'undefined' &&
+        'keyboard' in navigator &&
+        typeof navigator.keyboard.lock === 'function';
+}
+
+function lockEscapeKey() {
+    if (!supportsKeyboardLock()) return;
+    Promise.resolve(navigator.keyboard.lock(['Escape']))
+        .catch(() => { /* navegador recusou a trava: usa o fallback */ });
+}
+
+function unlockEscapeKey() {
+    if (!supportsKeyboardLock()) return;
+    try {
+        navigator.keyboard.unlock();
+    } catch (err) { /* ignora */ }
+}
 
 function enterFullscreen(el) {
     if (!el) return;
@@ -81,6 +106,8 @@ function onFullscreenChange() {
         fsTarget = document.fullscreenElement;
         fsKeepRequested = true;
         fsManualExit = false;
+        // Adquire o teclado no fullscreen para o ESC chegar ao jogo
+        lockEscapeKey();
         return;
     }
 
@@ -92,6 +119,7 @@ function onFullscreenChange() {
             : document.documentElement;
         enterFullscreen(target);
     }
+    unlockEscapeKey();
     fsManualExit = false;
 }
 
