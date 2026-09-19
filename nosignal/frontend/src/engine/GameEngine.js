@@ -34,6 +34,12 @@ const MAP_LABELS = {
     [MAP_IDS.CASTLE_KING_ROOM]: 'SALA DO REI',
 };
 
+// Collision debug overlay for the sprite-castle rooms. When ON it paints the
+// room's real collision data on top of the art: red = solid obstacles, blue =
+// door interaction areas, bright green = spawn points, yellow = player body.
+// Flip to `true` only while reviewing the castle maps; commit as `false`.
+const SHOW_CASTLE_COLLISION_DEBUG = false;
+
 // Excavate each freeMoveZone out of an obstacle, splitting it into the
 // remaining pieces, so the band becomes a real collision-free corridor
 // instead of a collision bypass (no penetration -> no resolveSlide teleport).
@@ -791,6 +797,9 @@ export class GameEngine {
         // 1. Render Martian Map and Terrain
         this.mapRenderer.render(ctx, this.camera);
 
+        // 1.5 Castle collision debug overlay (red/blue/green/yellow, see above)
+        this._renderCollisionDebug(ctx);
+
         // 2. Render non-player characters (NPCs / enemies)
         for (const actor of this.actors) {
             actor.render(ctx, this.camera);
@@ -862,6 +871,54 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.fillText(text, screen.x, screen.y + 3);
         ctx.restore();
+    }
+
+    // Paints the collision geometry of the current map over the art, so the
+    // sprite-castle rooms can be reviewed precisely against their drawing.
+    _renderCollisionDebug(ctx) {
+        if (!SHOW_CASTLE_COLLISION_DEBUG) return;
+        if (!this.currentMap) return;
+        const off = this.camera.getRenderOffset();
+
+        // Solid obstacles (walls, pillars, blocked background) — red.
+        ctx.fillStyle = 'rgba(255, 60, 60, 0.55)';
+        for (const o of this.currentMap.obstacles || []) {
+            ctx.fillRect(
+                Math.round(o.x + off.x),
+                Math.round(o.y + off.y),
+                Math.round(o.w),
+                Math.round(o.h)
+            );
+        }
+
+        // Door / interaction areas — blue.
+        ctx.fillStyle = 'rgba(60, 130, 255, 0.55)';
+        for (const exit of this.currentMap.exits || []) {
+            if (!exit.area) continue;
+            ctx.fillRect(
+                Math.round(exit.area.x + off.x),
+                Math.round(exit.area.y + off.y),
+                Math.round(exit.area.w),
+                Math.round(exit.area.h)
+            );
+        }
+
+        // Spawn points — bright green squares.
+        ctx.fillStyle = '#00ff00';
+        for (const s of Object.values(this.currentMap.spawnPoints || {})) {
+            ctx.fillRect(Math.round(s.x + off.x - 6), Math.round(s.y + off.y - 6), 12, 12);
+        }
+
+        // Player collider box — yellow outline.
+        const p = this.player;
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+            Math.round(p.x - p.colliderHalfW + off.x) + 0.5,
+            Math.round(p.y - p.colliderHalfH + off.y) + 0.5,
+            p.colliderHalfW * 2,
+            p.colliderHalfH * 2
+        );
     }
 
     _renderHUD(ctx) {

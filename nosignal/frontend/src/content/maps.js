@@ -664,110 +664,21 @@ export const marsCatacombsMap = {
     ],
 };
 
-/* ─────────────── Sprite-based Castle maps ───────────────
- * Each map is a single pre-composed PNG (sprite-castle type).
- * The sprite is drawn 1:1 at world origin by MapRenderer.
- * Collisions are defined separately via walkability masks.
- *
- * Sprite dimensions: 1790x879 pixels.
- * MASK_CELL = 32 → mask grid ~56×28 cells.
- * '.' = walkable floor, '#' = solid wall/obstacle.
- * Doors are walkable areas in the mask.
- * ─────────────────────────────────────────────────────── */
-
-const MASK_CELL = 32;
-
-// map_principal_room.png (1790×879 → 56×28 cells).
-// Walkable floor in the center; walls on the edges.
-// Door openings on the east (to king room) and west (return to surface).
-const PRINCIPAL_MASK = [
-    '####################################################',
-    '####################################################',
-    '#######################........................#######',
-    '######################.......................#######',
-    '######################.......................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '####################################################',
-];
-
-// map_king_room.png (1790×879 → 56×28 cells).
-// Walkable floor in the center; walls on the edges.
-// Door opening on the west (back to principal room).
-const KING_MASK = [
-    '####################################################',
-    '####################################################',
-    '#######################........................#######',
-    '######################.......................#######',
-    '######################.......................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '######################........................#######',
-    '####################################################',
-];
-
-function castleObstacles(mask, cell, mapWidth, mapHeight) {
-    const rects = [];
-    const rows = mask.length;
-    const cols = mask[0].length;
-    for (let r = 0; r < rows; r++) {
-        let c = 0;
-        while (c < cols) {
-            if (mask[r][c] === '.') {
-                c++;
-                continue;
-            }
-            let c2 = c;
-            while (c2 < cols && mask[r][c2] !== '.') c2++;
-            const x = c * cell;
-            const x2 = c2 >= cols ? mapWidth : c2 * cell;
-            const y = r * cell;
-            const y2 = r === rows - 1 ? mapHeight : (r + 1) * cell;
-            rects.push({ x, y, w: x2 - x, h: y2 - y, kind: 'castle-wall' });
-            c = c2;
-        }
-    }
-return rects;
-}
+/* ─────────────── Mapas do castelo (sprite, colisão precisa) ───────────────
+ * Cada mapa é um único PNG pré-composto (tipo sprite-castle), desenhado 1:1 na
+ * origem do mundo pelo MapRenderer. As colisões são retângulos AABB escritos à
+ * mão em coordenadas LOCAIS (espaço do mundo desta sala 1790x879), sem mascaras:
+ *   - a borda preta ao redor do sprite é totalmente bloqueada (o jogador fica
+ *     dentro da arte),
+ *   - a faixa da parede do topo é sólida, exceto o vão da porta alinhado ao
+ *     desenho da porta,
+ *   - interações de porta usam áreas retangulares com prompt explícito,
+ *   - os spawns são locais (dentro da sala); respawns nunca reutilizam coords
+ *     da superfície.
+ * Caixas de base de pilares/móveis podem ser adicionadas em 'obstacles'
+ * (kind 'castle-pillar') medidas a partir da arte; valide com o overlay de
+ * colisão (SHOW_CASTLE_COLLISION_DEBUG no GameEngine).
+ * ─────────────────────────────────────────────────────────────────────── */
 
 export const castlePrincipalRoomMap = {
     id: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
@@ -776,30 +687,49 @@ export const castlePrincipalRoomMap = {
     height: 879,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 900, y: 440 },
+    coordinateSpace: 'local',
+    spawn: { x: 1530, y: 260 },
     spawnPoints: {
-        'castle-principal-entry': { x: 900, y: 440 },
-        'castle-return': { x: 100, y: 440 },
+        'castle-principal-entry': { x: 1530, y: 260 },
+        'castle-principal-south-entry': { x: 890, y: 650 },
+        'castle-return': { x: 1530, y: 260 },
     },
-    terrainMask: PRINCIPAL_MASK,
-    maskCell: MASK_CELL,
-    obstacles: castleObstacles(PRINCIPAL_MASK, MASK_CELL, 1790, 879),
+    obstacles: [
+        // Parede esquerda contínua: bloqueia a partir de X <= 109 para qualquer Y.
+        { x: 0, y: 0, w: 109, h: 879, kind: 'castle-wall' },
+        // Parede direita contínua: bloqueia a partir de X >= 1690 para qualquer Y.
+        { x: 1690, y: 0, w: 100, h: 879, kind: 'castle-wall' },
+        // Parede superior contínua cobrindo toda a extensão superior (sem corte da porta).
+        { x: 0, y: 0, w: 1790, h: 210, kind: 'castle-wall' },
+        // Parede inferior contínua: bloqueia a partir de Y >= 704 para qualquer X.
+        { x: 0, y: 704, w: 1790, h: 175, kind: 'castle-wall' },
+        // Caixas de colisão de pilares/móveis inferiores.
+        { x: 1380, y: 600, w: 50, h: 60, kind: 'castle-pillar' },
+        { x: 1540, y: 600, w: 50, h: 60, kind: 'castle-pillar' },
+        // Pilares adicionais especificados (coordenadas da Sala Principal):
+        { x: 1152, y: 222, w: 56, h: 36, kind: 'castle-pillar' },  // (1167, 232), (1193, 232), (1176, 245)
+        { x: 1242, y: 222, w: 70, h: 140, kind: 'castle-pillar' }, // (1257, 352), (1271, 352), (1297, 352), (1292, 232), (1297, 349)
+        { x: 1194, y: 540, w: 115, h: 152, kind: 'castle-pillar' },// (1222, 551), (1277, 551), (1204, 595), (1294, 595), (1294, 682), (1208, 682)
+        { x: 132, y: 222, w: 58, h: 36, kind: 'castle-pillar' },   // (167, 248), (180, 232), (142, 232)
+    ],
     exits: [
         {
             id: 'principal-to-king',
             label: 'ENTRAR NA SALA DO REI',
             targetMap: MAP_IDS.CASTLE_KING_ROOM,
             targetSpawn: 'castle-king-entry',
-            x: 1500, y: 400, radius: 60,
-            promptX: 1500, promptY: 340,
+            area: { x: 1450, y: 195, w: 160, h: 125 },
+            promptX: 1557,
+            promptY: 168,
         },
         {
-            id: 'principal-to-surface',
+            id: 'castle-principal-exit',
             label: 'SAIR DO CASTELO',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'castle-return',
-            x: 100, y: 440, radius: 62,
-            promptX: 100, promptY: 380,
+            area: { x: 720, y: 640, w: 340, h: 64 },
+            promptX: 890,
+            promptY: 630,
         },
     ],
     structures: [],
@@ -813,21 +743,33 @@ export const castleKingRoomMap = {
     height: 879,
     tileSize: TILE,
     dust: false,
-    spawn: { x: 1000, y: 440 },
+    coordinateSpace: 'local',
+    spawn: { x: 1530, y: 260 },
     spawnPoints: {
-        'castle-king-entry': { x: 1000, y: 440 },
+        'castle-king-entry': { x: 1530, y: 260 },
     },
-    terrainMask: KING_MASK,
-    maskCell: MASK_CELL,
-    obstacles: castleObstacles(KING_MASK, MASK_CELL, 1790, 879),
+    obstacles: [
+        // Borda preta do sprite (moldura ao redor da sala desenhada).
+        { x: 0, y: 0, w: 32, h: 879, kind: 'castle-wall' },
+        { x: 1754, y: 0, w: 36, h: 879, kind: 'castle-wall' },
+        // Parede superior contínua cobrindo toda a extensão superior (inclusive sobre a porta).
+        { x: 0, y: 0, w: 1790, h: 210, kind: 'castle-wall' },
+        // Parede inferior contínua impedindo a passagem abaixo de y=697 (independente do X).
+        { x: 0, y: 697, w: 1790, h: 182, kind: 'castle-wall' },
+        // Caixas de colisão de elementos decorativos do trono/baú/grades.
+        { x: 670, y: 220, w: 110, h: 70, kind: 'castle-pillar' },
+        { x: 595, y: 185, w: 45, h: 35, kind: 'castle-pillar' },
+        { x: 115, y: 250, w: 90, h: 447, kind: 'castle-wall' },
+    ],
     exits: [
         {
             id: 'king-to-principal',
             label: 'VOLTAR À SALA PRINCIPAL',
             targetMap: MAP_IDS.CASTLE_PRINCIPAL_ROOM,
             targetSpawn: 'castle-principal-entry',
-            x: 300, y: 400, radius: 60,
-            promptX: 300, promptY: 340,
+            area: { x: 1450, y: 195, w: 160, h: 125 },
+            promptX: 1530,
+            promptY: 186,
         },
     ],
     structures: [],
