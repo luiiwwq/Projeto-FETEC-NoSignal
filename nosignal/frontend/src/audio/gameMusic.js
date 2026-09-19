@@ -82,6 +82,26 @@ function _unbindFirstInteraction() {
     if (unbindFirstInteraction) unbindFirstInteraction();
 }
 
+// Pré-carrega a música do gameplay durante a tela de loading, reutilizando a
+// instância única. Assim o play() no início da partida já encontra o buffer
+// pronto e a música começa imediatamente (em vez de baixar o arquivo na hora).
+export function preloadGameMusic() {
+    const audio = getGameMusic();
+    if (!audio || typeof audio.readyState !== 'number') return Promise.resolve();
+    // HAVE_CURRENT_DATA (>=2): já há dados suficientes para iniciar de forma
+    // instantânea; o restante continua baixando em segundo plano.
+    if (audio.readyState >= 2) return Promise.resolve();
+    return new Promise((resolve) => {
+        const done = () => {
+            audio.removeEventListener('loadeddata', done);
+            audio.removeEventListener('error', done);
+            resolve();
+        };
+        audio.addEventListener('loadeddata', done);
+        audio.addEventListener('error', done);
+    });
+}
+
 export function startGameMusic() {
     const settings = loadSettings();
     if (!Number.isFinite(settings.musicVolume) || settings.musicVolume <= 0) return;

@@ -8,7 +8,7 @@ import { assetLoader } from '../engine/AssetLoader.js';
 import { GameEngine } from '../engine/GameEngine.js';
 import { gameState } from '../state/gameState.js';
 import { stopMenuMusic } from '../audio/menuMusic.js';
-import { startGameMusic } from '../audio/gameMusic.js';
+import { startGameMusic, preloadGameMusic } from '../audio/gameMusic.js';
 
 export function renderLoadingScreen(container) {
     // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
@@ -62,13 +62,17 @@ export function renderLoadingScreen(container) {
         }
     }, 450);
 
+    // Pré-carrega a música do gameplay em paralelo com os sprites, para que
+    // o play() no início da partida já tenha o buffer pronto (início imediato).
+    const musicReady = preloadGameMusic();
+
     // Run preload
     assetLoader.preloadAll((progress, loaded, total) => {
         const pct = Math.floor(progress * 100);
         if (fillElement) fillElement.style.width = `${pct}%`;
         if (counterElement) counterElement.innerText = `${loaded} / ${total} MÓDULOS`;
         if (percentElement) percentElement.innerText = `${pct}%`;
-    }, gameState.selectedCharacter).then(() => {
+    }, gameState.selectedCharacter).then(() => musicReady).then(() => {
         clearInterval(phraseInterval);
         if (statusElement) statusElement.innerText = 'POUSO AUTORIZADO! INICIANDO SIMULAÇÃO...';
         if (fillElement) fillElement.style.width = '100%';
