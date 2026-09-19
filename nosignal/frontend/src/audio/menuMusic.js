@@ -17,6 +17,7 @@ const MENU_MUSIC_PATH = './src/assets/sounds/music menu/menu_music.mp3';
 let menuMusic = null;
 let menuMusicLoadStarted = false;
 let menuMusicWarned = false;
+let menuMusicMutedWarned = false;
 let menuMusicPlaying = false;
 let firstInteractionBound = false;
 let unbindFirstInteraction = null;
@@ -78,12 +79,16 @@ function _bindFirstInteraction() {
     unbindFirstInteraction = () => {
         window.removeEventListener('click', onInteraction);
         window.removeEventListener('keydown', onInteraction);
+        window.removeEventListener('pointerdown', onInteraction);
+        window.removeEventListener('touchstart', onInteraction);
         firstInteractionBound = false;
         unbindFirstInteraction = null;
     };
 
     window.addEventListener('click', onInteraction);
     window.addEventListener('keydown', onInteraction);
+    window.addEventListener('pointerdown', onInteraction);
+    window.addEventListener('touchstart', onInteraction);
 }
 
 function _unbindFirstInteraction() {
@@ -92,7 +97,13 @@ function _unbindFirstInteraction() {
 
 export function startMenuMusic() {
     const settings = loadSettings();
-    if (!Number.isFinite(settings.musicVolume) || settings.musicVolume <= 0) return;
+    if (!Number.isFinite(settings.musicVolume) || settings.musicVolume <= 0) {
+        if (!menuMusicMutedWarned && Number.isFinite(settings.musicVolume)) {
+            menuMusicMutedWarned = true;
+            console.warn('[Audio] Música do menu silenciada: "VOLUME DA MÚSICA" está em 0 nas opções.');
+        }
+        return;
+    }
 
     const audio = getMenuMusic();
     if (!audio) return;
@@ -112,8 +123,9 @@ export function startMenuMusic() {
             _unbindFirstInteraction();
             audio.volume = _resolveVolume();
         }).catch(() => {
-            // Autoplay bloqueado antes da primeira interação: o listener
-            // instalado acima é o gatilho. Nenhum erro é exibido ao usuário.
+            // Autoplay bloqueado: rearma o gatilho de interação para que um
+            // clique/tecla posterior retome a música — nada trava em silêncio.
+            _bindFirstInteraction();
         });
     } else {
         menuMusicPlaying = true;

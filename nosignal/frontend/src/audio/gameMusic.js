@@ -16,6 +16,7 @@ const GAME_MUSIC_PATH = './src/assets/sounds/music game ambient/music_game.mp3';
 let gameMusic = null;
 let gameMusicLoadStarted = false;
 let gameMusicWarned = false;
+let gameMusicMutedWarned = false;
 let gameMusicPlaying = false;
 let firstInteractionBound = false;
 let unbindFirstInteraction = null;
@@ -77,12 +78,16 @@ function _bindFirstInteraction() {
     unbindFirstInteraction = () => {
         window.removeEventListener('click', onInteraction);
         window.removeEventListener('keydown', onInteraction);
+        window.removeEventListener('pointerdown', onInteraction);
+        window.removeEventListener('touchstart', onInteraction);
         firstInteractionBound = false;
         unbindFirstInteraction = null;
     };
 
     window.addEventListener('click', onInteraction);
     window.addEventListener('keydown', onInteraction);
+    window.addEventListener('pointerdown', onInteraction);
+    window.addEventListener('touchstart', onInteraction);
 }
 
 function _unbindFirstInteraction() {
@@ -111,7 +116,13 @@ export function preloadGameMusic() {
 
 export function startGameMusic() {
     const settings = loadSettings();
-    if (!Number.isFinite(settings.musicVolume) || settings.musicVolume <= 0) return;
+    if (!Number.isFinite(settings.musicVolume) || settings.musicVolume <= 0) {
+        if (!gameMusicMutedWarned && Number.isFinite(settings.musicVolume)) {
+            gameMusicMutedWarned = true;
+            console.warn('[Audio] Música do gameplay silenciada: "VOLUME DA MÚSICA" está em 0 nas opções.');
+        }
+        return;
+    }
 
     const audio = getGameMusic();
     if (!audio) return;
@@ -131,7 +142,9 @@ export function startGameMusic() {
             _unbindFirstInteraction();
             audio.volume = _resolveVolume();
         }).catch(() => {
-            // Autoplay bloqueado: o listener instalado acima é o gatilho.
+            // Autoplay bloqueado: rearma o gatilho de interação para que um
+            // clique/tecla posterior retome a música — nada trava em silêncio.
+            _bindFirstInteraction();
         });
     } else {
         gameMusicPlaying = true;

@@ -62,8 +62,8 @@ const CAVERN_SPRITE_PATHS = {
 // Each map is a single pre-composed PNG (1790×879). Drawn 1:1 at world
 // (0,0). Collisions are defined by a walkability mask in maps.js.
 const SPRITE_CASTLE_PATHS = {
-    'castle-principal-room': './src/assets/sprites/Castle/map_principal_room.png',
-    'castle-king-room': './src/assets/sprites/Castle/map_king_room.png',
+    'castle-principal-room': `./src/assets/sprites/Castle/map_principal_room.png?v=${Date.now()}`,
+    'castle-king-room': `./src/assets/sprites/Castle/map_king_room.png?v=${Date.now()}`,
 };
 
 // Ground texture (tileable PNG), loaded once and used as a CanvasPattern in

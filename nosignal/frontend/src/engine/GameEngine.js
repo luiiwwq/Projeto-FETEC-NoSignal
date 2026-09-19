@@ -9,6 +9,21 @@ import { MapRenderer } from './MapRenderer.js';
 import { Player, PlayerState } from '../entities/Player.js';
 import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
 import { Golem, GOLEM_WAVE_SPAWNS, GOLEM_COLLIDER_HALF_W, GOLEM_COLLIDER_HALF_H, preloadGolemSprites } from '../entities/Golem.js';
+import { AmongUsEasterEgg, preloadAmongUsSprites, AMONG_US_ELIGIBLE_MAPS, AMONG_US_INTERVAL_SECONDS, AMONG_US_TEST_HALF_W, AMONG_US_TEST_HALF_H, AMONG_US_MAX_ATTEMPTS, DEBUG_AMONG_US_EASTER_EGG } from '../entities/AmongUsEasterEgg.js';
+import {
+    SkeletonAxe,
+    CATACOMBS_SKELETON_AXE_SPAWNS,
+    SKELETON_COLLIDER_HALF_W,
+    SKELETON_COLLIDER_HALF_H,
+    preloadSkeletonAxeSprites,
+} from '../entities/SkeletonAxe.js';
+import {
+    SkeletonSpearman,
+    CATACOMBS_SKELETON_SPEARMAN_SPAWNS,
+    SPEARMAN_COLLIDER_HALF_W,
+    SPEARMAN_COLLIDER_HALF_H,
+    preloadSkeletonSpearmanSprites,
+} from '../entities/SkeletonSpearman.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
@@ -39,6 +54,12 @@ const MAP_LABELS = {
 // door interaction areas, bright green = spawn points, yellow = player body.
 // Flip to `true` only while reviewing the castle maps; commit as `false`.
 const SHOW_CASTLE_COLLISION_DEBUG = false;
+
+// Temporary debug overlay for the Catacombs skeletons (Skeleton_Axe +
+// Skeleton_Spearman). When ON it paints each spawn point (with id, local
+// coordinates and current map) plus every skeleton's collider box over the
+// map art. Flip to `true` only while reviewing the spawns; commit as `false`.
+const DEBUG_CATACOMBS_SKELETONS = false;
 
 // Excavate each freeMoveZone out of an obstacle, splitting it into the
 // remaining pieces, so the band becomes a real collision-free corridor
@@ -94,8 +115,13 @@ export class GameEngine {
         this.actors = [];
         this.characterRoles = { ally: null, enemy: null };
 
+        // Among Us easter egg (estado do loop entre aparições)
+        this.amongUsTimer = 0;
+        this.amongUsEasterEgg = null;
+
         // Golem wave + day/night cycle
         this.golems = [];
+        this.skeletons = [];
         this.dayNight = new DayNightSystem();
         this._golemWavePendingNight = 0; // night that must still be paid out
         this._lastGolemWaveNight = 0;    // guard against a double spawn
@@ -177,8 +203,11 @@ export class GameEngine {
         // Aplica configurações persistidas (ex.: brilho ajustado na tela inicial)
         this._applyStoredSettings();
 
-        // Warm the golem + day/night sprite caches once for the whole session.
+// Warm the golem + day/night sprite caches once for the whole session.
         preloadGolemSprites();
+        preloadAmongUsSprites();
+        preloadSkeletonAxeSprites();
+        preloadSkeletonSpearmanSprites();
         this._loadDayNightIcons();
 
         // Initialize Player with state name
@@ -257,6 +286,21 @@ export class GameEngine {
         // (Re)create non-player characters for this map
         this._setupCharacterRoles(map);
         this.golems = [];
+
+        // Troca de mapa / nova partida: easter egg some e cronômetro reinicia.
+        this.amongUsEasterEgg = null;
+        this.amongUsTimer = 0;
+        this.skeletons = [];
+
+        // The Catacombs have five fixed Skeleton_Axe spawns (plus five
+        // Skeleton_Spearman standing beside them) in LOCAL map coordinates.
+        // They are recreated on every load of the map and wiped together with
+        // `actors` the moment the player leaves (see above), so they never leak
+        // to the surface/castle and never duplicate.
+        if (mapId === MAP_IDS.MARS_CATACOMBS) {
+            this._spawnCatacombsSkeletons(map);
+            this._spawnCatacombsSpearmen(map);
+        }
 
         // A wave scheduled while the player was away is paid out as soon as
         // they set foot back on the allowed map (never lost, never doubled).
@@ -390,6 +434,185 @@ export class GameEngine {
         return null;
     }
 
+    /**
+     * Spawn the five fixed Skeleton_Axe of the Catacombs. `spawn.x/spawn.y`
+     * are LOCAL map coordinates (feet position, bottom-center anchor) — never
+     * world/surface coordinates. Every spawn is validated before the entity is
+     * created: inside the map bounds, on a walkable mask cell, with a collider
+     * free of obstacles/edges/exits/player/other actors. If a spot fails the
+     * walkability checks, the closest free floor cell is used instead (small
+     * local adjustment, never a silent move to another map).
+     */
+    _spawnCatacombsSkeletons(map) {
+        this._spawnCatacombsSkeletonGroup(map, {
+            spawns: CATACOMBS_SKELETON_AXE_SPAWNS,
+            ctor: SkeletonAxe,
+            hw: SKELETON_COLLIDER_HALF_W,
+            hh: SKELETON_COLLIDER_HALF_H,
+            label: 'Skeleton_Axe',
+        });
+    }
+
+    /** Spawn the five Skeleton_Spearman, one beside each axe skeleton. */
+    _spawnCatacombsSpearmen(map) {
+        this._spawnCatacombsSkeletonGroup(map, {
+            spawns: CATACOMBS_SKELETON_SPEARMAN_SPAWNS,
+            ctor: SkeletonSpearman,
+            hw: SPEARMAN_COLLIDER_HALF_W,
+            hh: SPEARMAN_COLLIDER_HALF_H,
+            label: 'Skeleton_Spearman',
+        });
+    }
+
+    /**
+     * Respawn instantâneo: remove todos os esqueletos atuais (vivos, mortos ou
+     * em remoção) e recria cada um exatamente no posto de origem com vida cheia.
+     * Só faz sentido nas Catacumbas; fora delas não há esqueletos para resetar.
+     */
+    _resetCatacombsSkeletons() {
+        const removed = this.skeletons;
+        this.skeletons = [];
+        this.actors = this.actors.filter((a) => !removed.includes(a));
+        if (this.currentMapId === MAP_IDS.MARS_CATACOMBS) {
+            this._spawnCatacombsSkeletons(this.currentMap);
+            this._spawnCatacombsSpearmen(this.currentMap);
+        }
+    }
+
+    /** Shared spawn/validation/backfill used by both catacombs skeleton types. */
+    _spawnCatacombsSkeletonGroup(map, { spawns, ctor, hw, hh, label }) {
+        const mask = map.terrainMask;
+        const cell = map.maskCell || 32;
+
+        for (const spawn of spawns) {
+            // 1) Range check — these are LOCAL catacombs coordinates.
+            if (
+                spawn.x < 0 ||
+                spawn.y < 0 ||
+                spawn.x > map.width ||
+                spawn.y > map.height
+            ) {
+                throw new Error(`Spawn inválido: ${spawn.id} (fora dos limites das Catacumbas)`);
+            }
+
+            // 2) Feet must sit on a walkable mask cell ('.' = piso caminhável).
+            const col = Math.floor(spawn.x / cell);
+            const row = Math.floor(spawn.y / cell);
+            const walkable =
+                mask && mask[row] && mask[row][col] === '.';
+
+            // 3) Collider must be free of obstacles, edges, exits, player and
+            //    other actors.
+            const feetY = spawn.y; // y dos pés
+            const centerY = feetY - hh; // collider centre (feet = base)
+            let px = spawn.x;
+            let py = centerY;
+            if (!walkable || !this._skeletonBoxIsFree(map, mask, cell, px, py, hw, hh)) {
+                const adj = this._findNearestFreeSkeletonSpot(map, mask, cell, spawn.x, feetY, hw, hh);
+                if (!adj) {
+                    console.error(`[Catacombas] spawn ${label} inválido e sem piso livre: ${spawn.id} (${spawn.x},${spawn.y}) — ignorado.`);
+                    continue;
+                }
+                console.warn(
+                    `[Catacombas] spawn ${label} ${spawn.id} em ${spawn.x},${spawn.y} não era piso caminhável; ajuste local para ${adj.x},${adj.y}.`
+                );
+                px = adj.x;
+                py = adj.y - hh;
+            }
+
+            const skeleton = new ctor(px, py, { id: spawn.id });
+            skeleton.setCollisionResolver(
+                this._buildCollisionResolver(map, skeleton.colliderHalfW, skeleton.colliderHalfH)
+            );
+            skeleton.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+            this.actors.push(skeleton);
+            this.skeletons.push(skeleton);
+        }
+    }
+
+    // True when a skeleton collider centred at (cx, cy) does not touch an
+    // obstacle, a map edge, an exit area, the player or any existing actor.
+    _skeletonBoxIsFree(map, mask, cell, cx, cy, hw = SKELETON_COLLIDER_HALF_W, hh = SKELETON_COLLIDER_HALF_H) {
+        const box = { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+
+        if (box.x < 0 || box.y < 0 || box.x + box.w > map.width || box.y + box.h > map.height) {
+            return false;
+        }
+
+        // Every cell covered by the collider must be walkable floor.
+        if (mask) {
+            const c0 = Math.floor(box.x / cell);
+            const c1 = Math.floor((box.x + box.w - 1) / cell);
+            const r0 = Math.floor(box.y / cell);
+            const r1 = Math.floor((box.y + box.h - 1) / cell);
+            for (let r = r0; r <= r1; r++) {
+                for (let c = c0; c <= c1; c++) {
+                    if (!mask[r] || mask[r][c] !== '.') return false;
+                }
+            }
+        }
+
+        for (const o of map.obstacles) {
+            if (rectsOverlap(o, box)) return false;
+        }
+
+        for (const exit of map.exits || []) {
+            const area = exit.area
+                ? exit.area
+                : { x: exit.x - (exit.radius || 0), y: exit.y - (exit.radius || 0), w: (exit.radius || 0) * 2, h: (exit.radius || 0) * 2 };
+            if (rectsOverlap(area, box)) return false;
+        }
+
+        const p = this.player;
+        if (p && !p.isDead) {
+            const pr = { x: p.x - p.colliderHalfW, y: p.y - p.colliderHalfH, w: p.colliderHalfW * 2, h: p.colliderHalfH * 2 };
+            if (rectsOverlap(pr, box)) return false;
+        }
+
+        for (const actor of this.actors) {
+            if (actor.isDead) continue;
+            const ar = { x: actor.x - actor.colliderHalfW, y: actor.y - actor.colliderHalfH, w: actor.colliderHalfW * 2, h: actor.colliderHalfH * 2 };
+            if (rectsOverlap(ar, box)) return false;
+        }
+
+        return true;
+    }
+
+    // Ring search (up to 3 cells out) for the closest walkable floor cell
+    // around a requested catacombs feet position. Returns the cell centre
+    // (feet position) or null when nothing fits.
+    _findNearestFreeSkeletonSpot(map, mask, cell, targetX, targetY, hw = SKELETON_COLLIDER_HALF_W, hh = SKELETON_COLLIDER_HALF_H) {
+        if (!mask) return null;
+        const rows = mask.length;
+        const cols = mask[0] && mask[0].length;
+        if (!cols) return null;
+        const centerCol = Math.floor(targetX / cell);
+        const centerRow = Math.floor(targetY / cell);
+
+        let best = null;
+        const maxRadius = 3;
+        for (let radius = 0; radius <= maxRadius; radius++) {
+            for (let dr = -radius; dr <= radius; dr++) {
+                for (let dc = -radius; dc <= radius; dc++) {
+                    if (Math.max(Math.abs(dr), Math.abs(dc)) !== radius) continue;
+                    const r = centerRow + dr;
+                    const c = centerCol + dc;
+                    if (r < 0 || c < 0 || r >= rows || c >= cols) continue;
+                    if (mask[r][c] !== '.') continue;
+
+                    const feetX = c * cell + cell / 2;
+                    const feetY = r * cell + cell / 2;
+                    if (!this._skeletonBoxIsFree(map, mask, cell, feetX, feetY - hh, hw, hh)) continue;
+
+                    const dist = Math.hypot(feetX - targetX, feetY - targetY);
+                    if (!best || dist < best.dist) best = { x: feetX, y: feetY, dist };
+                }
+            }
+            if (best) break;
+        }
+        return best;
+    }
+
     _loadDayNightIcons() {
         if (this._dayNightIcons.requested || typeof Image === 'undefined') return;
         this._dayNightIcons.requested = true;
@@ -455,6 +678,172 @@ export class GameEngine {
 
     changeMap(targetMapId, spawnId) {
         this._loadMap(targetMapId, spawnId);
+    }
+
+    /* ── Among Us easter egg ─────────────────────────────── */
+    _updateAmongUs(dt) {
+        // Uma instância por vez: anima e descarta quando o loop acaba.
+        if (this.amongUsEasterEgg) {
+            this.amongUsEasterEgg.update(dt);
+            if (this.amongUsEasterEgg.shouldRemove) {
+                this.amongUsEasterEgg = null;
+            }
+        }
+
+        // O cronômetro só conta em gameplay, dentro de um mapa elegível.
+        if (!AMONG_US_ELIGIBLE_MAPS.has(this.currentMapId)) return;
+        if (this.player.isDead) return;
+
+        this.amongUsTimer += dt;
+        const interval = DEBUG_AMONG_US_EASTER_EGG ? 5 : AMONG_US_INTERVAL_SECONDS;
+        if (this.amongUsEasterEgg || this.amongUsTimer < interval) return;
+
+        this.amongUsTimer = 0;
+        this._spawnAmongUs();
+    }
+
+    _spawnAmongUs() {
+        const spot = this._findAmongUsSpot(this.currentMap);
+        if (!spot) {
+            if (DEBUG_AMONG_US_EASTER_EGG) {
+                console.warn(`[AmongUs] nenhuma posição válida em ${this.currentMapId}`);
+            }
+            return;
+        }
+        this._placeAmongUs(spot);
+    }
+
+    // Spawn secreto (Ctrl+Shift+1+F): faz o impostor surgir pouquíssimos passos
+    // à frente do jogador, na direção que ele está olhando.
+    _spawnAmongUsInFront() {
+        const dist = 96;
+        const v = this._facingOffset();
+        const spot = this._nudgeAmongUsSpot(
+            this.currentMap,
+            this.player.x + v.x * dist,
+            this.player.y + v.y * dist
+        );
+        if (!spot) {
+            if (DEBUG_AMONG_US_EASTER_EGG) {
+                console.warn('[AmongUs] sem posição válida na frente do jogador');
+            }
+            return;
+        }
+        this.amongUsTimer = 0;
+        this._placeAmongUs(spot);
+        if (DEBUG_AMONG_US_EASTER_EGG) {
+            console.info(`[AmongUs] spawn secreto na frente em (${spot.x}, ${spot.y})`);
+        }
+    }
+
+    _placeAmongUs(spot) {
+        this.amongUsEasterEgg = new AmongUsEasterEgg(spot.x, spot.y, this.currentMapId);
+        if (DEBUG_AMONG_US_EASTER_EGG) {
+            console.info(`[AmongUs] easter egg na posição (${spot.x}, ${spot.y}) de ${this.currentMapId}`);
+        }
+    }
+
+    // Vetor unitário da direção do jogador (direções de 8 pontos do Player).
+    _facingOffset() {
+        const vectors = {
+            south: { x: 0, y: 1 },
+            'south-east': { x: 0.7071, y: 0.7071 },
+            east: { x: 1, y: 0 },
+            'north-east': { x: 0.7071, y: -0.7071 },
+            north: { x: 0, y: -1 },
+            'north-west': { x: -0.7071, y: -0.7071 },
+            west: { x: -1, y: 0 },
+            'south-west': { x: -0.7071, y: 0.7071 }
+        };
+        return vectors[this.player.direction] || { x: 0, y: 1 };
+    }
+
+    // Uma posição está livre quando a caixa de teste (TEST_HALF_W/H) não encosta
+    // em nada: fora dos limites, obstáculos, área preta/máscara, portas, jogador
+    // ou qualquer ator do mapa.
+    _amongUsIsBlocked(map, cx, cy) {
+        const hw = AMONG_US_TEST_HALF_W;
+        const hh = AMONG_US_TEST_HALF_H;
+        const rect = { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+        if (rect.x < 0 || rect.y < 0 || rect.x + rect.w > map.width || rect.y + rect.h > map.height) {
+            return true;
+        }
+        for (const o of map.obstacles) {
+            if (rectsOverlap(o, rect)) return true;
+        }
+        for (const exit of map.exits || []) {
+            if (exit.area && rectsOverlap(exit.area, rect)) return true;
+            if (!exit.area && exit.x !== undefined) {
+                const r = exit.radius ?? 48;
+                const dx = cx - exit.x;
+                const dy = cy - exit.y;
+                if (dx * dx + dy * dy <= (r + hw) * (r + hw)) return true;
+            }
+        }
+        const p = this.player;
+        if (p && !p.isDead) {
+            const pr = {
+                x: p.x - p.colliderHalfW,
+                y: p.y - p.colliderHalfH,
+                w: p.colliderHalfW * 2,
+                h: p.colliderHalfH * 2
+            };
+            if (rectsOverlap(pr, rect)) return true;
+        }
+        for (const actor of this.actors) {
+            const ar = {
+                x: actor.x - actor.colliderHalfW,
+                y: actor.y - actor.colliderHalfH,
+                w: actor.colliderHalfW * 2,
+                h: actor.colliderHalfH * 2
+            };
+            if (rectsOverlap(ar, rect)) return true;
+        }
+        return false;
+    }
+
+    // Procurou uma posição aleatória válida no mapa: livre de obstáculos,
+    // área preta (via obstacles/terrainMask), portas, do jogador e dos atores.
+    _findAmongUsSpot(map) {
+        const hw = AMONG_US_TEST_HALF_W;
+        const hh = AMONG_US_TEST_HALF_H;
+        const mask = map.terrainMask;
+        const cell = map.maskCell;
+        for (let attempt = 0; attempt < AMONG_US_MAX_ATTEMPTS; attempt++) {
+            let cx, cy;
+            if (mask && mask.length) {
+                // Cavernas por sprite: a âncora cai no centro de uma célula '.' do chão.
+                const cols = mask[0].length;
+                const r = Math.floor(Math.random() * mask.length);
+                const c = Math.floor(Math.random() * cols);
+                if (mask[r][c] !== '.') continue;
+                cx = c * cell + cell / 2;
+                cy = r * cell + cell / 2;
+            } else {
+                cx = hw + Math.random() * (map.width - hw * 2);
+                cy = hh + Math.random() * (map.height - hh * 2);
+            }
+            if (this._amongUsIsBlocked(map, cx, cy)) continue;
+            return { x: Math.round(cx), y: Math.round(cy) };
+        }
+        return null;
+    }
+
+    // Espiral ao redor de um ponto preferido até achar uma posição livre.
+    _nudgeAmongUsSpot(map, baseX, baseY) {
+        if (!this._amongUsIsBlocked(map, baseX, baseY)) {
+            return { x: Math.round(baseX), y: Math.round(baseY) };
+        }
+        const step = 40;
+        for (let radius = step; radius <= 240; radius += step) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+                const cx = baseX + Math.cos(a) * radius;
+                const cy = baseY + Math.sin(a) * radius;
+                if (this._amongUsIsBlocked(map, cx, cy)) continue;
+                return { x: Math.round(cx), y: Math.round(cy) };
+            }
+        }
+        return null;
     }
 
     _handleResize() {
@@ -547,8 +936,21 @@ export class GameEngine {
             return;
         }
 
+        // Easter egg secreto: Ctrl+Shift+1+F faz o Among Us surgir na frente.
+        // (Ctrl+1 puro é roubado pelo navegador, por isso o Shift.)
+        const secretAmongUs = e.ctrlKey && e.shiftKey && (
+            (e.code === 'Digit1' && this.input.keys['KeyF']) ||
+            (e.code === 'KeyF' && this.input.keys['Digit1'])
+        );
+        if (secretAmongUs) {
+            e.preventDefault();
+            this._spawnAmongUsInFront();
+            return;
+        }
+
         // State-testing hotkeys
-        if (e.code === 'KeyF') {
+        // (Ctrl+F é 'buscar' do navegador; com Ctrl segurado o F não troca de estado)
+        if (e.code === 'KeyF' && !e.ctrlKey) {
             if (this.player.state === PlayerState.FLOATING) {
                 this.player.setState(PlayerState.IDLE, true);
             } else {
@@ -564,6 +966,7 @@ export class GameEngine {
             const spawn = this.currentMap.spawn;
             this.player.respawn(spawn.x, spawn.y);
             this.camera.follow(spawn.x, spawn.y, true);
+            this._resetCatacombsSkeletons();
         }
     }
 
@@ -668,6 +1071,9 @@ export class GameEngine {
         // transition is simulated in the same frame.
         this._updateDayNight(dt);
 
+        // Among Us easter egg: só anima/spawna em gameplay, dentro de mapas elegíveis.
+        this._updateAmongUs(dt);
+
         // Update player input and logic
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
@@ -681,6 +1087,7 @@ export class GameEngine {
         if (this.actors.some((a) => a.shouldRemove)) {
             this.actors = this.actors.filter((a) => !a.shouldRemove);
             this.golems = this.golems.filter((g) => !g.shouldRemove);
+            this.skeletons = this.skeletons.filter((s) => !s.shouldRemove);
         }
 
         // Map transition interaction detection
@@ -800,10 +1207,18 @@ export class GameEngine {
         // 1.5 Castle collision debug overlay (red/blue/green/yellow, see above)
         this._renderCollisionDebug(ctx);
 
-        // 2. Render non-player characters (NPCs / enemies)
+        // 1.7 Among Us easter egg (após mapa/deco, antes dos NPCs)
+        if (this.amongUsEasterEgg) {
+            this.amongUsEasterEgg.render(ctx, this.camera);
+        }
+
+        // 2. Render non-player characters (NPCs / enemies / skeletons)
         for (const actor of this.actors) {
             actor.render(ctx, this.camera);
         }
+
+        // 2.5 Catacomb skeleton spawn debug overlay (ponto + collider + ids)
+        this._renderSkeletonAxeDebug(ctx);
 
         // 3. Render Bullets
         for (const bullet of this.bullets) {
@@ -919,6 +1334,70 @@ export class GameEngine {
             p.colliderHalfW * 2,
             p.colliderHalfH * 2
         );
+    }
+
+    // Debug overlay for the Catacombs Skeleton_Axe (see DEBUG_CATACOMBS_SKELETONS).
+    // Paints each spawn point (axe in green, spearman in cyan) with its id,
+    // local coordinates and current map, plus the collider box of every live
+    // skeleton.
+    _renderSkeletonAxeDebug(ctx) {
+        if (!DEBUG_CATACOMBS_SKELETONS) return;
+        if (this.currentMapId !== MAP_IDS.MARS_CATACOMBS) return;
+
+        const off = this.camera.getRenderOffset();
+
+        ctx.font = '8px "Press Start 2P", monospace';
+
+        CATACOMBS_SKELETON_AXE_SPAWNS.forEach((spawn, i) => {
+            const sx = Math.round(spawn.x + off.x);
+            const sy = Math.round(spawn.y + off.y);
+
+            // Spawn marker — bright green cross on the feet position.
+            ctx.fillStyle = '#00ff66';
+            ctx.fillRect(sx - 5, sy - 1, 10, 2);
+            ctx.fillRect(sx - 1, sy - 5, 2, 10);
+
+            // Text block — id, current map and LOCAL coordinates.
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00ff66';
+            ctx.fillText(`Skeleton_Axe_${i + 1}`, sx, sy - 12);
+            ctx.fillText(`MAP: ${this.currentMapId}`, sx, sy + 18);
+            ctx.fillText(`LOCAL: ${spawn.x}, ${spawn.y}`, sx, sy + 28);
+        });
+
+        CATACOMBS_SKELETON_SPEARMAN_SPAWNS.forEach((spawn, i) => {
+            const sx = Math.round(spawn.x + off.x);
+            const sy = Math.round(spawn.y + off.y);
+
+            ctx.fillStyle = '#00ccff';
+            ctx.fillRect(sx - 5, sy - 1, 10, 2);
+            ctx.fillRect(sx - 1, sy - 5, 2, 10);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#00ccff';
+            ctx.fillText(`Skeleton_Spearman_${i + 1}`, sx, sy - 12);
+            ctx.fillText(`MAP: ${this.currentMapId}`, sx, sy + 18);
+            ctx.fillText(`LOCAL: ${spawn.x}, ${spawn.y}`, sx, sy + 28);
+        });
+
+        // Collider box of every live skeleton — yellow outline.
+        for (const s of this.skeletons) {
+            ctx.strokeStyle = '#ffff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                Math.round(s.x - s.colliderHalfW + off.x) + 0.5,
+                Math.round(s.y - s.colliderHalfH + off.y) + 0.5,
+                s.colliderHalfW * 2,
+                s.colliderHalfH * 2
+            );
+            ctx.fillStyle = '#ffff00';
+            ctx.fillRect(
+                Math.round(s.x + off.x - 2),
+                Math.round(s.y + off.y - 2),
+                4,
+                4
+            );
+        }
     }
 
     _renderHUD(ctx) {

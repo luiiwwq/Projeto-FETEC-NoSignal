@@ -312,8 +312,8 @@ const CATACOMBS_MASK = [
     '#######################################',
     '#######################################',
     '#####################...###############',
-    '###################......##....########',
-    '##################............#########',
+    '###################......##############',
+    '##################..........###########',
     '################..............#########',
     '###############................########',
     '##############....................#..##',
@@ -687,12 +687,12 @@ export const castlePrincipalRoomMap = {
     height: 879,
     tileSize: TILE,
     dust: false,
-    coordinateSpace: 'local',
-    spawn: { x: 1530, y: 260 },
+coordinateSpace: 'local',
+    spawn: { x: 735, y: 599 },
     spawnPoints: {
-        'castle-principal-entry': { x: 1530, y: 260 },
-        'castle-principal-south-entry': { x: 890, y: 650 },
-        'castle-return': { x: 1530, y: 260 },
+        'castle-principal-entry': { x: 735, y: 599 },
+        'castle-principal-south-entry': { x: 732, y: 650 },
+        'castle-return': { x: 735, y: 599 },
     },
     obstacles: [
         // Parede esquerda contínua: bloqueia a partir de X <= 109 para qualquer Y.
@@ -703,14 +703,20 @@ export const castlePrincipalRoomMap = {
         { x: 0, y: 0, w: 1790, h: 210, kind: 'castle-wall' },
         // Parede inferior contínua: bloqueia a partir de Y >= 704 para qualquer X.
         { x: 0, y: 704, w: 1790, h: 175, kind: 'castle-wall' },
-        // Caixas de colisão de pilares/móveis inferiores.
-        { x: 1380, y: 600, w: 50, h: 60, kind: 'castle-pillar' },
-        { x: 1540, y: 600, w: 50, h: 60, kind: 'castle-pillar' },
-        // Pilares adicionais especificados (coordenadas da Sala Principal):
-        { x: 1152, y: 222, w: 56, h: 36, kind: 'castle-pillar' },  // (1167, 232), (1193, 232), (1176, 245)
-        { x: 1242, y: 222, w: 70, h: 140, kind: 'castle-pillar' }, // (1257, 352), (1271, 352), (1297, 352), (1292, 232), (1297, 349)
-        { x: 1194, y: 540, w: 115, h: 152, kind: 'castle-pillar' },// (1222, 551), (1277, 551), (1204, 595), (1294, 595), (1294, 682), (1208, 682)
-        { x: 132, y: 222, w: 58, h: 36, kind: 'castle-pillar' },   // (167, 248), (180, 232), (142, 232)
+        // Divisória vertical de alvenaria (parede de tijolos vermelhos no topo direito)
+        { x: 1245, y: 150, w: 60, h: 245, kind: 'castle-wall' },
+        // Área contínua das 4 cadeiras encostadas na divisória (sem recortes/vãos intermediários)
+        { x: 1305, y: 240, w: 180, h: 125, kind: 'castle-pillar' },
+        // Mesa de madeira inferior direita com pergaminhos
+        { x: 1405, y: 665, w: 180, h: 40, kind: 'castle-pillar' },
+        // Estante de pergaminhos na parede direita (X: 1657)
+        { x: 1630, y: 385, w: 60, h: 140, kind: 'castle-pillar' },
+        // Pilares duplos de banner (canto inferior direito)
+        { x: 1195, y: 575, w: 115, h: 129, kind: 'castle-pillar' },
+        // Pilar decorativo de banner superior esquerdo
+        { x: 130, y: 210, w: 60, h: 90, kind: 'castle-pillar' },
+        // Pilar decorativo de banner superior direito
+        { x: 1150, y: 210, w: 60, h: 90, kind: 'castle-pillar' },
     ],
     exits: [
         {
@@ -727,9 +733,9 @@ export const castlePrincipalRoomMap = {
             label: 'SAIR DO CASTELO',
             targetMap: MAP_IDS.MARS_SURFACE,
             targetSpawn: 'castle-return',
-            area: { x: 720, y: 640, w: 340, h: 64 },
-            promptX: 890,
-            promptY: 630,
+            area: { x: 562, y: 640, w: 340, h: 120 },
+            promptX: 732,
+            promptY: 750,
         },
     ],
     structures: [],
@@ -757,7 +763,7 @@ export const castleKingRoomMap = {
         // Parede inferior contínua impedindo a passagem abaixo de y=697 (independente do X).
         { x: 0, y: 697, w: 1790, h: 182, kind: 'castle-wall' },
         // Caixas de colisão de elementos decorativos do trono/baú/grades.
-        { x: 670, y: 220, w: 110, h: 70, kind: 'castle-pillar' },
+        { x: 650, y: 220, w: 130, h: 190, kind: 'castle-pillar' },
         { x: 595, y: 185, w: 45, h: 35, kind: 'castle-pillar' },
         { x: 115, y: 250, w: 90, h: 447, kind: 'castle-wall' },
     ],

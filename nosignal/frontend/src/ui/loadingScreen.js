@@ -14,6 +14,12 @@ export function renderLoadingScreen(container) {
     // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
     stopMenuMusic();
 
+    // A música do gameplay começa AGORA: esta função é sempre chamada de
+    // dentro de um gesto do usuário (clique/Enter no modal de nome ou na
+    // seleção de tripulante), então o play() é permitido pelo navegador e a
+    // música inicia instantaneamente — sem esperar a tela de loading.
+    startGameMusic();
+
     container.innerHTML = `
         <div class="loading-screen-wrapper">
             <div class="mars-grid-overlay"></div>
