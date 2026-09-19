@@ -24,9 +24,30 @@ export const gameState = {
         waveCount: 0
     },
 
+    // Economia e loja
+    coins: 50, // Saldo inicial generoso para permitir testes imediatos
+    inventory: [], // IDs de itens comprados
+    allyBossHelpPurchased: false, // Flag de assistência tática no Necromancer
+
+    addCoins(amount) {
+        this.coins = Math.max(0, (this.coins || 0) + amount);
+        return this.coins;
+    },
+
+    spendCoins(amount) {
+        if ((this.coins || 0) >= amount) {
+            this.coins -= amount;
+            return true;
+        }
+        return false;
+    },
+
     reset() {
         this.playerHp = 100;
         this.currentScene = 'TITLE';
+        this.coins = 50;
+        this.inventory = [];
+        this.allyBossHelpPurchased = false;
         this.dayNight = {
             period: DAY_NIGHT_PERIOD.DAY,
             remainingTime: DAY_NIGHT_DURATION,

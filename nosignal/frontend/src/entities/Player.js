@@ -75,7 +75,7 @@ export class Player {
         // Health & combat stats
         this.maxHp = 100;
         this.hp = 100;
-        this.bulletDamage = 14;
+        this.bulletDamage = this.weapon?.damage ?? 14;
         this.invulnerableTimer = 0;
         this.isDead = false;
 
@@ -293,7 +293,7 @@ export class Player {
             const bulletOpts = {
                 team: this.team,
                 owner: this,
-                damage: this.bulletDamage
+                damage: this.weapon?.damage ?? this.bulletDamage
             };
 
             if (weapon.type === 'shotgun') {

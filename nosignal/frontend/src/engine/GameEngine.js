@@ -24,6 +24,21 @@ import {
     SPEARMAN_COLLIDER_HALF_H,
     preloadSkeletonSpearmanSprites,
 } from '../entities/SkeletonSpearman.js';
+import {
+    NecromancerBoss,
+    NECROMANCER_SPAWN,
+    NECROMANCER_COLLIDER_HALF_W,
+    NECROMANCER_COLLIDER_HALF_H,
+    NECROMANCER_REAPER_OFFSETS,
+    getSkillImages,
+    preloadNecromancerSprites,
+} from '../entities/NecromancerBoss.js';
+import {
+    Reaper,
+    REAPER_COLLIDER_HALF_W,
+    REAPER_COLLIDER_HALF_H,
+    preloadReaperSprites,
+} from '../entities/Reaper.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
@@ -32,6 +47,8 @@ import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionS
 import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
+import { openShopScreen, closeShopScreen, isShopOpen } from '../ui/shopScreen.js';
+import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings } from '../state/stateStorage.js';
 
@@ -60,6 +77,11 @@ const SHOW_CASTLE_COLLISION_DEBUG = false;
 // coordinates and current map) plus every skeleton's collider box over the
 // map art. Flip to `true` only while reviewing the spawns; commit as `false`.
 const DEBUG_CATACOMBS_SKELETONS = false;
+
+// Debug do boss Necromancer (Sala do Rei): mostra o spawn local, collider,
+// HP, estado, cooldowns, áreas de habilidades e pontos candidatos/finais dos
+// Reapers. Commit como `false`.
+const DEBUG_NECROMANCER_BOSS = false;
 
 // Excavate each freeMoveZone out of an obstacle, splitting it into the
 // remaining pieces, so the band becomes a real collision-free corridor
@@ -122,10 +144,17 @@ export class GameEngine {
         // Golem wave + day/night cycle
         this.golems = [];
         this.skeletons = [];
+
+        // Boss Necromancer (Sala do Rei) + Reapers invocados + efeitos ativos
+        this.necromancerBoss = null;
+        this.reapers = [];
+        this.necromancerEffects = [];
+        this._reaperPlacementLog = [];
         this.dayNight = new DayNightSystem();
         this._golemWavePendingNight = 0; // night that must still be paid out
         this._lastGolemWaveNight = 0;    // guard against a double spawn
         this._golemWaveCount = 0;
+        this._waveGolemsActive = false;
         this._nightBannerTimer = 0;
         this._nightBannerText = '';
         this._nightFlashTimer = 0;
@@ -138,6 +167,17 @@ export class GameEngine {
         this.mapTransitionCooldown = 0;
         this.interactableExit = null;
         this.promptText = '';
+
+        // Shop NPC interaction & Floating coin texts
+        this.interactableShop = null;
+        this.shopPrompt = '';
+        this.floatingTexts = [];
+
+        // Assistência tática do Aliado no Necromancer
+        this.allyBossHelpTriggered = false;
+        this.bossAssistAlly = null;
+        this.bossAssistTimer = 0;
+        this.bossAssistShotCooldown = 0;
 
         // Input state
         this.input = {
@@ -208,6 +248,8 @@ export class GameEngine {
         preloadAmongUsSprites();
         preloadSkeletonAxeSprites();
         preloadSkeletonSpearmanSprites();
+        preloadNecromancerSprites();
+        preloadReaperSprites();
         this._loadDayNightIcons();
 
         // Initialize Player with state name
@@ -249,6 +291,7 @@ export class GameEngine {
         }
         destroyPauseMenu();
         closeCaveChoiceScreen();
+        closeShopScreen();
         window.removeEventListener('keydown', this._onKeyDown);
         window.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('resize', this._onResize);
@@ -280,17 +323,29 @@ export class GameEngine {
 
         this.bullets.length = 0;
         this.particles.length = 0;
+        this.floatingTexts = [];
         this.mapTransitionCooldown = 0.4;
         this.interactableExit = null;
+        this.interactableShop = null;
+        this.bossAssistAlly = null;
+        this.allyBossHelpTriggered = false;
 
         // (Re)create non-player characters for this map
         this._setupCharacterRoles(map);
         this.golems = [];
+        this._waveGolemsActive = false;
 
         // Troca de mapa / nova partida: easter egg some e cronômetro reinicia.
         this.amongUsEasterEgg = null;
         this.amongUsTimer = 0;
         this.skeletons = [];
+
+        // Boss Necromancer: some junto com Reapers/efeitos ao trocar de mapa —
+        // nunca vaza para outro mapa e nunca duplica ao voltar.
+        this.necromancerBoss = null;
+        this.reapers = [];
+        this.necromancerEffects = [];
+        this._reaperPlacementLog = [];
 
         // The Catacombs have five fixed Skeleton_Axe spawns (plus five
         // Skeleton_Spearman standing beside them) in LOCAL map coordinates.
@@ -300,6 +355,12 @@ export class GameEngine {
         if (mapId === MAP_IDS.MARS_CATACOMBS) {
             this._spawnCatacombsSkeletons(map);
             this._spawnCatacombsSpearmen(map);
+        }
+
+        // Boss da Sala do Rei: spawn LOCAL (720,443), sem conversão de
+        // coordenadas com a superfície/entrada do castelo.
+        if (mapId === MAP_IDS.CASTLE_KING_ROOM) {
+            this._spawnNecromancerBoss(map);
         }
 
         // A wave scheduled while the player was away is paid out as soon as
@@ -381,7 +442,10 @@ export class GameEngine {
 
         this._lastGolemWaveNight = night;
         this._golemWavePendingNight = 0;
-        if (spawned > 0) this._golemWaveCount += 1;
+        if (spawned > 0) {
+            this._golemWaveCount += 1;
+            this._waveGolemsActive = true;
+        }
         return spawned;
     }
 
@@ -611,6 +675,566 @@ export class GameEngine {
             if (best) break;
         }
         return best;
+    }
+
+    /* ── Necromancer boss helpers ──────────────────────── */
+    // Cria o boss na Sala do Rei com spawn LOCAL (720,443). A validação de
+    // limites é estrita por spec; conflito com obstáculo só vira log.
+    _spawnNecromancerBoss(map) {
+        if (
+            NECROMANCER_SPAWN.x < 0 ||
+            NECROMANCER_SPAWN.y < 0 ||
+            NECROMANCER_SPAWN.x > map.width ||
+            NECROMANCER_SPAWN.y > map.height
+        ) {
+            throw new Error('Spawn local do Necromancer inválido (fora da Sala do Rei)');
+        }
+
+        const boss = new NecromancerBoss(
+            NECROMANCER_SPAWN.x,
+            NECROMANCER_SPAWN.y - NECROMANCER_COLLIDER_HALF_H,
+            { id: 'castle-king-boss' }
+        );
+        boss.setCollisionResolver(
+            this._buildCollisionResolver(map, boss.colliderHalfW, boss.colliderHalfH)
+        );
+        boss.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+        this.necromancerBoss = boss;
+
+        if (DEBUG_NECROMANCER_BOSS) {
+            const box = {
+                x: boss.x - boss.colliderHalfW,
+                y: boss.y - boss.colliderHalfH,
+                w: boss.colliderHalfW * 2,
+                h: boss.colliderHalfH * 2,
+            };
+            const clash = (map.obstacles || []).some((o) => rectsOverlap(o, box));
+            console.info(
+                `[Necromancer] spawn local (${NECROMANCER_SPAWN.x},${NECROMANCER_SPAWN.y}) ` +
+                `centro (${boss.x},${boss.y}); overlap obstáculo: ${clash}`
+            );
+        }
+    }
+
+    // Mantém o ponto alvo de uma habilidade dentro da área jogável da Sala do
+    // Rei (longe das paredes e do trono/grades).
+    clampNecromancerPoint(x, y) {
+        const map = this.currentMap;
+        const minX = 40;
+        const maxX = map.width - 40;
+        const minY = 225;
+        const maxY = 680;
+
+        let px = Math.max(minX, Math.min(maxX, x));
+        let py = Math.max(minY, Math.min(maxY, y));
+
+        for (const o of map.obstacles || []) {
+            if (!rectsOverlap(o, { x: px - 14, y: py - 14, w: 28, h: 28 })) continue;
+            const below = o.y + o.h + 24;
+            if (below <= maxY) {
+                py = Math.max(py, below);
+            } else {
+                const right = o.x + o.w + 24;
+                if (right <= maxX) px = Math.max(px, right);
+                else py = Math.min(py, Math.max(minY, o.y - 24));
+            }
+        }
+        return { x: Math.round(px), y: Math.round(py) };
+    }
+
+    addNecromancerEffect(effect) {
+        this.necromancerEffects.push(effect);
+        if (DEBUG_NECROMANCER_BOSS) {
+            console.info(`[Necromancer] efeito ${effect.kind} em (${effect.x},${effect.y})`);
+        }
+    }
+
+    // Invoca exatamente 5 Reapers nos offsets definidos (pés do boss). Cada
+    // posição é validada (limites, obstáculos, portas, jogador, boss, atores e
+    // Reapers); se bloqueada, usa o vão livre mais próximo. Nunca em outra mapa.
+    spawnNecromancerReapers(boss) {
+        const map = this.currentMap;
+        const hw = REAPER_COLLIDER_HALF_W;
+        const hh = REAPER_COLLIDER_HALF_H;
+        this._reaperPlacementLog = [];
+        const bossFeetY = boss.y + boss.colliderHalfH;
+
+        for (let i = 0; i < NECROMANCER_REAPER_OFFSETS.length; i++) {
+            const off = NECROMANCER_REAPER_OFFSETS[i];
+            const feetX = boss.x + off.x;
+            const feetY = bossFeetY + off.y;
+
+            let cx = feetX;
+            let cy = feetY - hh;
+            let adjusted = !this._reaperRectFree(map, cx, cy, hw, hh);
+            if (adjusted) {
+                const alt = this._findNearestFreeReaperSpot(map, cx, cy, hw, hh);
+                if (!alt) {
+                    if (DEBUG_NECROMANCER_BOSS) {
+                        console.warn(`[Necromancer] Reaper ${i + 1} sem posição livre — ignorado.`);
+                    }
+                    continue;
+                }
+                cx = alt.x;
+                cy = alt.y;
+            }
+
+            const reaper = new Reaper(cx, cy, { id: `king-reaper-${i + 1}` });
+            reaper.setCollisionResolver(
+                this._buildCollisionResolver(map, reaper.colliderHalfW, reaper.colliderHalfH)
+            );
+            reaper.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+            this.actors.push(reaper);
+            this.reapers.push(reaper);
+
+            this._reaperPlacementLog.push({
+                index: i + 1,
+                requested: { x: Math.round(feetX), y: Math.round(feetY) },
+                finalFeet: { x: Math.round(cx), y: Math.round(cy + hh) },
+                adjusted,
+            });
+
+            if (DEBUG_NECROMANCER_BOSS) {
+                console.info(
+                    `[Necromancer] Reaper ${i + 1} candidato (${Math.round(feetX)},${Math.round(feetY)}) ` +
+                    `-> final (${Math.round(cx)},${Math.round(cy + hh)}) ajustado=${adjusted}`
+                );
+            }
+        }
+    }
+
+    _reaperRectFree(map, cx, cy, hw, hh) {
+        const box = { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+        if (box.x < 0 || box.y < 0 || box.x + box.w > map.width || box.y + box.h > map.height) return false;
+
+        for (const o of map.obstacles || []) {
+            if (rectsOverlap(o, box)) return false;
+        }
+        for (const exit of map.exits || []) {
+            const area = exit.area
+                ? exit.area
+                : { x: exit.x - (exit.radius || 0), y: exit.y - (exit.radius || 0), w: (exit.radius || 0) * 2, h: (exit.radius || 0) * 2 };
+            if (rectsOverlap(area, box)) return false;
+        }
+
+        const p = this.player;
+        if (p && !p.isDead) {
+            const pr = { x: p.x - p.colliderHalfW, y: p.y - p.colliderHalfH, w: p.colliderHalfW * 2, h: p.colliderHalfH * 2 };
+            if (rectsOverlap(pr, box)) return false;
+        }
+
+        const b = this.necromancerBoss;
+        if (b && !b.isDead) {
+            const br = { x: b.x - b.colliderHalfW, y: b.y - b.colliderHalfH, w: b.colliderHalfW * 2, h: b.colliderHalfH * 2 };
+            if (rectsOverlap(br, box)) return false;
+        }
+
+        for (const actor of this.actors) {
+            if (actor.isDead) continue;
+            const ar = { x: actor.x - actor.colliderHalfW, y: actor.y - actor.colliderHalfH, w: actor.colliderHalfW * 2, h: actor.colliderHalfH * 2 };
+            if (rectsOverlap(ar, box)) return false;
+        }
+
+        for (const r of this.reapers) {
+            if (r.isDead) continue;
+            const rr = { x: r.x - r.colliderHalfW, y: r.y - r.colliderHalfH, w: r.colliderHalfW * 2, h: r.colliderHalfH * 2 };
+            if (rectsOverlap(rr, box)) return false;
+        }
+
+        return true;
+    }
+
+    _findNearestFreeReaperSpot(map, cx, cy, hw, hh) {
+        const step = 32;
+        for (let radius = step; radius <= 320; radius += step) {
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+                const nx = cx + Math.cos(a) * radius;
+                const ny = cy + Math.sin(a) * radius;
+                if (this._reaperRectFree(map, nx, ny, hw, hh)) {
+                    return { x: Math.round(nx), y: Math.round(ny) };
+                }
+            }
+        }
+        return null;
+    }
+
+    // Boss morto: limpa efeitos, dissolve os Reapers restantes e solta uma
+    // explosão de partículas. O boss continua visível (morte) até a última
+    // frame e então some.
+    onNecromancerDefeated(boss) {
+        this.necromancerEffects.length = 0;
+        if (!boss._coinAwarded) {
+            boss._coinAwarded = true;
+            this._awardEnemyCoins(boss.x, boss.y, 30);
+        }
+        for (const r of this.reapers) {
+            if (r.isDead || r.shouldRemove) continue;
+            r.takeDamage(r.maxHp + 9999, boss.x, boss.y);
+        }
+        for (let i = 0; i < 26; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 40 + Math.random() * 140;
+            this.particles.push({
+                x: boss.x,
+                y: boss.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 0.5 + Math.random() * 0.4,
+                color: Math.random() > 0.5 ? '#8f1821' : '#3a1a2a',
+                size: Math.random() > 0.5 ? 4 : 3,
+            });
+        }
+    }
+
+    /* ── Assistência do Aliado no Boss Necromancer ─────────── */
+    _triggerAllyBossHelp(boss) {
+        const selectedId = CHARACTERS[gameState.selectedCharacter]
+            ? gameState.selectedCharacter
+            : DEFAULT_CHARACTER_ID;
+        const roles = resolveCharacterRoles(selectedId);
+        const allyId = roles.ally || DEFAULT_CHARACTER_ID;
+
+        // Spawna à esquerda ou direita do jogador dentro da sala
+        const spawnX = Math.max(80, Math.min(this.currentMap.width - 80, this.player.x - 70));
+        const spawnY = Math.max(80, Math.min(this.currentMap.height - 80, this.player.y));
+
+        this._spawnTeleportFx(spawnX, spawnY);
+        this._nightBannerText = 'ALIADO: "FOGO DE COBERTURA! SEGURA AÍ!"';
+        this._nightBannerTimer = 3.2;
+
+        const ally = new CharacterActor({
+            x: spawnX,
+            y: spawnY,
+            characterId: allyId,
+            team: 'player',
+            role: ActorRole.ALLY
+        });
+        ally.setCollisionResolver(this._buildCollisionResolver(this.currentMap, ally.colliderHalfW, ally.colliderHalfH));
+        ally.setWorldBounds({ minX: 0, minY: 0, maxX: this.currentMap.width, maxY: this.currentMap.height });
+
+        this.actors.push(ally);
+        this.bossAssistAlly = ally;
+        this.bossAssistTimer = 4.0;
+        this.bossAssistShotCooldown = 0.15;
+    }
+
+    _spawnTeleportFx(x, y) {
+        for (let i = 0; i < 28; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 50 + Math.random() * 110;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 0.45 + Math.random() * 0.35,
+                color: Math.random() > 0.5 ? '#c084fc' : '#60a5fa',
+                size: Math.random() > 0.5 ? 4 : 2
+            });
+        }
+    }
+
+    /* ── Economia: Recompensas e Partículas de Moedas ────── */
+    _awardEnemyCoins(x, y, amount) {
+        gameState.addCoins(amount);
+        this._spawnCoinParticles(x, y, amount);
+    }
+
+    _spawnCoinParticles(x, y, amount) {
+        for (let i = 0; i < 10; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 30 + Math.random() * 80;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed - 15,
+                life: 0.45 + Math.random() * 0.35,
+                color: Math.random() > 0.4 ? '#ffd440' : '#fff275',
+                size: Math.random() > 0.5 ? 3 : 2
+            });
+        }
+        this.floatingTexts.push({
+            x,
+            y: y - 12,
+            text: `+${amount} 🪙`,
+            life: 1.2,
+            maxLife: 1.2,
+            vy: -35
+        });
+    }
+
+    _updateNecromancer(dt) {
+        const boss = this.necromancerBoss;
+
+        // Disparo da ajuda do aliado comprado na loja
+        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead) {
+            const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
+            if (distToBoss <= 520 || boss.hp < boss.maxHp) {
+                this.allyBossHelpTriggered = true;
+                gameState.allyBossHelpPurchased = false; // consumido nesta batalha
+                this._triggerAllyBossHelp(boss);
+            }
+        }
+
+        // Simulação ativa da aparição rápida do aliado no boss
+        if (this.bossAssistAlly) {
+            const ally = this.bossAssistAlly;
+            this.bossAssistTimer -= dt;
+            this.bossAssistShotCooldown -= dt;
+
+            if (boss && !boss.isDead) {
+                const dx = boss.x - ally.x;
+                const dy = boss.y - ally.y;
+                const aimAngle = Math.atan2(dy, dx);
+                ally.updateDirectionFromAngle(aimAngle);
+
+                if (this.bossAssistShotCooldown <= 0) {
+                    this.bossAssistShotCooldown = 0.3; // rajada rápida
+                    ally.setState(PlayerState.SHOOTING, true);
+                    const spawnDist = 24;
+                    const spawnX = ally.x + Math.cos(aimAngle) * spawnDist;
+                    const spawnY = ally.y - 18 + Math.sin(aimAngle) * 8;
+                    const bulletOpts = {
+                        team: 'player',
+                        owner: ally,
+                        damage: 35
+                    };
+                    const bullet = new Bullet(spawnX, spawnY, aimAngle, 680, ally.weapon, bulletOpts);
+                    this.bullets.push(bullet);
+                }
+            }
+
+            if (this.bossAssistTimer <= 0 || (boss && boss.isDead)) {
+                this._nightBannerText = 'ALIADO: "BATERIA ESGOTADA! O RESTO É COM VOCÊ!"';
+                this._nightBannerTimer = 2.6;
+                this._spawnTeleportFx(ally.x, ally.y);
+                this.actors = this.actors.filter((a) => a !== ally);
+                this.bossAssistAlly = null;
+            }
+        }
+
+        if (boss) {
+            if (!boss.isDead) boss.updateAi(dt, this);
+            boss.update(dt);
+            if (boss.shouldRemove) {
+                this.necromancerBoss = null;
+            }
+        }
+        this._updateNecromancerEffects(dt);
+    }
+
+    _updateNecromancerEffects(dt) {
+        for (let i = this.necromancerEffects.length - 1; i >= 0; i--) {
+            const e = this.necromancerEffects[i];
+            e.t += dt;
+
+            if (e.kind === 'explosion') {
+                if (!e.damaged) {
+                    e.damaged = true;
+                    this._applyNecromancerDamage(e);
+                }
+                if (e.t >= e.blastDur) {
+                    this.necromancerEffects.splice(i, 1);
+                }
+            } else if (e.kind === 'lightning') {
+                if (!e.damaged) {
+                    e.damaged = true;
+                    this._applyNecromancerDamage(e);
+                }
+                if (e.t >= e.strikeDur) {
+                    this.necromancerEffects.splice(i, 1);
+                }
+            } else if (e.kind === 'unholy') {
+                e.tickCd -= dt;
+                if (e.tickCd <= 0) {
+                    e.tickCd = e.tickEvery;
+                    this._applyNecromancerDamage(e);
+                }
+                if (e.t >= e.dur) {
+                    this.necromancerEffects.splice(i, 1);
+                }
+            }
+        }
+    }
+
+    _applyNecromancerDamage(e) {
+        const p = this.player;
+        if (!p || p.isDead) return;
+        const pr = {
+            x: p.x - p.colliderHalfW,
+            y: p.y - p.colliderHalfH,
+            w: p.colliderHalfW * 2,
+            h: p.colliderHalfH * 2,
+        };
+
+        let hit = false;
+        if (e.kind === 'explosion') {
+            hit = rectsOverlap(pr, { x: e.x - e.r, y: e.y - e.r, w: e.r * 2, h: e.r * 2 });
+        } else if (e.kind === 'lightning') {
+            hit = rectsOverlap(pr, { x: e.x - e.hitW / 2, y: e.y - e.hitH, w: e.hitW, h: e.hitH });
+        } else if (e.kind === 'unholy') {
+            hit = rectsOverlap(pr, { x: e.x - e.hitW / 2, y: e.y - e.hitH / 2, w: e.hitW, h: e.hitH });
+        }
+
+        if (hit) p.takeDamage(e.dmg, e.x, e.y);
+    }
+
+    /* ── Boss rendering ────────────────────────────────── */
+    _renderNecromancerEffects(ctx) {
+        if (this.necromancerEffects.length === 0) return;
+        const off = this.camera.getRenderOffset();
+
+        for (const e of this.necromancerEffects) {
+            if (e.kind === 'explosion') {
+                const imgs = getSkillImages('explosion');
+                if (!imgs) continue;
+                const sx = Math.round(e.x + off.x);
+                const sy = Math.round(e.y + off.y);
+                const frame = Math.min(Math.floor(e.t / 0.1), imgs.length - 1);
+                const drawW = 64 * 4;
+                const drawH = 55 * 4;
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - Math.round(drawH / 2), drawW, drawH);
+                ctx.restore();
+            } else if (e.kind === 'lightning') {
+                const imgs = getSkillImages('lightning', e.variant);
+                if (!imgs) continue;
+                const sx = Math.round(e.x + off.x);
+                const sy = Math.round(e.y + off.y);
+                const frame = Math.min(Math.floor(e.t / (e.strikeDur / imgs.length)), imgs.length - 1);
+                const drawW = 100 * 3;
+                const drawH = 208 * 3;
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
+                ctx.restore();
+            } else if (e.kind === 'unholy') {
+                const imgs = getSkillImages('unholy');
+                if (!imgs) continue;
+                const scale = e.scale || 2;
+                const drawW = 300 * scale;
+                const drawH = 256 * scale;
+                const frame = Math.floor(e.t / 0.09) % imgs.length;
+                const sx = Math.round(e.x + off.x);
+                const sy = Math.round(e.y + off.y);
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
+                ctx.restore();
+            }
+        }
+    }
+
+    _renderBossBar(ctx) {
+        const boss = this.necromancerBoss;
+        if (!boss) return;
+
+        const barW = Math.min(this.width - 120, 760);
+        const barH = 18;
+        const barX = Math.round((this.width - barW) / 2);
+        const barY = this.height - 92;
+
+        ctx.save();
+
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#d7a45d';
+        ctx.fillText('NECROMANCER', this.width / 2, barY - 8);
+
+        ctx.fillStyle = '#160b0d';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.strokeStyle = '#d7a45d';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
+
+        const ratio = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+        const fillW = Math.round((barW - 4) * ratio);
+        if (fillW > 0) {
+            ctx.fillStyle = '#8f1821';
+            ctx.fillRect(barX + 2, barY + 2, fillW, barH - 4);
+        }
+
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(`${Math.round(boss.hp)} / ${boss.maxHp}`, this.width / 2, barY + barH + 25);
+
+        ctx.restore();
+    }
+
+    _renderNecromancerDebug(ctx) {
+        if (!DEBUG_NECROMANCER_BOSS) return;
+        if (this.currentMapId !== MAP_IDS.CASTLE_KING_ROOM) return;
+
+        const off = this.camera.getRenderOffset();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+
+        const spx = Math.round(NECROMANCER_SPAWN.x + off.x);
+        const spy = Math.round(NECROMANCER_SPAWN.y + off.y);
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillRect(spx - 6, spy - 2, 12, 4);
+        ctx.fillRect(spx - 2, spy - 6, 4, 12);
+        ctx.fillText('SPAWN', spx, spy + 22);
+        ctx.fillStyle = '#ff88ff';
+        ctx.fillText(`${NECROMANCER_SPAWN.x}, ${NECROMANCER_SPAWN.y}`, spx, spy + 34);
+
+        const boss = this.necromancerBoss;
+        if (boss) {
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+                Math.round(boss.x - boss.colliderHalfW + off.x) + 0.5,
+                Math.round(boss.y - boss.colliderHalfH + off.y) + 0.5,
+                boss.colliderHalfW * 2,
+                boss.colliderHalfH * 2
+            );
+            const bx = Math.round(boss.x + off.x);
+            const by = Math.round(boss.y + off.y);
+            ctx.fillStyle = '#ff00ff';
+            ctx.fillText(`HP ${Math.round(boss.hp)}/${boss.maxHp}`, bx, by + 30);
+            ctx.fillText(`ESTADO ${boss.state}`, bx, by + 44);
+            ctx.fillStyle = '#ff66ff';
+            ctx.fillText(`ATK ${boss.attackCooldown.toFixed(2)} SKILL ${boss.skillCooldown.toFixed(2)}`, bx, by + 58);
+            ctx.fillText(`FASE2 ${boss.hasSummonedReapers ? 'sim' : 'nao'} SUMMON ${boss.summonTimer.toFixed(2)}`, bx, by + 72);
+        }
+
+        for (const e of this.necromancerEffects) {
+            if (e.kind === 'explosion') {
+                ctx.strokeStyle = '#ff8888';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(Math.round(e.x + off.x), Math.round(e.y + off.y), e.r, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (e.kind === 'lightning') {
+                ctx.strokeStyle = '#88aaff';
+                ctx.strokeRect(
+                    Math.round(e.x + off.x - e.hitW / 2) + 0.5,
+                    Math.round(e.y + off.y - e.hitH) + 0.5,
+                    e.hitW,
+                    e.hitH
+                );
+            } else if (e.kind === 'unholy') {
+                ctx.strokeStyle = '#aa55aa';
+                ctx.strokeRect(
+                    Math.round(e.x + off.x - e.hitW / 2) + 0.5,
+                    Math.round(e.y + off.y - e.hitH / 2) + 0.5,
+                    e.hitW,
+                    e.hitH
+                );
+            }
+        }
+
+        for (const entry of this._reaperPlacementLog) {
+            const reqx = Math.round(entry.requested.x + off.x);
+            const reqy = Math.round(entry.requested.y + off.y);
+            ctx.fillStyle = '#ff4444';
+            ctx.fillRect(reqx - 1, reqy - 1, 2, 2);
+            ctx.fillStyle = entry.adjusted ? '#ffcc44' : '#44ff44';
+            ctx.fillRect(reqx - 2, reqy - 2, 4, 4);
+            ctx.fillText(`${entry.index}`, reqx, reqy + 14);
+        }
     }
 
     _loadDayNightIcons() {
@@ -903,6 +1527,11 @@ export class GameEngine {
                 this.paused = false;
                 return;
             }
+            if (isShopOpen()) {
+                closeShopScreen();
+                this.paused = false;
+                return;
+            }
             if (isPauseMenuOpen()) {
                 closePauseMenu();
                 this.paused = false;
@@ -918,6 +1547,13 @@ export class GameEngine {
 
         // While paused, gameplay/debug actions must not execute
         if (this.paused) return;
+
+        // Interação com a loja do NPC Aliado ([E] perto do aliado)
+        if (e.code === 'KeyE' && this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
+            playClickButtonSound();
+            openShopScreen(this.container, this);
+            return;
+        }
 
         // Map transition interaction ([E] on a doorway/portal)
         if (e.code === 'KeyE' && this.interactableExit && this.mapTransitionCooldown <= 0) {
@@ -1038,7 +1674,7 @@ export class GameEngine {
         if (!this.isRunning) return;
 
         // If the pause menu was closed by clicking the backdrop, resume.
-        if (this.paused && !isPauseMenuOpen() && !isCaveChoiceOpen()) {
+        if (this.paused && !isPauseMenuOpen() && !isCaveChoiceOpen() && !isShopOpen()) {
             this.paused = false;
         }
 
@@ -1083,11 +1719,51 @@ export class GameEngine {
         for (const actor of this.actors) {
             actor.updateAi(dt, this);
             actor.update(dt);
+            if (actor.isDead && !actor._coinAwarded && actor.team === 'enemy') {
+                actor._coinAwarded = true;
+                const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
+                this._awardEnemyCoins(actor.x, actor.y, reward);
+            }
         }
+        for (const r of this.reapers) {
+            if (r.isDead && !r._coinAwarded) {
+                r._coinAwarded = true;
+                this._awardEnemyCoins(r.x, r.y, 2);
+            }
+        }
+        // Verifica se a horda de golems foi completamente derrotada
+        if (this._waveGolemsActive) {
+            const aliveGolems = this.golems.filter((g) => !g.isDead && !g.shouldRemove);
+            if (aliveGolems.length === 0) {
+                this._waveGolemsActive = false;
+                this._awardEnemyCoins(this.player.x, this.player.y - 30, 40);
+                this._nightBannerText = 'HORDA DERROTADA! +40 🪙';
+                this._nightBannerTimer = 3.5;
+            }
+        }
+
         if (this.actors.some((a) => a.shouldRemove)) {
             this.actors = this.actors.filter((a) => !a.shouldRemove);
             this.golems = this.golems.filter((g) => !g.shouldRemove);
             this.skeletons = this.skeletons.filter((s) => !s.shouldRemove);
+            this.reapers = this.reapers.filter((r) => !r.shouldRemove);
+        }
+
+        // Boss Necromancer: IA, animação, fase de invocação e efeitos ativos.
+        this._updateNecromancer(dt);
+
+        // Shop interaction detection (Ally NPC on Mars Surface)
+        this.interactableShop = null;
+        this.shopPrompt = '';
+        if (this.currentMapId === MAP_IDS.MARS_SURFACE && !this.player.isDead) {
+            const ally = this.actors.find((a) => (a.role === 'ally' || a.team === 'ally') && a !== this.bossAssistAlly);
+            if (ally) {
+                const distToAlly = Math.hypot(this.player.x - ally.x, this.player.y - ally.y);
+                if (distToAlly <= 95) {
+                    this.interactableShop = ally;
+                    this.shopPrompt = 'LOJA DO ALIADO';
+                }
+            }
         }
 
         // Map transition interaction detection
@@ -1111,6 +1787,16 @@ export class GameEngine {
             }
         }
 
+        // Update Floating coin texts
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            const ft = this.floatingTexts[i];
+            ft.y += ft.vy * dt;
+            ft.life -= dt;
+            if (ft.life <= 0) {
+                this.floatingTexts.splice(i, 1);
+            }
+        }
+
         // Update Camera
         this.camera.follow(this.player.x, this.player.y);
         this.camera.update();
@@ -1128,7 +1814,8 @@ export class GameEngine {
                 continue;
             }
 
-            const bRect = { x: bullet.x - 4, y: bullet.y - 4, w: 8, h: 8 };
+            const hr = bullet.hitRadius ?? 4;
+            const bRect = { x: bullet.x - hr, y: bullet.y - hr, w: hr * 2, h: hr * 2 };
             let consumed = false;
 
             // Bullets stop against solid obstacles (walls, rocks, towers)
@@ -1152,9 +1839,37 @@ export class GameEngine {
                     if (rectsOverlap(aRect, bRect)) {
                         if (this._bulletCanDamage(bullet, actor.team, actor)) {
                             actor.takeDamage(bullet.damage, bullet.x, bullet.y);
+                            if (actor.isDead && !actor._coinAwarded && actor.team === 'enemy') {
+                                actor._coinAwarded = true;
+                                const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
+                                this._awardEnemyCoins(actor.x, actor.y, reward);
+                            }
                         }
                         consumed = true;
                         break;
+                    }
+                }
+            }
+
+            // Boss Necromancer também é alvo válido das balas do jogador.
+            if (!consumed && this.necromancerBoss) {
+                const b = this.necromancerBoss;
+                if (!b.isDead) {
+                    const bRectBoss = {
+                        x: b.x - b.colliderHalfW,
+                        y: b.y - b.colliderHalfH,
+                        w: b.colliderHalfW * 2,
+                        h: b.colliderHalfH * 2
+                    };
+                    if (rectsOverlap(bRectBoss, bRect)) {
+                        if (this._bulletCanDamage(bullet, 'enemy', b)) {
+                            b.takeDamage(bullet.damage, bullet.x, bullet.y);
+                            if (b.isDead && !b._coinAwarded) {
+                                b._coinAwarded = true;
+                                this._awardEnemyCoins(b.x, b.y, 30);
+                            }
+                        }
+                        consumed = true;
                     }
                 }
             }
@@ -1207,33 +1922,57 @@ export class GameEngine {
         // 1.5 Castle collision debug overlay (red/blue/green/yellow, see above)
         this._renderCollisionDebug(ctx);
 
+        // 1.6 Efeitos de chão do boss (unholy ground, raio/explosão) abaixo dos NPCs
+        this._renderNecromancerEffects(ctx);
+
         // 1.7 Among Us easter egg (após mapa/deco, antes dos NPCs)
         if (this.amongUsEasterEgg) {
             this.amongUsEasterEgg.render(ctx, this.camera);
         }
 
-        // 2. Render non-player characters (NPCs / enemies / skeletons)
+        // 2. Render non-player characters (NPCs / enemies / skeletons / reapers)
         for (const actor of this.actors) {
             actor.render(ctx, this.camera);
         }
 
         // 2.5 Catacomb skeleton spawn debug overlay (ponto + collider + ids)
         this._renderSkeletonAxeDebug(ctx);
+        this._renderNecromancerDebug(ctx);
+
+        // 2.8 Boss Necromancer por cima de Reapers/atores, antes dos projéteis
+        if (this.necromancerBoss) {
+            this.necromancerBoss.render(ctx, this.camera);
+        }
 
         // 3. Render Bullets
         for (const bullet of this.bullets) {
             bullet.render(ctx, this.camera);
         }
 
-        // 4. Render Particles
+        // 5. Render Player
+        this.player.render(ctx, this.camera);
+
+        // 5.5 Render Particles (por cima do jogador)
         for (const p of this.particles) {
             const screen = this.camera.worldToScreen(p.x, p.y);
             ctx.fillStyle = p.color;
             ctx.fillRect(Math.round(screen.x), Math.round(screen.y), p.size, p.size);
         }
 
-        // 5. Render Player
-        this.player.render(ctx, this.camera);
+        // 5.6 Render Floating coin texts (+🪙)
+        for (const ft of this.floatingTexts) {
+            const screen = this.camera.worldToScreen(ft.x, ft.y);
+            const alpha = Math.min(1, ft.life / 0.35);
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+            ctx.font = '9px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffd440';
+            ctx.shadowColor = '#000000';
+            ctx.shadowBlur = 4;
+            ctx.fillText(ft.text, screen.x, screen.y);
+            ctx.restore();
+        }
 
         // 6. Render Martian Dust Weather
         this.mapRenderer.renderAtmosphericDust(ctx, this.width, this.height);
@@ -1243,6 +1982,9 @@ export class GameEngine {
 
         // 7. Render Sci-Fi HUD
         this._renderHUD(ctx);
+
+        // 7.2 Barra do boss Necromancer (Dark Souls no rodapé, acima dos controles)
+        this._renderBossBar(ctx);
 
         // 7.5 Temporary "NOITE N" banner on top of everything
         this._renderNightBanner(ctx);
@@ -1259,6 +2001,31 @@ export class GameEngine {
         if (this.interactableExit && this.mapTransitionCooldown <= 0) {
             this._renderExitPrompt(ctx, this.interactableExit);
         }
+
+        // 10.5. Render Shop Prompt ([E]) when near the Ally NPC on surface
+        if (this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
+            this._renderShopPrompt(ctx, this.interactableShop);
+        }
+    }
+
+    _renderShopPrompt(ctx, ally) {
+        const screen = this.camera.worldToScreen(ally.x, ally.y - (ally.renderSize || 64) / 2 - 14);
+        const text = '[E] ABRIR LOJA';
+
+        ctx.save();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        const textW = ctx.measureText(text).width;
+
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.9)';
+        ctx.fillRect(screen.x - textW / 2 - 8, screen.y - 8, textW + 16, 18);
+        ctx.strokeStyle = '#ffd440';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(screen.x - textW / 2 - 8, screen.y - 8, textW + 16, 18);
+
+        ctx.fillStyle = '#ffd440';
+        ctx.fillText(text, screen.x, screen.y + 4);
+        ctx.restore();
     }
 
     _renderExitPrompt(ctx, exit) {
@@ -1467,21 +2234,24 @@ export class GameEngine {
         // covers the health bar
         this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
 
-        // TOP-RIGHT: Coordinates & Telemetry
+        // TOP-RIGHT: Coordinates & Telemetry & Moedas
         const trX = this.width - 240;
         const trY = 24;
         ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
-        ctx.fillRect(trX, trY, 216, 50);
+        ctx.fillRect(trX, trY, 216, 68);
         ctx.strokeStyle = '#e07228';
         ctx.lineWidth = 2;
-        ctx.strokeRect(trX + 0.5, trY + 0.5, 215, 49);
+        ctx.strokeRect(trX + 0.5, trY + 0.5, 215, 67);
 
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
         const posX = Math.round(this.player.x);
         const posY = Math.round(this.player.y);
-        ctx.fillText(`COORD X: ${posX.toString().padStart(5, '0')}`, trX + 14, trY + 20);
-        ctx.fillText(`COORD Y: ${posY.toString().padStart(5, '0')}`, trX + 14, trY + 36);
+        ctx.fillText(`COORD X: ${posX.toString().padStart(5, '0')}`, trX + 14, trY + 18);
+        ctx.fillText(`COORD Y: ${posY.toString().padStart(5, '0')}`, trX + 14, trY + 34);
+
+        ctx.fillStyle = '#ffd440';
+        ctx.fillText(`MOEDAS:  🪙 ${gameState.coins ?? 0}`, trX + 14, trY + 52);
 
         // BOTTOM: Sci-Fi Controls Reference Bar
         const barBottomY = this.height - 38;
