@@ -45,6 +45,13 @@ function getGameMusic() {
     gameMusic.preload = 'auto';
     gameMusic.volume = _resolveVolume();
 
+    // Garante que o volume configurado sempre reflita no momento exato em que
+    // a reprodução começa — evita que o play() inicie "alto" e o ajuste feito
+    // nas opções não seja percebido.
+    gameMusic.addEventListener('play', () => {
+        gameMusic.volume = _resolveVolume();
+    });
+
     gameMusic.addEventListener('error', () => {
         if (!gameMusicWarned) {
             gameMusicWarned = true;

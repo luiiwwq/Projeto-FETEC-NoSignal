@@ -194,7 +194,7 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
     bindFsListenerOnce();
 
     wrap.querySelectorAll('.opt-item__slider').forEach((slider) => {
-        slider.addEventListener('input', () => {
+        const onSliderChange = () => {
             const value = Number(slider.value);
             slider.style.setProperty('--val', fillPercent(slider));
             const label = wrap.querySelector(`[data-value-for="${slider.dataset.setting}"]`);
@@ -206,7 +206,9 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
                 setMenuMusicVolume();
                 setGameMusicVolume();
             }
-        });
+        };
+        slider.addEventListener('input', onSliderChange);
+        slider.addEventListener('change', onSliderChange);
     });
 
     fsBtn.addEventListener('click', () => toggleFullscreen(containerRef));

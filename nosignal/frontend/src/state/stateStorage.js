@@ -6,7 +6,7 @@
 const SETTINGS_KEY = 'nosignal.settings.v2';
 
 const DEFAULT_SETTINGS = {
-    musicVolume: 70,
+    musicVolume: 50,
     sfxVolume: 100,
     brightness: 100,
     fullscreen: false,
