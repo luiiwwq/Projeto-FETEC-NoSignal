@@ -9,6 +9,7 @@
 
 import { loadSettings, saveSettings } from '../state/stateStorage.js';
 import { setMenuMusicVolume } from '../audio/menuMusic.js';
+import { setGameMusicVolume } from '../audio/gameMusic.js';
 
 const RANGES = [
     { setting: 'musicVolume', label: 'VOLUME DA MÚSICA', min: 0, max: 100 },
@@ -200,9 +201,10 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
             if (label) label.textContent = value + '%';
             saveSettings({ [slider.dataset.setting]: value });
             applyBrightness(containerRef);
-            // Volume da música do menu segue ao vivo, sem reiniciar a música.
+            // Volumes de música (menu e gameplay) seguem ao vivo, sem reiniciar.
             if (slider.dataset.setting === 'musicVolume') {
                 setMenuMusicVolume();
+                setGameMusicVolume();
             }
         });
     });

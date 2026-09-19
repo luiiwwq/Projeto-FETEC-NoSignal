@@ -12,7 +12,7 @@
 
 import { loadSettings } from '../state/stateStorage.js';
 
-const MENU_MUSIC_PATH = './src/assets/sounds/music menu/music_menu.mp3';
+const MENU_MUSIC_PATH = './src/assets/sounds/music menu/menu_music.mp3';
 
 let menuMusic = null;
 let menuMusicLoadStarted = false;

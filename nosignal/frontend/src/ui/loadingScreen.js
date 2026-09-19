@@ -8,6 +8,7 @@ import { assetLoader } from '../engine/AssetLoader.js';
 import { GameEngine } from '../engine/GameEngine.js';
 import { gameState } from '../state/gameState.js';
 import { stopMenuMusic } from '../audio/menuMusic.js';
+import { startGameMusic } from '../audio/gameMusic.js';
 
 export function renderLoadingScreen(container) {
     // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
@@ -74,6 +75,8 @@ export function renderLoadingScreen(container) {
         if (percentElement) percentElement.innerText = '100%';
 
         setTimeout(() => {
+            // O jogador deixou o menu: a música ambiente do gameplay assume.
+            startGameMusic();
             const engine = new GameEngine(container);
             engine.init();
         }, 500);
@@ -84,6 +87,7 @@ export function renderLoadingScreen(container) {
             statusElement.innerText = 'AVISO: FALHA PARCIAL NO CARREGAMENTO. INICIANDO...';
         }
         setTimeout(() => {
+            startGameMusic();
             const engine = new GameEngine(container);
             engine.init();
         }, 800);
