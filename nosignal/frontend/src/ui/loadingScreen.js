@@ -11,6 +11,11 @@ import { stopMenuMusic } from '../audio/menuMusic.js';
 import { startGameMusic, preloadGameMusic } from '../audio/gameMusic.js';
 
 export function renderLoadingScreen(container) {
+    // Qualquer fluxo que chegue ao gameplay começa UMA PARTIDA NOVA: garante a
+    // limpeza da sessão anterior (inclusive a compra única da Ajuda no Boss,
+    // persistida em localStorage) para o item poder ser comprado de novo.
+    gameState.reset();
+
     // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
     stopMenuMusic();
 

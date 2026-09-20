@@ -763,7 +763,7 @@ export const castleKingRoomMap = {
         // Parede inferior contínua impedindo a passagem abaixo de y=697 (independente do X).
         { x: 0, y: 697, w: 1790, h: 182, kind: 'castle-wall' },
         // Caixas de colisão de elementos decorativos do trono/baú/grades.
-        { x: 650, y: 220, w: 130, h: 190, kind: 'castle-pillar' },
+        { x: 650, y: 220, w: 130, h: 180, kind: 'castle-pillar' },
         { x: 595, y: 185, w: 45, h: 35, kind: 'castle-pillar' },
         { x: 115, y: 250, w: 90, h: 447, kind: 'castle-wall' },
     ],

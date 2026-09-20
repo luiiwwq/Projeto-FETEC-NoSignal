@@ -185,6 +185,14 @@ export class GameEngine {
         this.bossAssistShotCooldown = 0;
         this.bossAssistDamageBudget = 0;
 
+        // Morte estilo Dark Souls: mensagem central + respawn adiado (não
+        // teletransporta de volta na hora) sem resetar chefe/esqueletos.
+        this._deathHandled = false;
+        this._deathRespawnTimer = 0;
+        this._soulsMessage = null; // { text, color, timer } exibido em tela cheia
+        this._allyHelpRetry = false; // aliado reaparece após morte do jogador
+        this._allyHelpRetryTimer = 0; // espera 0.5s após o respawn para reaparecer
+
         // Input state
         this.input = {
             keys: {},
@@ -359,8 +367,9 @@ export class GameEngine {
         // Skeleton_Spearman standing beside them) in LOCAL map coordinates.
         // They are recreated on every load of the map and wiped together with
         // `actors` the moment the player leaves (see above), so they never leak
-        // to the surface/castle and never duplicate.
-        if (mapId === MAP_IDS.MARS_CATACOMBS) {
+        // to the surface/castle and never duplicate. Depois de limpas, ficam
+        // limpas até iniciar um jogo novo (gameState.catacombsCleared).
+        if (mapId === MAP_IDS.MARS_CATACOMBS && !gameState.catacombsCleared) {
             this._spawnCatacombsSkeletons(map);
             this._spawnCatacombsSpearmen(map);
             this._catacombsSkeletonsActive = true;
@@ -369,8 +378,9 @@ export class GameEngine {
         }
 
         // Boss da Sala do Rei: spawn LOCAL (720,443), sem conversão de
-        // coordenadas com a superfície/entrada do castelo.
-        if (mapId === MAP_IDS.CASTLE_KING_ROOM) {
+        // coordenadas com a superfície/entrada do castelo. Depois de derrotado,
+        // não reaparece até iniciar um jogo novo (gameState.necromancerDefeated).
+        if (mapId === MAP_IDS.CASTLE_KING_ROOM && !gameState.necromancerDefeated) {
             this._spawnNecromancerBoss(map);
         }
 
@@ -396,6 +406,17 @@ export class GameEngine {
             this._nightBannerTimer = 3.0;
             this._nightFlashTimer = 0.45;
             this._startNight();
+        }
+
+        if (event && event.type === 'day-start') {
+            // A horda de golens só existe durante a própria noite: se o jogador
+            // não a eliminou antes do amanhecer, ela some sem recompensa.
+            this._despawnGolemWave();
+            // Idem para a onda adiada: se a noite que ela pertencia acabou sem
+            // ter sido eliminada, ela nunca mais spawna.
+            if (this._golemWavePendingNight > 0 && this._golemWavePendingNight === this.dayNight.nightCount) {
+                this._golemWavePendingNight = 0;
+            }
         }
 
         if (this._nightBannerTimer > 0) this._nightBannerTimer -= dt;
@@ -462,6 +483,20 @@ export class GameEngine {
             this._waveGolemsActive = true;
         }
         return spawned;
+    }
+
+    // A horda de golens só existe durante a própria noite: se não for eliminada
+    // até o amanhecer, ela desaparece sem recompensa.
+    _despawnGolemWave() {
+        const aliveGolems = this.golems.filter((g) => !g.isDead && !g.shouldRemove);
+        if (aliveGolems.length === 0) return;
+        for (const g of aliveGolems) {
+            g.shouldRemove = true;
+        }
+        this.golems = [];
+        this._waveGolemsActive = false;
+        this._nightBannerText = 'A HORDA DESAPARECEU COM O AMANHECER';
+        this._nightBannerTimer = 3.0;
     }
 
     // Returns a free {x,y} for a golem box, nudging outward from the requested
@@ -876,8 +911,10 @@ export class GameEngine {
 
     // Boss morto: limpa efeitos, dissolve os Reapers restantes e solta uma
     // explosão de partículas. O boss continua visível (morte) até a última
-    // frame e então some.
+    // frame e então some. A derrota é permanente: só volta em novo jogo.
     onNecromancerDefeated(boss) {
+        gameState.necromancerDefeated = true;
+        this._showSoulsMessage('SINAL REIVINDICADO', '#f5d28a');
         this.necromancerEffects.length = 0;
         if (!boss._coinAwarded) {
             boss._coinAwarded = true;
@@ -981,14 +1018,85 @@ export class GameEngine {
         });
     }
 
+    // Mensagem central em tela cheia estilo Dark Souls (VOCÊ MORREU, vitórias).
+    _showSoulsMessage(text, color = '#e62424') {
+        this._soulsMessage = { text, color, timer: 3.0 };
+    }
+
+    // Morte estilo Dark Souls: trava a cena com "VOCÊ MORREU" e, após um tempo,
+    // respawna o jogador no spawn do mapa. O boss volta NA HORA ao estado
+    // inicial da luta (HP cheio no seu posto) e o aliado comprado na loja fica
+    // rearmado para reaparecer e continuar ajudando.
+    _handlePlayerDeath(dt) {
+        if (!this.player.isDead) {
+            // Respawn (automático, tecla R ou troca de mapa) encerra o aviso
+            // de morte para ele não ficar na tela.
+            if (this._deathHandled && this._soulsMessage && this._soulsMessage.text === 'VOCÊ MORREU') {
+                this._soulsMessage = null;
+            }
+            this._deathHandled = false;
+            return;
+        }
+
+        if (!this._deathHandled) {
+            this._deathHandled = true;
+            this._deathRespawnTimer = 3.2;
+            this._showSoulsMessage('VOCÊ MORREU', '#e62424');
+            this._resetBossOnDeath();
+        }
+
+        if (this._deathRespawnTimer > 0) this._deathRespawnTimer -= dt;
+        if (this._deathRespawnTimer > 0) return;
+
+        const spawn = this.currentMap.spawn || { x: 0, y: 0 };
+        this.player.respawn(spawn.x, spawn.y);
+        this.player.applyUpgrades(gameState.upgrades || []);
+        this.camera.follow(spawn.x, spawn.y, true);
+        this._spawnTeleportFx(spawn.x, spawn.y);
+        // O aliado só volta a aparecer 0.5s DEPOIS do respawn — nunca na tela
+        // de morte ("VOCÊ MORREU").
+        this._allyHelpRetryTimer = 0.5;
+    }
+
+    // RESET INSTANTÂNEO na morte: o boss (ainda não derrotado) volta ao início,
+    // os Reapers invocados se dissolvem e a ajuda do aliado fica rearmada para,
+    // ao respawnar, ele continuar apoiando a luta.
+    _resetBossOnDeath() {
+        const boss = this.necromancerBoss;
+        if (boss && !boss.isDead && !gameState.necromancerDefeated) {
+            boss.resetForRetry();
+            for (const r of this.reapers) {
+                if (r.isDead || r.shouldRemove) continue;
+                r.takeDamage(r.maxHp + 9999, boss.x, boss.y);
+            }
+            this.necromancerEffects.length = 0;
+        }
+
+        // Recua o aliado que estava em campo: ele reaparece só depois do
+        // respawn (0.5s), para não surgir por cima da tela "VOCÊ MORREU".
+        if (this.bossAssistAlly) {
+            this._spawnTeleportFx(this.bossAssistAlly.x, this.bossAssistAlly.y);
+            this.actors = this.actors.filter((a) => a !== this.bossAssistAlly);
+            this.bossAssistAlly = null;
+        }
+        this.bossAssistTimer = 0;
+        this.bossAssistShotCooldown = 0;
+        this.bossAssistDamageBudget = 0;
+        this._allyHelpRetry = false;
+        this.allyBossHelpTriggered = false;
+    }
+
     _updateNecromancer(dt) {
         const boss = this.necromancerBoss;
 
         // Disparo da ajuda do aliado comprado na loja (compra única permanente)
-        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead) {
+        // Nunca na tela de morte e somente 0.5s após o respawn.
+        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead &&
+            !this.player.isDead && this._allyHelpRetryTimer <= 0) {
             const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
-            if (distToBoss <= 520 || boss.hp < boss.maxHp) {
+            if (distToBoss <= 520 || boss.hp < boss.maxHp || this._allyHelpRetry) {
                 this.allyBossHelpTriggered = true;
+                this._allyHelpRetry = false;
                 this._triggerAllyBossHelp(boss);
             }
         }
@@ -1010,13 +1118,21 @@ export class GameEngine {
                     this.bossAssistShotCooldown = 0.3; // rajada rápida
                     this.bossAssistDamageBudget -= shotDamage;
                     ally.setState(PlayerState.SHOOTING, true);
+
+                    // Dano garantido: cada disparo do aliado acerta o boss sem
+                    // depender de trajetória — nenhum tiro se perde em obstáculo
+                    // ou desvio (total de 400 ao fim do assist).
+                    boss.takeDamage(shotDamage, ally.x, ally.y);
+                    this._spawnHitSparks(boss.x, boss.y);
+
+                    // Projétil apenas visual (dano 0 para não dobrar o dano).
                     const spawnDist = 24;
                     const spawnX = ally.x + Math.cos(aimAngle) * spawnDist;
                     const spawnY = ally.y - 18 + Math.sin(aimAngle) * 8;
                     const bulletOpts = {
                         team: 'player',
                         owner: ally,
-                        damage: shotDamage
+                        damage: 0
                     };
                     const bullet = new Bullet(spawnX, spawnY, aimAngle, 680, ally.weapon, bulletOpts);
                     this.bullets.push(bullet);
@@ -1658,7 +1774,8 @@ export class GameEngine {
             this.player.respawn(spawn.x, spawn.y);
             this.player.applyUpgrades(gameState.upgrades || []);
             this.camera.follow(spawn.x, spawn.y, true);
-            this._resetCatacombsSkeletons();
+            // Mantém o aliado reaparecendo 0.5s após o respawn manual também.
+            this._allyHelpRetryTimer = 0.5;
         }
     }
 
@@ -1769,6 +1886,22 @@ export class GameEngine {
         // Update player input and logic
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
+        this._handlePlayerDeath(dt);
+
+        // Conta o tempo das mensagens em tela cheia (VOCÊ MORREU / vitórias).
+        if (this._soulsMessage) {
+            this._soulsMessage.timer -= dt;
+            if (this._soulsMessage.timer <= 0) this._soulsMessage = null;
+        }
+
+        // Após o respawn, espera 0.5s e só então libera o aliado para reaparecer.
+        if (this._allyHelpRetryTimer > 0) {
+            this._allyHelpRetryTimer -= dt;
+            if (this._allyHelpRetryTimer <= 0) {
+                this._allyHelpRetryTimer = 0;
+                this._allyHelpRetry = true;
+            }
+        }
 
         // Update non-player characters (allies idle, enemies pursue & fire,
         // golems pursue & melee)
@@ -1812,10 +1945,12 @@ export class GameEngine {
         }
 
         // Upgrade: damage_up (ao derrotar todos os esqueletos nas Catacumbas)
+        // — a limpeza é permanente até iniciar um jogo novo.
         if (this.currentMapId === MAP_IDS.MARS_CATACOMBS && this._catacombsSkeletonsActive && !gameState.hasUpgrade('damage_up')) {
             const aliveSkeletons = this.skeletons.filter((s) => !s.isDead && !s.shouldRemove);
             if (aliveSkeletons.length === 0) {
                 this._catacombsSkeletonsActive = false;
+                gameState.catacombsCleared = true;
                 this.unlockUpgrade('damage_up');
             }
         }
@@ -2083,9 +2218,9 @@ export class GameEngine {
         // 8. Render Aim Crosshair
         this._renderCrosshair(ctx);
 
-        // 9. Render Death Screen Overlay if dead
-        if (this.player.state === PlayerState.DEAD) {
-            this._renderDeathOverlay(ctx);
+        // 9. Mensagens centrais estilo Dark Souls (VOCÊ MORREU / vitórias)
+        if (this._soulsMessage) {
+            this._renderSoulsMessage(ctx);
         }
 
         // 10. Render Map Transition Prompt ([E]) when near a doorway
@@ -2592,21 +2727,28 @@ export class GameEngine {
         ctx.restore();
     }
 
-    _renderDeathOverlay(ctx) {
+    _renderSoulsMessage(ctx) {
+        const msg = this._soulsMessage;
+        if (!msg || msg.timer <= 0) return;
+
+        // Fade-in estilo Dark Souls: escurece a tela e revela o texto.
+        const total = 3.0;
+        const t = Math.max(0, total - msg.timer);
+        const alpha = Math.min(1, t / 0.9);
+        const scale = Math.max(1, 1.35 - 0.35 * Math.min(1, t / 0.9));
+
         ctx.save();
-        ctx.fillStyle = 'rgba(15, 5, 5, 0.7)';
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.62 * alpha})`;
         ctx.fillRect(0, 0, this.width, this.height);
 
-        ctx.font = '24px "Press Start 2P", monospace';
-        ctx.fillStyle = '#e62424';
+        ctx.globalAlpha = alpha;
+        ctx.font = `${Math.round(26 * scale)}px "Press Start 2P", monospace`;
         ctx.textAlign = 'center';
-        ctx.fillText('SINAL PERDIDO', this.width / 2, this.height / 2 - 20);
-
-        ctx.font = '10px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
-        ctx.fillText('O TRAJE ESPACIAL SOFREU DESCOMPRESSÃO CRÍTICA.', this.width / 2, this.height / 2 + 20);
-        ctx.fillText('PRESSIONE [ R ] PARA REINICIALIZAR O ASTRONAUTA', this.width / 2, this.height / 2 + 50);
-
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = msg.color;
+        ctx.shadowColor = msg.color;
+        ctx.shadowBlur = 18;
+        ctx.fillText(msg.text, this.width / 2, this.height / 2);
         ctx.restore();
     }
 }

@@ -46,6 +46,10 @@ export const gameState = {
     inventory: [], // IDs de itens comprados
     allyBossHelpPurchased: (() => { try { return localStorage.getItem('noSignal_allyBossHelpPurchased') === 'true'; } catch { return false; } })(),
 
+    // Estado permanente de chefes e áreas da sessão
+    necromancerDefeated: false,
+    catacombsCleared: false,
+
     addCoins(amount) {
         this.coins = Math.max(0, (this.coins || 0) + amount);
         return this.coins;
@@ -66,7 +70,12 @@ export const gameState = {
         this.coins = 50;
         this.inventory = [];
         this.upgrades = [];
-        this.allyBossHelpPurchased = (() => { try { return localStorage.getItem('noSignal_allyBossHelpPurchased') === 'true'; } catch { return false; } })();
+        this.necromancerDefeated = false;
+        this.catacombsCleared = false;
+        try {
+            localStorage.removeItem('noSignal_allyBossHelpPurchased');
+        } catch { /* sem suporte a localStorage */ }
+        this.allyBossHelpPurchased = false;
         this.dayNight = {
             period: DAY_NIGHT_PERIOD.DAY,
             remainingTime: DAY_NIGHT_DURATION,

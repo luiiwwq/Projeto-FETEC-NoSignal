@@ -13,12 +13,13 @@
 /* ── Combate ─────────────────────────────────────────────── */
 export const NECROMANCER_MAX_HP = 1000;
 export const NECROMANCER_ATTACK_DAMAGE = 35;
-export const NECROMANCER_ATTACK_COOLDOWN = 2.2;
+export const NECROMANCER_ATTACK_COOLDOWN = 1.2;
 export const NECROMANCER_MELEE_RANGE = 100;
-export const NECROMANCER_ENGAGE_RANGE = 560;
-export const NECROMANCER_SKILL_COOLDOWN = 3.8;
+export const NECROMANCER_ENGAGE_RANGE = 920;
+export const NECROMANCER_SKILL_COOLDOWN = 2.0;
 export const NECROMANCER_HURT_COOLDOWN = 0.45;
-export const NECROMANCER_SPEED = 46;
+export const NECROMANCER_SPEED = 64;
+export const NECROMANCER_HOME_TOLERANCE = 12;
 export const NECROMANCER_HIT_FRAME = 6;
 export const NECROMANCER_SUMMON_DURATION = 2.6;
 // Invocação única assim que o boss chega a 500 de vida (50% dos 1000 de HP).
@@ -28,14 +29,15 @@ export const NECROMANCER_SUMMON_AT_HP = 500;
 export const NECROMANCER_COLLIDER_HALF_W = 28;
 export const NECROMANCER_COLLIDER_HALF_H = 20;
 export const NECROMANCER_RENDER_SCALE = 3;
-export const NECROMANCER_ONESHOT_FPS = 0.09;
+export const NECROMANCER_ONESHOT_FPS = 0.055;
 
 // Os frames 160x128 têm a arte visível entre as linhas ~54 e ~116. O rodapé de
 // 12 linhas é transparente; este deslocamento alinha o chão da arte ao piso.
 export const NECROMANCER_ART_BOTTOM_ROW = 116;
 
 // Spawn LOCAL da Sala do Rei (1790x879) — bottom-center dos pés do boss.
-export const NECROMANCER_SPAWN = { x: 720, y: 443 };
+// Posição ajustada para y=470 para não colidir com o obstáculo do trono acima.
+export const NECROMANCER_SPAWN = { x: 720, y: 470 };
 
 // Posições relativas dos 5 Reapers a partir dos pés do boss (eixo local).
 export const NECROMANCER_REAPER_OFFSETS = [
@@ -204,6 +206,8 @@ export class NecromancerBoss {
         // Posição LOCAL da Sala do Rei (bottom-center dos pés).
         this.x = x;
         this.y = y;
+        this.homeX = x; // posto fixo: o boss volta para cá se o jogador fugir
+        this.homeY = y;
 
         this.team = 'enemy';
         this.role = 'boss';
@@ -224,8 +228,8 @@ export class NecromancerBoss {
         this.animTime = 0;
 
         this.attackDamage = NECROMANCER_ATTACK_DAMAGE;
-        this.attackCooldown = 1.2;
-        this.skillCooldown = 2.6;
+        this.attackCooldown = 0.5;
+        this.skillCooldown = 1.2;
         this.hurtCooldown = 0;
         this.attackHitApplied = false;
         this._attackTarget = null;
@@ -241,6 +245,41 @@ export class NecromancerBoss {
 
         this._pendingSkill = null;
         this._castOnComplete = null;
+    }
+
+    /* Quando o jogador morre, o boss volta ao estado inicial da luta: HP cheio,
+       de volta ao posto, sem invocação de Reapers e cooldowns zerados. A
+       derrota só acontece de verdade (permanente) quando o boss morre. */
+    resetForRetry() {
+        this.x = this.homeX;
+        this.y = this.homeY;
+        this.hp = this.maxHp;
+        this.isDead = false;
+        this.shouldRemove = false;
+
+        this.state = NECROMANCER_STATES.IDLE;
+        this.currentFrame = 0;
+        this.animTime = 0;
+
+        this.attackCooldown = 0.5;
+        this.skillCooldown = 1.2;
+        this.hurtCooldown = 0;
+        this.attackHitApplied = false;
+        this._attackTarget = null;
+        this._playerNear = false;
+
+        this._facing = 1;
+        this._hpBarTimer = 0;
+        this._moving = false;
+
+        this.hasSummonedReapers = false;
+        this.summonTimer = 0;
+
+        this._pendingSkill = null;
+        this._castOnComplete = null;
+
+        this.vx = 0;
+        this.vy = 0;
     }
 
     setCollisionResolver(resolver) {
@@ -297,6 +336,8 @@ export class NecromancerBoss {
             return;
         }
 
+        // Movimentação intensa: persegue o jogador pelo alcance de combate sem
+        // voltar para o posto (batalha móvel).
         if (dist <= NECROMANCER_ENGAGE_RANGE) {
             this._moveToward(player, dt);
             return;
@@ -334,8 +375,10 @@ export class NecromancerBoss {
     }
 
     _startSkillCast(player) {
+        // Raios pretos (lightning) são o ataque favorito do boss — metade das
+        // habilidades é de raio; o resto alterna explosão, bola de fogo e unholy.
         const roll = Math.random();
-        const kind = roll < 0.4 ? 'lightning' : roll < 0.65 ? 'explosion' : roll < 0.85 ? 'fireball' : 'unholy';
+        const kind = roll < 0.5 ? 'lightning' : roll < 0.7 ? 'explosion' : roll < 0.85 ? 'fireball' : 'unholy';
 
         const tx = player.x;
         const ty = player.y;
@@ -366,7 +409,9 @@ export class NecromancerBoss {
         if (!engine) return;
 
         if (skill.kind === 'fireball') {
-            const angle = Math.atan2(skill.vy - this.y, skill.vx - this.x);
+            // skill.vx/vy já são os deltas até o jogador (tx - this.x / ty - this.y);
+            // o ângulo aponta direto no alvo para a bola de fogo ser desviável.
+            const angle = Math.atan2(skill.vy, skill.vx);
             // Nasce um pouco à frente do corpo (fora do pilar/trono) para não ser
             // engolido por obstáculo no primeiro frame.
             const dist = this.colliderHalfW + 26 + 4;
@@ -446,11 +491,7 @@ export class NecromancerBoss {
         this.hp = Math.max(0, this.hp - Math.round(amount));
         this._hpBarTimer = 6;
 
-        if (fromX !== null && fromY !== null) {
-            const angle = Math.atan2(this.y - fromY, this.x - fromX);
-            this.vx += Math.cos(angle) * 70;
-            this.vy += Math.sin(angle) * 70;
-        }
+        // Sem knockback: o boss permanece firme no posto de spawn.
 
         if (this.hp <= 0) {
             this.isDead = true;
