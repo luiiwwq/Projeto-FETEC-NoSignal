@@ -7,6 +7,22 @@
 import { gameState } from '../state/gameState.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 
+const ALLY_HELP_STORAGE_KEY = 'noSignal_allyBossHelpPurchased';
+
+/** Verifica se a ajuda do aliado já foi comprada permanentemente. */
+function _isAllyHelpPermanentlyPurchased() {
+    try {
+        return localStorage.getItem(ALLY_HELP_STORAGE_KEY) === 'true';
+    } catch { return !!gameState.allyBossHelpPurchased; }
+}
+
+/** Marca a compra como permanente no localStorage. */
+function _markAllyHelpPermanentlyPurchased() {
+    try {
+        localStorage.setItem(ALLY_HELP_STORAGE_KEY, 'true');
+    } catch { /* sem suporte a localStorage */ }
+}
+
 export const SHOP_ITEMS = [
     {
         id: 'item_slot_1',
@@ -33,7 +49,7 @@ export const SHOP_ITEMS = [
         id: 'necro_ally_help',
         name: 'Ajuda no Boss Necromancer',
         description: 'O aliado surge na Sala do Rei para uma aparição rápida desferindo rajadas devastadoras no Boss.',
-        price: 30,
+        price: 50,
         type: 'boss_assist'
     }
 ];
@@ -95,7 +111,7 @@ export function openShopScreen(container, engine) {
 
 function _renderItemCard(item, index) {
     const isPurchased = item.type === 'boss_assist'
-        ? !!gameState.allyBossHelpPurchased
+        ? _isAllyHelpPermanentlyPurchased()
         : (gameState.inventory && gameState.inventory.includes(item.id));
 
     const isSpecial = item.type === 'boss_assist';
@@ -159,7 +175,7 @@ function _handlePurchase(itemId) {
     if (!item) return;
 
     const isPurchased = item.type === 'boss_assist'
-        ? !!gameState.allyBossHelpPurchased
+        ? _isAllyHelpPermanentlyPurchased()
         : (gameState.inventory && gameState.inventory.includes(item.id));
 
     if (isPurchased) {
@@ -178,7 +194,8 @@ function _handlePurchase(itemId) {
 
     if (item.type === 'boss_assist') {
         gameState.allyBossHelpPurchased = true;
-        _showShopMessage('Apoio Tático contratado! O aliado entrará na Sala do Rei.', 'success');
+        _markAllyHelpPermanentlyPurchased();
+        _showShopMessage('Apoio Tático contratado! O aliado entrará na Sala do Rei. (Compra única permanente)', 'success');
     } else {
         if (!gameState.inventory) gameState.inventory = [];
         gameState.inventory.push(item.id);

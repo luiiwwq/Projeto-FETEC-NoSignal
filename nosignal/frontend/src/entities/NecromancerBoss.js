@@ -11,7 +11,7 @@
  */
 
 /* ── Combate ─────────────────────────────────────────────── */
-export const NECROMANCER_MAX_HP = 500;
+export const NECROMANCER_MAX_HP = 1000;
 export const NECROMANCER_ATTACK_DAMAGE = 35;
 export const NECROMANCER_ATTACK_COOLDOWN = 2.2;
 export const NECROMANCER_MELEE_RANGE = 100;
@@ -21,8 +21,8 @@ export const NECROMANCER_HURT_COOLDOWN = 0.45;
 export const NECROMANCER_SPEED = 46;
 export const NECROMANCER_HIT_FRAME = 6;
 export const NECROMANCER_SUMMON_DURATION = 2.6;
-// Invocação única assim que o boss chega a 250 de vida (50% dos 500 de HP).
-export const NECROMANCER_SUMMON_AT_HP = 250;
+// Invocação única assim que o boss chega a 500 de vida (50% dos 1000 de HP).
+export const NECROMANCER_SUMMON_AT_HP = 500;
 
 /* ── Hitbox & render ─────────────────────────────────────── */
 export const NECROMANCER_COLLIDER_HALF_W = 28;

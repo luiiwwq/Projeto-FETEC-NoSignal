@@ -73,9 +73,11 @@ export class Player {
         this.isSprinting = false;
 
         // Health & combat stats
-        this.maxHp = 100;
-        this.hp = 100;
+        this.maxHp = 105;
+        this.hp = 105;
         this.bulletDamage = this.weapon?.damage ?? 14;
+        this.damageMultiplier = 1.0;
+        this.speedMultiplier = 1.0;
         this.invulnerableTimer = 0;
         this.isDead = false;
 
@@ -250,7 +252,7 @@ export class Player {
             moveY *= Math.SQRT1_2;
         }
 
-        const currentSpeed = this.isSprinting ? this.sprintSpeed : this.baseSpeed;
+        const currentSpeed = (this.isSprinting ? this.sprintSpeed : this.baseSpeed) * (this.speedMultiplier ?? 1.0);
         this.vx = moveX * currentSpeed;
         this.vy = moveY * currentSpeed;
 
@@ -290,10 +292,11 @@ export class Player {
             // clip into the ground/collision box on the first frame.
             const spawnY = this.y - 20 + Math.sin(aimAngle) * spawnDist * 0.35;
 
+            const bulletDamage = Number(((this.weapon?.damage ?? this.bulletDamage) * (this.damageMultiplier ?? 1.0)).toFixed(1));
             const bulletOpts = {
                 team: this.team,
                 owner: this,
-                damage: this.weapon?.damage ?? this.bulletDamage
+                damage: bulletDamage
             };
 
             if (weapon.type === 'shotgun') {
@@ -366,6 +369,20 @@ export class Player {
         this.isDead = false;
         this.invulnerableTimer = 0.5;
         this.setState(PlayerState.IDLE, true);
+    }
+
+    applyUpgrades(upgrades = []) {
+        this.damageMultiplier = upgrades.includes('damage_up') ? 1.20 : 1.0;
+        this.speedMultiplier = upgrades.includes('movespeed_up') ? 1.10 : 1.0;
+
+        const prevMax = this.maxHp;
+        const targetMax = upgrades.includes('life_up') ? 130 : 105;
+        this.maxHp = targetMax;
+        if (targetMax > prevMax) {
+            this.hp = Math.min(this.maxHp, this.hp + (targetMax - prevMax));
+        } else if (this.hp > this.maxHp) {
+            this.hp = this.maxHp;
+        }
     }
 
     update(dt) {

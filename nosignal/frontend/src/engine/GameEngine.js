@@ -160,6 +160,11 @@ export class GameEngine {
         this._nightFlashTimer = 0;
         this._nightBlend = 0; // 0 = full day, 1 = full night tint
         this._dayNightIcons = { cached: new Map(), requested: false };
+        this._upgradeIcons = new Map();
+        this._upgradeIconsRequested = false;
+        this._catacombsSkeletonsActive = false;
+        this._enemyNpcActor = null;
+        this._loadUpgradeIcons();
 
         // Map state
         this.currentMapId = MAP_IDS.MARS_SURFACE;
@@ -178,6 +183,7 @@ export class GameEngine {
         this.bossAssistAlly = null;
         this.bossAssistTimer = 0;
         this.bossAssistShotCooldown = 0;
+        this.bossAssistDamageBudget = 0;
 
         // Input state
         this.input = {
@@ -251,10 +257,12 @@ export class GameEngine {
         preloadNecromancerSprites();
         preloadReaperSprites();
         this._loadDayNightIcons();
+        this._loadUpgradeIcons();
 
         // Initialize Player with state name
         const astronautName = gameState.playerName || 'ARES-1';
         this.player = new Player(0, 0, astronautName);
+        this.player.applyUpgrades(gameState.upgrades || []);
         gameState.activeEngine = this;
         gameState.currentScene = 'GAMEPLAY';
 
@@ -355,12 +363,19 @@ export class GameEngine {
         if (mapId === MAP_IDS.MARS_CATACOMBS) {
             this._spawnCatacombsSkeletons(map);
             this._spawnCatacombsSpearmen(map);
+            this._catacombsSkeletonsActive = true;
+        } else {
+            this._catacombsSkeletonsActive = false;
         }
 
         // Boss da Sala do Rei: spawn LOCAL (720,443), sem conversão de
         // coordenadas com a superfície/entrada do castelo.
         if (mapId === MAP_IDS.CASTLE_KING_ROOM) {
             this._spawnNecromancerBoss(map);
+        }
+
+        if (this.player) {
+            this.player.applyUpgrades(gameState.upgrades || []);
         }
 
         // A wave scheduled while the player was away is paid out as soon as
@@ -540,6 +555,7 @@ export class GameEngine {
         if (this.currentMapId === MAP_IDS.MARS_CATACOMBS) {
             this._spawnCatacombsSkeletons(this.currentMap);
             this._spawnCatacombsSpearmen(this.currentMap);
+            this._catacombsSkeletonsActive = true;
         }
     }
 
@@ -916,6 +932,7 @@ export class GameEngine {
         this.bossAssistAlly = ally;
         this.bossAssistTimer = 4.0;
         this.bossAssistShotCooldown = 0.15;
+        this.bossAssistDamageBudget = 400; // Dano total máximo do aliado neste assist
     }
 
     _spawnTeleportFx(x, y) {
@@ -967,12 +984,11 @@ export class GameEngine {
     _updateNecromancer(dt) {
         const boss = this.necromancerBoss;
 
-        // Disparo da ajuda do aliado comprado na loja
+        // Disparo da ajuda do aliado comprado na loja (compra única permanente)
         if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead) {
             const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
             if (distToBoss <= 520 || boss.hp < boss.maxHp) {
                 this.allyBossHelpTriggered = true;
-                gameState.allyBossHelpPurchased = false; // consumido nesta batalha
                 this._triggerAllyBossHelp(boss);
             }
         }
@@ -989,8 +1005,10 @@ export class GameEngine {
                 const aimAngle = Math.atan2(dy, dx);
                 ally.updateDirectionFromAngle(aimAngle);
 
-                if (this.bossAssistShotCooldown <= 0) {
+                if (this.bossAssistShotCooldown <= 0 && this.bossAssistDamageBudget > 0) {
+                    const shotDamage = Math.min(40, this.bossAssistDamageBudget);
                     this.bossAssistShotCooldown = 0.3; // rajada rápida
+                    this.bossAssistDamageBudget -= shotDamage;
                     ally.setState(PlayerState.SHOOTING, true);
                     const spawnDist = 24;
                     const spawnX = ally.x + Math.cos(aimAngle) * spawnDist;
@@ -998,14 +1016,15 @@ export class GameEngine {
                     const bulletOpts = {
                         team: 'player',
                         owner: ally,
-                        damage: 35
+                        damage: shotDamage
                     };
                     const bullet = new Bullet(spawnX, spawnY, aimAngle, 680, ally.weapon, bulletOpts);
                     this.bullets.push(bullet);
                 }
             }
 
-            if (this.bossAssistTimer <= 0 || (boss && boss.isDead)) {
+            // Sai quando o timer acaba, o boss morre OU o orçamento de dano esgotou
+            if (this.bossAssistTimer <= 0 || (boss && boss.isDead) || this.bossAssistDamageBudget <= 0) {
                 this._nightBannerText = 'ALIADO: "BATERIA ESGOTADA! O RESTO É COM VOCÊ!"';
                 this._nightBannerTimer = 2.6;
                 this._spawnTeleportFx(ally.x, ally.y);
@@ -1247,6 +1266,39 @@ export class GameEngine {
         }
     }
 
+    _loadUpgradeIcons() {
+        if (this._upgradeIconsRequested || typeof Image === 'undefined') return;
+        this._upgradeIconsRequested = true;
+        const iconPaths = {
+            'damage_up': './src/assets/sprites/Upgrades/damage_up.png',
+            'life_up': './src/assets/sprites/Upgrades/life_up.png',
+            'movespeed_up': './src/assets/sprites/Upgrades/movespeed_up.png'
+        };
+        for (const [id, path] of Object.entries(iconPaths)) {
+            const img = new Image();
+            img.src = path;
+            this._upgradeIcons.set(id, img);
+        }
+    }
+
+    unlockUpgrade(upgradeId) {
+        if (!gameState.addUpgrade(upgradeId)) return;
+
+        // Apply stats immediately to player
+        this.player.applyUpgrades(gameState.upgrades);
+        gameState.playerHp = this.player.hp;
+        gameState.maxPlayerHp = this.player.maxHp;
+
+        const titles = {
+            'damage_up': 'UPGRADE: DANO +20%!',
+            'life_up': 'UPGRADE: VIDA MÁXIMA +25!',
+            'movespeed_up': 'UPGRADE: VELOCIDADE +10%!'
+        };
+        this._nightBannerText = titles[upgradeId] || `UPGRADE: ${upgradeId.toUpperCase()}`;
+        this._nightBannerTimer = 4.0;
+        console.log(`[Upgrades] Desbloqueado: ${upgradeId}. Upgrades ativos:`, gameState.upgrades);
+    }
+
     _buildCollisionResolver(map, halfW, halfH) {
         const obstacles = buildCollisionObstacles(map, halfW, halfH);
         return (px, py, dx, dy) => resolveSlide(
@@ -1283,6 +1335,7 @@ export class GameEngine {
             this.actors.push(ally);
         }
 
+        this._enemyNpcActor = null;
         if (map.id === MAP_IDS.MARS_SURFACE && roles.enemy) {
             const spawn = CHARACTER_ENEMY_SPAWNS[roles.enemy];
             if (spawn) {
@@ -1293,9 +1346,11 @@ export class GameEngine {
                     team: 'enemy',
                     role: ActorRole.ENEMY
                 });
+                enemy.isEnemyNpc = true;
                 enemy.setCollisionResolver(this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH));
                 enemy.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
                 this.actors.push(enemy);
+                this._enemyNpcActor = enemy;
             }
         }
     }
@@ -1601,6 +1656,7 @@ export class GameEngine {
         } else if (e.code === 'KeyR') {
             const spawn = this.currentMap.spawn;
             this.player.respawn(spawn.x, spawn.y);
+            this.player.applyUpgrades(gameState.upgrades || []);
             this.camera.follow(spawn.x, spawn.y, true);
             this._resetCatacombsSkeletons();
         }
@@ -1719,10 +1775,18 @@ export class GameEngine {
         for (const actor of this.actors) {
             actor.updateAi(dt, this);
             actor.update(dt);
-            if (actor.isDead && !actor._coinAwarded && actor.team === 'enemy') {
-                actor._coinAwarded = true;
-                const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
-                this._awardEnemyCoins(actor.x, actor.y, reward);
+            if (actor.isDead) {
+                if (!actor._coinAwarded && actor.team === 'enemy') {
+                    actor._coinAwarded = true;
+                    const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
+                    this._awardEnemyCoins(actor.x, actor.y, reward);
+                }
+
+                // Upgrade: movespeed_up (ao derrotar o NPC inimigo Space Lizard / Ocstronaut)
+                if (!gameState.hasUpgrade('movespeed_up') &&
+                    (actor.isEnemyNpc || actor === this._enemyNpcActor || (actor instanceof CharacterActor && (actor.role === ActorRole.ENEMY || actor.team === 'enemy')))) {
+                    this.unlockUpgrade('movespeed_up');
+                }
             }
         }
         for (const r of this.reapers) {
@@ -1739,7 +1803,26 @@ export class GameEngine {
                 this._awardEnemyCoins(this.player.x, this.player.y - 30, 40);
                 this._nightBannerText = 'HORDA DERROTADA! +40 🪙';
                 this._nightBannerTimer = 3.5;
+
+                // Upgrade: life_up (ao derrotar a primeira horda de golems)
+                if (!gameState.hasUpgrade('life_up')) {
+                    this.unlockUpgrade('life_up');
+                }
             }
+        }
+
+        // Upgrade: damage_up (ao derrotar todos os esqueletos nas Catacumbas)
+        if (this.currentMapId === MAP_IDS.MARS_CATACOMBS && this._catacombsSkeletonsActive && !gameState.hasUpgrade('damage_up')) {
+            const aliveSkeletons = this.skeletons.filter((s) => !s.isDead && !s.shouldRemove);
+            if (aliveSkeletons.length === 0) {
+                this._catacombsSkeletonsActive = false;
+                this.unlockUpgrade('damage_up');
+            }
+        }
+
+        // Upgrade: movespeed_up (verificação direta do NPC inimigo)
+        if (!gameState.hasUpgrade('movespeed_up') && this._enemyNpcActor && (this._enemyNpcActor.isDead || this._enemyNpcActor.hp <= 0)) {
+            this.unlockUpgrade('movespeed_up');
         }
 
         if (this.actors.some((a) => a.shouldRemove)) {
@@ -1839,10 +1922,18 @@ export class GameEngine {
                     if (rectsOverlap(aRect, bRect)) {
                         if (this._bulletCanDamage(bullet, actor.team, actor)) {
                             actor.takeDamage(bullet.damage, bullet.x, bullet.y);
-                            if (actor.isDead && !actor._coinAwarded && actor.team === 'enemy') {
-                                actor._coinAwarded = true;
-                                const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
-                                this._awardEnemyCoins(actor.x, actor.y, reward);
+                            if (actor.isDead) {
+                                if (!actor._coinAwarded && actor.team === 'enemy') {
+                                    actor._coinAwarded = true;
+                                    const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
+                                    this._awardEnemyCoins(actor.x, actor.y, reward);
+                                }
+
+                                // Upgrade: movespeed_up (ao derrotar o NPC inimigo Space Lizard / Ocstronaut)
+                                if (!gameState.hasUpgrade('movespeed_up') &&
+                                    (actor.isEnemyNpc || actor === this._enemyNpcActor || (actor instanceof CharacterActor && (actor.role === ActorRole.ENEMY || actor.team === 'enemy')))) {
+                                    this.unlockUpgrade('movespeed_up');
+                                }
                             }
                         }
                         consumed = true;
@@ -2233,6 +2324,7 @@ export class GameEngine {
         // DAY / NIGHT INDICATOR — directly below the vitals panel so it never
         // covers the health bar
         this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
+        this._renderUpgradeIndicators(ctx, hudX + 168 + 8, hudY + panelH + 10);
 
         // TOP-RIGHT: Coordinates & Telemetry & Moedas
         const trX = this.width - 240;
@@ -2313,6 +2405,119 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.fillText(formatDayNightTime(this.dayNight.getRemainingSeconds()), x + 48, y + 33);
         ctx.restore();
+    }
+
+    _renderUpgradeIndicators(ctx, startX, y) {
+        const boxSize = 40;
+        const gap = 8;
+        const totalSlots = 3;
+        const upgrades = gameState.upgrades || [];
+
+        let hoveredTooltip = null;
+
+        for (let i = 0; i < totalSlots; i++) {
+            const bx = startX + i * (boxSize + gap);
+            const by = y;
+            const upgradeId = upgrades[i];
+
+            ctx.save();
+
+            // Background socket matching the sci-fi HUD aesthetic
+            ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
+            ctx.fillRect(bx, by, boxSize, boxSize);
+
+            if (upgradeId) {
+                // Active slot with upgrade
+                let borderColor = '#e07228';
+                let desc = '';
+                if (upgradeId === 'damage_up') {
+                    borderColor = '#ef4444';
+                    desc = 'DANO: +20%';
+                } else if (upgradeId === 'life_up') {
+                    borderColor = '#22c55e';
+                    desc = 'VIDA MÁX: +25 (130)';
+                } else if (upgradeId === 'movespeed_up') {
+                    borderColor = '#38bdf8';
+                    desc = 'VELOCIDADE: +10%';
+                }
+
+                ctx.strokeStyle = borderColor;
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(bx + 0.5, by + 0.5, boxSize - 1, boxSize - 1);
+
+                // Draw upgrade icon image
+                const icon = this._upgradeIcons?.get(upgradeId);
+                if (icon && icon.complete && icon.naturalWidth > 0) {
+                    const pad = 5;
+                    const inner = boxSize - pad * 2;
+                    const ratio = icon.naturalWidth / icon.naturalHeight;
+                    let iw = inner;
+                    let ih = inner;
+                    if (ratio > 1) {
+                        ih = Math.round(inner / ratio);
+                    } else {
+                        iw = Math.round(inner * ratio);
+                    }
+                    const ix = bx + Math.round((boxSize - iw) / 2);
+                    const iy = by + Math.round((boxSize - ih) / 2);
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(icon, ix, iy, iw, ih);
+                } else {
+                    // Fallback visual icon while loading
+                    ctx.fillStyle = borderColor;
+                    ctx.font = '10px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const symbol = upgradeId === 'damage_up' ? '⚔' : (upgradeId === 'life_up' ? '❤' : '⚡');
+                    ctx.fillText(symbol, bx + boxSize / 2, by + boxSize / 2);
+                }
+
+                // Check mouse hover for tooltip
+                if (this.input) {
+                    const mx = this.input.mouseX;
+                    const my = this.input.mouseY;
+                    if (mx >= bx && mx <= bx + boxSize && my >= by && my <= by + boxSize) {
+                        hoveredTooltip = { x: bx + boxSize / 2, y: by - 8, text: desc, color: borderColor };
+                    }
+                }
+            } else {
+                // Empty placeholder slot
+                ctx.strokeStyle = 'rgba(143, 52, 25, 0.35)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(bx + 0.5, by + 0.5, boxSize - 1, boxSize - 1);
+
+                // Dim '+' socket indicator
+                ctx.fillStyle = 'rgba(143, 52, 25, 0.25)';
+                ctx.font = '10px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('+', bx + boxSize / 2, by + boxSize / 2);
+            }
+
+            ctx.restore();
+        }
+
+        // Render hover tooltip if hovering over an unlocked upgrade
+        if (hoveredTooltip) {
+            ctx.save();
+            ctx.font = '7px "Press Start 2P", monospace';
+            const tw = ctx.measureText(hoveredTooltip.text).width + 14;
+            const th = 18;
+            const tx = Math.max(10, hoveredTooltip.x - tw / 2);
+            const ty = hoveredTooltip.y - th;
+
+            ctx.fillStyle = 'rgba(10, 8, 14, 0.95)';
+            ctx.fillRect(tx, ty, tw, th);
+            ctx.strokeStyle = hoveredTooltip.color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tx + 0.5, ty + 0.5, tw - 1, th - 1);
+
+            ctx.fillStyle = '#f6c885';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(hoveredTooltip.text, tx + tw / 2, ty + th / 2);
+            ctx.restore();
+        }
     }
 
     _renderDayNightOverlay(ctx) {
