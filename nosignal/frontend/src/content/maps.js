@@ -66,16 +66,51 @@ const castlePillarRight = { id: 'castle-pillar-right', x: 3713, y: 505, w: 198, 
 const castleStairPostLeft = { id: 'castle-stair-post-left', x: 3515, y: 855, w: 58, h: 64, kind: 'castle-wall' };
 const castleStairPostRight = { id: 'castle-stair-post-right', x: 3724, y: 855, w: 58, h: 64, kind: 'castle-wall' };
 const castleDoorBlock = { id: 'castle-door-block', x: 3595, y: 830, w: 110, h: 20, kind: 'castle-wall' };
-const castleCliffBottomLeft = { id: 'castle-cliff-bottom-left', x: 3170, y: 915, w: 350, h: 105, kind: 'castle-wall' };
-const castleCliffBottomRight = { id: 'castle-cliff-bottom-right', x: 3725, y: 915, w: 380, h: 105, kind: 'castle-wall' };
+const castleCliffBottomLeftParts = [
+    // Left-center cliff re-cut as a staircase hugging the castle base: the old
+    // box (x3170..3520 / y915..1020) blocked ~55px of empty ground below the
+    // mound in x3150..3540 / y997..1031. Each step stops flush with the sprite
+    // silhouette (bottom rises 966 -> 996 -> 1018 -> ~1008..1016 as the mound
+    // dips through the keep base), keeping the opaque facade solid.
+    { id: 'castle-cliff-bot-left-a', x: 3170, y: 915, w: 18, h: 65, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-b', x: 3188, y: 915, w: 16, h: 76, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-c', x: 3204, y: 915, w: 79, h: 82, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-d', x: 3283, y: 915, w: 11, h: 90, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-e', x: 3294, y: 915, w: 23, h: 97, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-f', x: 3317, y: 915, w: 39, h: 104, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-g', x: 3356, y: 915, w: 32, h: 96, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-h', x: 3388, y: 915, w: 52, h: 94, kind: 'castle-wall' },
+    { id: 'castle-cliff-bot-left-i', x: 3440, y: 915, w: 81, h: 102, kind: 'castle-wall' },
+];
+const castleCliffBottomRightParts = [
+    { id: 'castle-cliff-bottom-right', x: 3725, y: 915, w: 355, h: 105, kind: 'castle-wall' },
+    // Solid tip of the cliff against the transparent ground drop (x4080..4105):
+    // bottom trimmed from 1020 to the sprite base (~967..976) so the corner
+    // ground (x4080..4265) is free on the main-map texture.
+    { id: 'castle-cliff-bottom-right-tip', x: 4080, y: 915, w: 18, h: 51, kind: 'castle-wall' },
+    { id: 'castle-cliff-bottom-right-tip2', x: 4098, y: 915, w: 7, h: 61, kind: 'castle-wall' },
+];
 const castleMoundShelfLeft = { id: 'castle-mound-shelf-left', x: 3160, y: 780, w: 360, h: 135, kind: 'castle-wall' };
 const castleMoundShelfRight = { id: 'castle-mound-shelf-right', x: 3725, y: 780, w: 390, h: 135, kind: 'castle-wall' };
 const castleFlankTopLeft = { id: 'castle-flank-top-left', x: 3110, y: 570, w: 100, h: 160, kind: 'castle-wall' };
 const castleFlankMidLeft = { id: 'castle-flank-mid-left', x: 3050, y: 710, w: 120, h: 170, kind: 'castle-wall' };
-const castleFlankBotLeft = { id: 'castle-flank-bot-left', x: 3010, y: 830, w: 170, h: 185, kind: 'castle-wall' };
+// Bottom-left flank trimmed to the castle base: no collision jutting left of the
+// sprite (x3010..3075) or below its base (y975..1015), so the corner rectangle
+// x2990..3150 / y891..1037 is free on the main-map texture.
+const castleFlankBotLeft = { id: 'castle-flank-bot-left', x: 3150, y: 830, w: 30, h: 145, kind: 'castle-wall' };
 const castleFlankTopRight = { id: 'castle-flank-top-right', x: 4085, y: 570, w: 100, h: 160, kind: 'castle-wall' };
-const castleFlankMidRight = { id: 'castle-flank-mid-right', x: 4125, y: 710, w: 120, h: 170, kind: 'castle-wall' };
-const castleFlankBotRight = { id: 'castle-flank-bot-right', x: 4115, y: 830, w: 175, h: 185, kind: 'castle-wall' };
+// Mid-right flank ends at x4210: east of that the sprite collapses into a thin
+// diagonal tail, so the old box (to x4245) blocked transparent ground slope.
+const castleFlankMidRight = { id: 'castle-flank-mid-right', x: 4125, y: 710, w: 85, h: 170, kind: 'castle-wall' };
+// Bottom-right flank re-cut as a staircase hugging the castle base: the old box
+// (x4115..4290 / y830..1015) blocked ~65px of empty ground to the right and
+// below the mound. New boxes keep the opaque slope and drop the overhang.
+const castleFlankBotRightParts = [
+    { id: 'castle-flank-bot-right-1', x: 4115, y: 830, w: 30, h: 140, kind: 'castle-wall' },
+    { id: 'castle-flank-bot-right-2', x: 4145, y: 830, w: 30, h: 112, kind: 'castle-wall' },
+    { id: 'castle-flank-bot-right-3', x: 4175, y: 830, w: 30, h: 102, kind: 'castle-wall' },
+    { id: 'castle-flank-bot-right-4', x: 4205, y: 830, w: 25, h: 75, kind: 'castle-wall' },
+];
 
 
 // Border rocks framing the world edges (visual + collision)
@@ -155,8 +190,8 @@ export const marsSurfaceMap = {
         castleStairPostLeft,
         castleStairPostRight,
         castleDoorBlock,
-        castleCliffBottomLeft,
-        castleCliffBottomRight,
+        ...castleCliffBottomLeftParts,
+        ...castleCliffBottomRightParts,
         castleMoundShelfLeft,
         castleMoundShelfRight,
         castleFlankTopLeft,
@@ -164,7 +199,7 @@ export const marsSurfaceMap = {
         castleFlankBotLeft,
         castleFlankTopRight,
         castleFlankMidRight,
-        castleFlankBotRight,
+        ...castleFlankBotRightParts,
     ],
     exits: [
         {

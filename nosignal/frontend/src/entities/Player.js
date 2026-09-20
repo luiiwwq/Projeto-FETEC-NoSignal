@@ -9,6 +9,8 @@ import { assetLoader } from '../engine/AssetLoader.js';
 import { Bullet } from './Bullet.js';
 import { getCharacter } from '../content/characters.js';
 import { gameState } from '../state/gameState.js';
+import { playShootSound } from '../audio/shootSound.js';
+import { playDamageSound, playDieSound, playWalkSound } from '../audio/playerSound.js';
 
 const DIAGONAL_FALLBACK = {
     'south-east': ['south', 'east'],
@@ -16,6 +18,29 @@ const DIAGONAL_FALLBACK = {
     'north-east': ['north', 'east'],
     'north-west': ['north', 'west']
 };
+
+// Silhueta branca de cada frame: recaloriza apenas os pixels não-transparentes
+// do sprite para um overlay de flash de dano, sem precisar de asset com brilho.
+// WeakMap -> os canvases descartáveis são liberados junto com o Image original.
+const _whiteSpriteCache = new WeakMap();
+
+function _getWhiteSprite(frameImg) {
+    let white = _whiteSpriteCache.get(frameImg);
+    if (white) return white;
+
+    white = document.createElement('canvas');
+    white.width = frameImg.width;
+    white.height = frameImg.height;
+    const wctx = white.getContext('2d');
+    wctx.drawImage(frameImg, 0, 0);
+    wctx.globalCompositeOperation = 'source-in';
+    wctx.fillStyle = '#ffffff';
+    wctx.fillRect(0, 0, white.width, white.height);
+    wctx.globalCompositeOperation = 'source-over';
+
+    _whiteSpriteCache.set(frameImg, white);
+    return white;
+}
 
 export const PlayerState = {
     IDLE: 'IDLE',
@@ -80,6 +105,13 @@ export class Player {
         this.speedMultiplier = 1.0;
         this.invulnerableTimer = 0;
         this.isDead = false;
+
+        // Hit flash: brilho branco sobre o asset ao tomar dano
+        this.hitFlashTimer = 0;
+        this.hitFlashDuration = 0.18;
+
+        // Footstep cadence (walk/run sound)
+        this.stepTimer = 0;
 
         // Cooldowns
         this.shootCooldown = 0;
@@ -280,6 +312,11 @@ export class Player {
         this.updateDirectionFromAngle(aimAngle);
         this.setState(PlayerState.SHOOTING, true);
 
+        // Som do disparo sincronizado com a criação do(s) projétil(is):
+        // toca no mesmo instante em que a bala nasce (um som por disparo,
+        // mesmo no shotgun de 5 pellets — os pellets saem do mesmo tiro).
+        playShootSound(this.characterId);
+
         // Slight weapon recoil
         this.recoilX = -Math.cos(aimAngle) * 45;
         this.recoilY = -Math.sin(aimAngle) * 45;
@@ -335,6 +372,10 @@ export class Player {
         this.hp = Math.max(0, this.hp - amount);
         this.invulnerableTimer = 0.65; // Invulnerability window
 
+        // Hit feedback: brilho branco no asset + som de dano do jogador
+        this.hitFlashTimer = this.hitFlashDuration;
+        if (this.role === 'player') playDamageSound();
+
         // Knockback away from source
         if (fromX !== null && fromY !== null) {
             const angle = Math.atan2(this.y - fromY, this.x - fromX);
@@ -357,6 +398,8 @@ export class Player {
         this.isDead = true;
         this.vx = 0;
         this.vy = 0;
+        this.hitFlashTimer = 0;
+        if (this.role === 'player') playDieSound();
         this.setState(PlayerState.DEAD, true);
     }
 
@@ -390,6 +433,22 @@ export class Player {
         if (this.shootCooldown > 0) this.shootCooldown -= dt;
         if (this.punchCooldown > 0) this.punchCooldown -= dt;
         if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
+        if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+
+        // Footstep cadence enquanto corre (apenas o jogador controlado).
+        // Só toca quando realmente há movimento; pool único reutilizado a cada
+        // passo (sem sobreposição de instâncias -> som limpo, sem cacofonia).
+        const isMoving = Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1;
+        if (this.role === 'player' && this.state === PlayerState.RUNNING && isMoving && !this.isDead) {
+            this.stepTimer -= dt;
+            if (this.stepTimer <= 0) {
+                playWalkSound();
+                this.stepTimer = (this.isSprinting ? 0.22 : 0.32) * (0.9 + Math.random() * 0.2);
+            }
+        } else {
+            // Reprime o timer para o primeiro passo sair rápido ao começar a correr
+            this.stepTimer = 0;
+        }
 
         // Recoil decay
         this.recoilX *= Math.max(0, 1 - dt * 10);
@@ -510,6 +569,16 @@ export class Player {
         }
 
         ctx.globalAlpha = 1.0;
+
+        // Brilho branco de dano: sobrescreve apenas os pixels do asset do
+        // personagem com a silhueta branca, sumindo junto com o timer.
+        if (frameImg && this.hitFlashTimer > 0) {
+            const flashAlpha = Math.min(1, this.hitFlashTimer / this.hitFlashDuration);
+            ctx.save();
+            ctx.globalAlpha = flashAlpha;
+            ctx.drawImage(_getWhiteSprite(frameImg), drawX, drawY, renderW, renderH);
+            ctx.restore();
+        }
 
         // Overhead Player Name Tag
         this._renderNameTag(ctx, screenPos.x, drawY);

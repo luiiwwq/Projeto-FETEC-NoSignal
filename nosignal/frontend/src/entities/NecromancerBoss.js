@@ -143,13 +143,89 @@ export function getSkillImages(kind, variant = null) {
 
 /* ── Projétil (Skull Fireball) ───────────────────────────── */
 import { Bullet } from './Bullet.js';
+import { gameState } from '../state/gameState.js';
 
 export const NECRO_FIREBALL_SPEED = 360;
 export const NECRO_FIREBALL_DAMAGE = 25;
 
+// Dano das skills do Necromancer conforme o suporte do NPC:
+// - SEM ajuda (allyBossHelpPurchased false): lightning/fireball/explosion
+//   alinhados no mesmo dano (~15) e unholy em 35.
+// - COM ajuda comprada na loja: mantém o dano original da luta.
+const NECRO_SKILL_DMG_SOLO = { fireball: 15, lightning: 15, explosion: 15, unholy: 35 };
+const NECRO_SKILL_DMG_ASSISTED = { fireball: NECRO_FIREBALL_DAMAGE, lightning: 35, explosion: 30, unholy: 12 };
+
+export function getNecroSkillDamage(kind) {
+    const table = gameState.allyBossHelpPurchased ? NECRO_SKILL_DMG_ASSISTED : NECRO_SKILL_DMG_SOLO;
+    return table[kind];
+}
+
+/* ── Hitboxes das skills desenhadas a partir dos sprites ──
+ * Cada bbox é [l, t, r, b] NORMALIZADO (0..1) sobre o frame do sprite,
+ * medido da área não-transparente real. As hitboxes usam os MESMOS
+ * transforms do render:
+ *   - explosion: 64x55 x4, centrada em (e.x, e.y)
+ *   - lightning: 100x208 x3, bottom-anchored em e.y (frame por variante)
+ *   - unholy:    300x256 x2, bottom-anchored em e.y (união da poça crescida)
+ */
+const SKILL_SPRITE_LAYOUT = {
+    explosion: { w: 64, h: 55, scale: 4, anchor: 'center' },
+    lightning: { w: 100, h: 208, scale: 3, anchor: 'bottom' },
+    unholy:    { w: 300, h: 256, scale: 2, anchor: 'bottom' },
+};
+
+// União dos frames "poça crescida" (11-17 e 19-34) de unholy_ground_size_reduction.
+const UNHOLY_POOL_BBOX = [0.0167, 0.0586, 0.8467, 0.9688];
+
+// União dos 3 frames por variante (01..09) de lightning_variantXX.
+const LIGHTNING_VARIANT_BBOX = {
+    1: [0.0800, 0.0337, 0.8100, 0.9519],
+    2: [0.0200, 0.0192, 0.8800, 0.9663],
+    3: [0.0700, 0.0913, 0.8700, 0.9615],
+    4: [0.0400, 0.0288, 0.8700, 0.9567],
+    5: [0.0400, 0.0288, 0.8800, 0.9615],
+    6: [0.0500, 0.0481, 0.8900, 0.9663],
+    7: [0.0800, 0.0337, 0.9000, 0.9663],
+    8: [0.0800, 0.0337, 0.8100, 0.9327],
+    9: [0.0900, 0.1058, 0.8000, 0.8942],
+};
+
+// União dos 6 frames de explosion_simple.
+const EXPLOSION_BBOX = [0.0000, 0.0000, 0.9688, 1.0000];
+
+/**
+ * Retorna o retângulo de colisão em coordenadas de MUNDO que reproduz
+ * exatamente a área visível do sprite desenhado (mesmo anchor+scale do
+ * render). null para ataques sem área própria (fireball é projétil).
+ */
+export function getNecroSkillHitRect(e) {
+    let bb = null;
+    if (e.kind === 'lightning') {
+        bb = LIGHTNING_VARIANT_BBOX[e.variant] || LIGHTNING_VARIANT_BBOX[1];
+    } else if (e.kind === 'explosion') {
+        bb = EXPLOSION_BBOX;
+    } else if (e.kind === 'unholy') {
+        bb = UNHOLY_POOL_BBOX;
+    }
+    if (!bb) return null;
+
+    const { w, h, scale: cfgScale, anchor } = SKILL_SPRITE_LAYOUT[e.kind];
+    const scale = e.kind === 'unholy' ? (e.scale || cfgScale) : cfgScale;
+    const drawW = w * scale;
+    const drawH = h * scale;
+    const left = e.x - drawW / 2;
+    const top = anchor === 'center' ? e.y - drawH / 2 : e.y - drawH;
+    return {
+        x: left + bb[0] * drawW,
+        y: top + bb[1] * drawH,
+        w: (bb[2] - bb[0]) * drawW,
+        h: (bb[3] - bb[1]) * drawH,
+    };
+}
+
 export class NecromancerProjectile extends Bullet {
-    constructor(x, y, angle, owner) {
-        super(x, y, angle, NECRO_FIREBALL_SPEED, null, { team: 'enemy', owner, damage: NECRO_FIREBALL_DAMAGE });
+    constructor(x, y, angle, owner, damage = NECRO_FIREBALL_DAMAGE) {
+        super(x, y, angle, NECRO_FIREBALL_SPEED, null, { team: 'enemy', owner, damage });
         this.life = 6;
         this.maxLife = 6;
         this.hitRadius = 26;
@@ -176,10 +252,15 @@ export class NecromancerProjectile extends Bullet {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         if (imgs) {
+            // A caveira aponta para a direita por padrão: espelha na horizontal
+            // quando o projétil voa para a esquerda (angle fora dos 0..PI).
+            const flip = Math.cos(this.angle) < 0 ? -1 : 1;
+            ctx.translate(Math.round(screen.x), Math.round(screen.y));
+            ctx.scale(flip, 1);
             ctx.drawImage(
                 imgs[Math.min(this.frame, imgs.length - 1)],
-                Math.round(screen.x - drawW / 2),
-                Math.round(screen.y - drawH / 2),
+                -Math.round(drawW / 2),
+                -Math.round(drawH / 2),
                 drawW,
                 drawH
             );
@@ -417,7 +498,7 @@ export class NecromancerBoss {
             const dist = this.colliderHalfW + 26 + 4;
             const spawnX = this.x + Math.cos(angle) * dist;
             const spawnY = this.y + Math.sin(angle) * dist;
-            const proj = new NecromancerProjectile(spawnX, spawnY, angle, this);
+            const proj = new NecromancerProjectile(spawnX, spawnY, angle, this, getNecroSkillDamage('fireball'));
             engine.addBullet(proj);
             return;
         }
@@ -430,9 +511,7 @@ export class NecromancerBoss {
                 variant: skill.variant,
                 t: 0,
                 strikeDur: 0.34,
-                dmg: 35,
-                hitW: 74,
-                hitH: 180,
+                dmg: getNecroSkillDamage('lightning'),
             });
             return;
         }
@@ -444,8 +523,7 @@ export class NecromancerBoss {
                 y: skill.y,
                 t: 0,
                 blastDur: 0.6,
-                dmg: 30,
-                r: 95,
+                dmg: getNecroSkillDamage('explosion'),
             });
             return;
         }
@@ -459,10 +537,8 @@ export class NecromancerBoss {
                 dur: 4.2,
                 tickEvery: 0.6,
                 tickCd: 0,
-                dmg: 12,
+                dmg: getNecroSkillDamage('unholy'),
                 scale: 2,
-                hitW: 520,
-                hitH: 340,
             });
         }
     }

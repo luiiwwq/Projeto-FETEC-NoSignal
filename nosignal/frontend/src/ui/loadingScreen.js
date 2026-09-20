@@ -9,6 +9,8 @@ import { GameEngine } from '../engine/GameEngine.js';
 import { gameState } from '../state/gameState.js';
 import { stopMenuMusic } from '../audio/menuMusic.js';
 import { startGameMusic, preloadGameMusic } from '../audio/gameMusic.js';
+import { preloadShootSounds } from '../audio/shootSound.js';
+import { preloadPlayerSounds } from '../audio/playerSound.js';
 
 export function renderLoadingScreen(container) {
     // Qualquer fluxo que chegue ao gameplay começa UMA PARTIDA NOVA: garante a
@@ -76,6 +78,14 @@ export function renderLoadingScreen(container) {
     // Pré-carrega a música do gameplay em paralelo com os sprites, para que
     // o play() no início da partida já tenha o buffer pronto (início imediato).
     const musicReady = preloadGameMusic();
+
+    // Pré-carrega os sons de tiro para o primeiro disparo soar já com o
+    // buffer pronto (nenhuma latência de download no meio do combate).
+    preloadShootSounds();
+
+    // Pré-carrega os efeitos do jogador (dano, morte e passos) para tocarem
+    // imediatamente quando o primeiro acontecer em gameplay.
+    preloadPlayerSounds();
 
     // Run preload
     assetLoader.preloadAll((progress, loaded, total) => {

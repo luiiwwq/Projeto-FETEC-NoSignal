@@ -24,22 +24,20 @@ export const SPEARMAN_ENGAGE_RANGE = 650;      // starts chasing inside this rad
 export const SPEARMAN_HOME_TOLERANCE = 12;     // snap distance back at its post
 export const SPEARMAN_SPEED = 70;              // px/sec
 
-/* ── Hitbox & rendering ──────────────────────────────────── */
-export const SPEARMAN_COLLIDER_HALF_W = 12;
-export const SPEARMAN_COLLIDER_HALF_H = 14;
-export const SPEARMAN_RENDER_SCALE = 1.0;      // 128px frames -> 128px, body ~80px
+/* ── Hitbox & rendering (1.5x em relação ao 128px base) ─── */
+export const SPEARMAN_COLLIDER_HALF_W = 18;
+export const SPEARMAN_COLLIDER_HALF_H = 21;
+export const SPEARMAN_RENDER_SCALE = 1.5;      // 128px frames -> 192px, corpo ~120px
 
 /* ── Local spawn layout (CATACOMBS coordinate space) ───────
  * These coordinates are LOCAL to `mars-catacombs` (1254×1254). They are NOT
  * world/surface coordinates and are never summed with the surface origin —
  * the engine spawns each spearman using spawn.x/spawn.y directly as the
- * catacombs feet position. Each one stands beside an axe skeleton.          */
+ * catacombs feet position. Each one stands beside a warrior skeleton.        */
 export const CATACOMBS_SKELETON_SPEARMAN_SPAWNS = [
-    { id: 'catacombs-skeleton-spear-1', x: 892, y: 374 }, // beside axe-1 (940,374)
-    { id: 'catacombs-skeleton-spear-2', x: 1002, y: 498 }, // beside axe-2 (1050,498)
-    { id: 'catacombs-skeleton-spear-3', x: 979, y: 671 }, // beside axe-3 (931,671)
-    { id: 'catacombs-skeleton-spear-4', x: 785, y: 863 }, // beside axe-4 (833,863)
-    { id: 'catacombs-skeleton-spear-5', x: 793, y: 1002 }, // beside axe-5 (745,1002)
+    { id: 'catacombs-skeleton-spear-1', x: 892, y: 374 }, // beside warrior-1 (940,374)
+    { id: 'catacombs-skeleton-spear-2', x: 1002, y: 498 }, // beside warrior-2 (1050,498)
+    { id: 'catacombs-skeleton-spear-3', x: 979, y: 671 }, // beside warrior-3 (931,671)
 ];
 
 export const SPEARMAN_STATES = {
@@ -394,7 +392,7 @@ export class SkeletonSpearman {
         ctx.save();
         ctx.fillStyle = 'rgba(10, 5, 5, 0.45)';
         ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 2, 13, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(screen.x, feetY - 2, 20, 7, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 

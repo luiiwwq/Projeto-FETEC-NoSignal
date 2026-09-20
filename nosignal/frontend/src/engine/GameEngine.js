@@ -11,12 +11,30 @@ import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
 import { Golem, GOLEM_WAVE_SPAWNS, GOLEM_COLLIDER_HALF_W, GOLEM_COLLIDER_HALF_H, preloadGolemSprites } from '../entities/Golem.js';
 import { AmongUsEasterEgg, preloadAmongUsSprites, AMONG_US_ELIGIBLE_MAPS, AMONG_US_INTERVAL_SECONDS, AMONG_US_TEST_HALF_W, AMONG_US_TEST_HALF_H, AMONG_US_MAX_ATTEMPTS, DEBUG_AMONG_US_EASTER_EGG } from '../entities/AmongUsEasterEgg.js';
 import {
-    SkeletonAxe,
-    CATACOMBS_SKELETON_AXE_SPAWNS,
     SKELETON_COLLIDER_HALF_W,
     SKELETON_COLLIDER_HALF_H,
     preloadSkeletonAxeSprites,
 } from '../entities/SkeletonAxe.js';
+import {
+    SkeletonWarrior,
+    CATACOMBS_SKELETON_WARRIOR_SPAWNS,
+    WARRIOR_COLLIDER_HALF_W,
+    WARRIOR_COLLIDER_HALF_H,
+    preloadSkeletonWarriorSprites,
+} from '../entities/SkeletonWarrior.js';
+import {
+    SkeletonArcher,
+    CATACOMBS_SKELETON_ARCHER_SPAWNS,
+    ARCHER_COLLIDER_HALF_W,
+    ARCHER_COLLIDER_HALF_H,
+    preloadSkeletonArcherSprites,
+} from '../entities/SkeletonArcher.js';
+import {
+    SkeletonAxeBoss,
+    NUCLEUS_SKELETON_AXE_BOSS_SPAWN,
+    SKELETON_AXE_BOSS_COLLIDER_HALF_W,
+    SKELETON_AXE_BOSS_COLLIDER_HALF_H,
+} from '../entities/SkeletonAxeBoss.js';
 import {
     SkeletonSpearman,
     CATACOMBS_SKELETON_SPEARMAN_SPAWNS,
@@ -31,6 +49,7 @@ import {
     NECROMANCER_COLLIDER_HALF_H,
     NECROMANCER_REAPER_OFFSETS,
     getSkillImages,
+    getNecroSkillHitRect,
     preloadNecromancerSprites,
 } from '../entities/NecromancerBoss.js';
 import {
@@ -150,6 +169,10 @@ export class GameEngine {
         this.reapers = [];
         this.necromancerEffects = [];
         this._reaperPlacementLog = [];
+
+        // Boss Skeleton_Axe (Núcleo de Marte) — o Skeleton_Axe que saiu das
+        // Catacumbas virou guardião do Núcleo; some ao trocar de mapa.
+        this.skeletonAxeBoss = null;
         this.dayNight = new DayNightSystem();
         this._golemWavePendingNight = 0; // night that must still be paid out
         this._lastGolemWaveNight = 0;    // guard against a double spawn
@@ -261,6 +284,8 @@ export class GameEngine {
         preloadGolemSprites();
         preloadAmongUsSprites();
         preloadSkeletonAxeSprites();
+        preloadSkeletonWarriorSprites();
+        preloadSkeletonArcherSprites();
         preloadSkeletonSpearmanSprites();
         preloadNecromancerSprites();
         preloadReaperSprites();
@@ -363,14 +388,19 @@ export class GameEngine {
         this.necromancerEffects = [];
         this._reaperPlacementLog = [];
 
-        // The Catacombs have five fixed Skeleton_Axe spawns (plus five
-        // Skeleton_Spearman standing beside them) in LOCAL map coordinates.
-        // They are recreated on every load of the map and wiped together with
-        // `actors` the moment the player leaves (see above), so they never leak
-        // to the surface/castle and never duplicate. Depois de limpas, ficam
-        // limpas até iniciar um jogo novo (gameState.catacombsCleared).
+        // Boss Skeleton_Axe (Núcleo): same — wipe on map change.
+        this.skeletonAxeBoss = null;
+
+        // The Catacombs have five fixed Skeleton_Warrior posts, three
+        // Skeleton_Archer posts at the wall tips (plus five Skeleton_Spearman
+        // standing beside them) in LOCAL map coordinates. They are recreated on
+        // every load of the map and wiped together with `actors` the moment the
+        // player leaves (see above), so they never leak to the surface/castle
+        // and never duplicate. Depois de limpas, ficam limpas até iniciar um
+        // jogo novo (gameState.catacombsCleared).
         if (mapId === MAP_IDS.MARS_CATACOMBS && !gameState.catacombsCleared) {
-            this._spawnCatacombsSkeletons(map);
+            this._spawnCatacombsWarriors(map);
+            this._spawnCatacombsArchers(map);
             this._spawnCatacombsSpearmen(map);
             this._catacombsSkeletonsActive = true;
         } else {
@@ -382,6 +412,12 @@ export class GameEngine {
         // não reaparece até iniciar um jogo novo (gameState.necromancerDefeated).
         if (mapId === MAP_IDS.CASTLE_KING_ROOM && !gameState.necromancerDefeated) {
             this._spawnNecromancerBoss(map);
+        }
+
+        // Boss Skeleton_Axe do Núcleo de Marte: spawn LOCAL (792,512) caminhável.
+        // Depois de derrotado, não reaparece até iniciar um jogo novo.
+        if (mapId === MAP_IDS.MARS_CORE && !gameState.skeletonAxeBossDefeated) {
+            this._spawnSkeletonAxeBoss(map);
         }
 
         if (this.player) {
@@ -557,17 +593,28 @@ export class GameEngine {
      * walkability checks, the closest free floor cell is used instead (small
      * local adjustment, never a silent move to another map).
      */
-    _spawnCatacombsSkeletons(map) {
+    _spawnCatacombsWarriors(map) {
         this._spawnCatacombsSkeletonGroup(map, {
-            spawns: CATACOMBS_SKELETON_AXE_SPAWNS,
-            ctor: SkeletonAxe,
-            hw: SKELETON_COLLIDER_HALF_W,
-            hh: SKELETON_COLLIDER_HALF_H,
-            label: 'Skeleton_Axe',
+            spawns: CATACOMBS_SKELETON_WARRIOR_SPAWNS,
+            ctor: SkeletonWarrior,
+            hw: WARRIOR_COLLIDER_HALF_W,
+            hh: WARRIOR_COLLIDER_HALF_H,
+            label: 'Skeleton_Warrior',
         });
     }
 
-    /** Spawn the five Skeleton_Spearman, one beside each axe skeleton. */
+    /** Spawn the three Skeleton_Archer, one at each Catacombs wall tip. */
+    _spawnCatacombsArchers(map) {
+        this._spawnCatacombsSkeletonGroup(map, {
+            spawns: CATACOMBS_SKELETON_ARCHER_SPAWNS,
+            ctor: SkeletonArcher,
+            hw: ARCHER_COLLIDER_HALF_W,
+            hh: ARCHER_COLLIDER_HALF_H,
+            label: 'Skeleton_Archer',
+        });
+    }
+
+    /** Spawn the five Skeleton_Spearman, one beside each warrior skeleton. */
     _spawnCatacombsSpearmen(map) {
         this._spawnCatacombsSkeletonGroup(map, {
             spawns: CATACOMBS_SKELETON_SPEARMAN_SPAWNS,
@@ -588,7 +635,8 @@ export class GameEngine {
         this.skeletons = [];
         this.actors = this.actors.filter((a) => !removed.includes(a));
         if (this.currentMapId === MAP_IDS.MARS_CATACOMBS) {
-            this._spawnCatacombsSkeletons(this.currentMap);
+            this._spawnCatacombsWarriors(this.currentMap);
+            this._spawnCatacombsArchers(this.currentMap);
             this._spawnCatacombsSpearmen(this.currentMap);
             this._catacombsSkeletonsActive = true;
         }
@@ -767,6 +815,47 @@ export class GameEngine {
         }
     }
 
+    // Boss Skeleton_Axe do Núcleo (2.5x, 500 HP). Spawn LOCAL de pés (792,512)
+    // no `mars-core`, validado por limites por spec; conflito com obstáculo só
+    // vira log (o spawn é num piso caminhável).
+    _spawnSkeletonAxeBoss(map) {
+        if (
+            NUCLEUS_SKELETON_AXE_BOSS_SPAWN.x < 0 ||
+            NUCLEUS_SKELETON_AXE_BOSS_SPAWN.y < 0 ||
+            NUCLEUS_SKELETON_AXE_BOSS_SPAWN.x > map.width ||
+            NUCLEUS_SKELETON_AXE_BOSS_SPAWN.y > map.height
+        ) {
+            throw new Error('Spawn local do Skeleton_Axe_Boss inválido (fora do Núcleo)');
+        }
+
+        const spawn = NUCLEUS_SKELETON_AXE_BOSS_SPAWN;
+        const boss = new SkeletonAxeBoss(
+            spawn.x,
+            spawn.y - SKELETON_AXE_BOSS_COLLIDER_HALF_H,
+            { id: spawn.id }
+        );
+        boss._engine = this;
+        boss.setCollisionResolver(
+            this._buildCollisionResolver(map, boss.colliderHalfW, boss.colliderHalfH)
+        );
+        boss.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+        this.skeletonAxeBoss = boss;
+
+        if (DEBUG_NECROMANCER_BOSS) {
+            const box = {
+                x: boss.x - boss.colliderHalfW,
+                y: boss.y - boss.colliderHalfH,
+                w: boss.colliderHalfW * 2,
+                h: boss.colliderHalfH * 2,
+            };
+            const clash = (map.obstacles || []).some((o) => rectsOverlap(o, box));
+            console.info(
+                `[SkeletonAxeBoss] spawn local (${spawn.x},${spawn.y}) ` +
+                `centro (${boss.x},${boss.y}); overlap obstáculo: ${clash}`
+            );
+        }
+    }
+
     // Mantém o ponto alvo de uma habilidade dentro da área jogável da Sala do
     // Rei (longe das paredes e do trono/grades).
     clampNecromancerPoint(x, y) {
@@ -939,6 +1028,31 @@ export class GameEngine {
         }
     }
 
+    // Boss Skeleton_Axe do Núcleo derrotado: mesma oportunidade única do
+    // Necromancer — 'SINAL REIVINDICADO' em tela cheia, moedas e explosão de
+    // partículas. A derrota é permanente até iniciar um jogo novo.
+    onSkeletonAxeBossDefeated(boss) {
+        gameState.skeletonAxeBossDefeated = true;
+        this._showSoulsMessage('SINAL REIVINDICADO', '#f6c885');
+        if (!boss._coinAwarded) {
+            boss._coinAwarded = true;
+            this._awardEnemyCoins(boss.x, boss.y, 30);
+        }
+        for (let i = 0; i < 30; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 50 + Math.random() * 150;
+            this.particles.push({
+                x: boss.x,
+                y: boss.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                life: 0.5 + Math.random() * 0.45,
+                color: Math.random() > 0.5 ? '#f6c885' : '#c84b1c',
+                size: Math.random() > 0.5 ? 4 : 3,
+            });
+        }
+    }
+
     /* ── Assistência do Aliado no Boss Necromancer ─────────── */
     _triggerAllyBossHelp(boss) {
         const selectedId = CHARACTERS[gameState.selectedCharacter]
@@ -1031,7 +1145,7 @@ export class GameEngine {
         if (!this.player.isDead) {
             // Respawn (automático, tecla R ou troca de mapa) encerra o aviso
             // de morte para ele não ficar na tela.
-            if (this._deathHandled && this._soulsMessage && this._soulsMessage.text === 'VOCÊ MORREU') {
+            if (this._deathHandled && this._soulsMessage && this._soulsMessage.text === 'SINAL PERDIDO') {
                 this._soulsMessage = null;
             }
             this._deathHandled = false;
@@ -1041,12 +1155,18 @@ export class GameEngine {
         if (!this._deathHandled) {
             this._deathHandled = true;
             this._deathRespawnTimer = 3.2;
-            this._showSoulsMessage('VOCÊ MORREU', '#e62424');
+            this._showSoulsMessage('SINAL PERDIDO', '#e62424');
             this._resetBossOnDeath();
         }
 
         if (this._deathRespawnTimer > 0) this._deathRespawnTimer -= dt;
         if (this._deathRespawnTimer > 0) return;
+
+        // Respawn após morrer: na Sala do Rei (boss Necromancer) o jogador
+        // respawna na Sala Principal do castelo — não dentro da sala do boss.
+        if (this.currentMapId === MAP_IDS.CASTLE_KING_ROOM) {
+            this.changeMap(MAP_IDS.CASTLE_PRINCIPAL_ROOM, 'castle-principal-entry');
+        }
 
         const spawn = this.currentMap.spawn || { x: 0, y: 0 };
         this.player.respawn(spawn.x, spawn.y);
@@ -1070,6 +1190,14 @@ export class GameEngine {
                 r.takeDamage(r.maxHp + 9999, boss.x, boss.y);
             }
             this.necromancerEffects.length = 0;
+        }
+
+        // Boss Skeleton_Axe do Núcleo: volta NA HORA ao estado inicial da luta
+        // (vida cheia no posto) quando o jogador morre; derrota só vale se o
+        // jogador matar o boss.
+        const axeBoss = this.skeletonAxeBoss;
+        if (axeBoss && !axeBoss.isDead && !gameState.skeletonAxeBossDefeated) {
+            axeBoss.resetForRetry();
         }
 
         // Recua o aliado que estava em campo: ele reaparece só depois do
@@ -1159,6 +1287,18 @@ export class GameEngine {
         this._updateNecromancerEffects(dt);
     }
 
+    // Boss Skeleton_Axe do Núcleo: IA + animação próprios (mesma estrutura do
+    // Necromancer). Ao final da animação de morte o boss some do mapa.
+    _updateSkeletonAxeBoss(dt) {
+        const boss = this.skeletonAxeBoss;
+        if (!boss) return;
+        if (!boss.isDead) boss.updateAi(dt, this);
+        boss.update(dt);
+        if (boss.shouldRemove) {
+            this.skeletonAxeBoss = null;
+        }
+    }
+
     _updateNecromancerEffects(dt) {
         for (let i = this.necromancerEffects.length - 1; i >= 0; i--) {
             const e = this.necromancerEffects[i];
@@ -1203,15 +1343,8 @@ export class GameEngine {
             h: p.colliderHalfH * 2,
         };
 
-        let hit = false;
-        if (e.kind === 'explosion') {
-            hit = rectsOverlap(pr, { x: e.x - e.r, y: e.y - e.r, w: e.r * 2, h: e.r * 2 });
-        } else if (e.kind === 'lightning') {
-            hit = rectsOverlap(pr, { x: e.x - e.hitW / 2, y: e.y - e.hitH, w: e.hitW, h: e.hitH });
-        } else if (e.kind === 'unholy') {
-            hit = rectsOverlap(pr, { x: e.x - e.hitW / 2, y: e.y - e.hitH / 2, w: e.hitW, h: e.hitH });
-        }
-
+        const rect = getNecroSkillHitRect(e);
+        const hit = rect ? rectsOverlap(pr, rect) : false;
         if (hit) p.takeDamage(e.dmg, e.x, e.y);
     }
 
@@ -1263,8 +1396,14 @@ export class GameEngine {
     }
 
     _renderBossBar(ctx) {
-        const boss = this.necromancerBoss;
+        const boss = this.necromancerBoss || this.skeletonAxeBoss;
         if (!boss) return;
+
+        const isAxeBoss = this.skeletonAxeBoss === boss;
+        const label = isAxeBoss ? 'SKELETON AXE' : 'NECROMANCER';
+        const accent = isAxeBoss ? '#f6c885' : '#d7a45d';
+        const fill = isAxeBoss ? '#c84b1c' : '#8f1821';
+        const numeric = isAxeBoss ? '#f6c885' : '#f6c885';
 
         const barW = Math.min(this.width - 120, 760);
         const barH = 18;
@@ -1275,24 +1414,24 @@ export class GameEngine {
 
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#d7a45d';
-        ctx.fillText('NECROMANCER', this.width / 2, barY - 8);
+        ctx.fillStyle = accent;
+        ctx.fillText(label, this.width / 2, barY - 8);
 
         ctx.fillStyle = '#160b0d';
         ctx.fillRect(barX, barY, barW, barH);
-        ctx.strokeStyle = '#d7a45d';
+        ctx.strokeStyle = accent;
         ctx.lineWidth = 2;
         ctx.strokeRect(barX + 0.5, barY + 0.5, barW - 1, barH - 1);
 
         const ratio = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
         const fillW = Math.round((barW - 4) * ratio);
         if (fillW > 0) {
-            ctx.fillStyle = '#8f1821';
+            ctx.fillStyle = fill;
             ctx.fillRect(barX + 2, barY + 2, fillW, barH - 4);
         }
 
         ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
+        ctx.fillStyle = numeric;
         ctx.fillText(`${Math.round(boss.hp)} / ${boss.maxHp}`, this.width / 2, barY + barH + 25);
 
         ctx.restore();
@@ -1336,29 +1475,17 @@ export class GameEngine {
         }
 
         for (const e of this.necromancerEffects) {
-            if (e.kind === 'explosion') {
-                ctx.strokeStyle = '#ff8888';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(Math.round(e.x + off.x), Math.round(e.y + off.y), e.r, 0, Math.PI * 2);
-                ctx.stroke();
-            } else if (e.kind === 'lightning') {
-                ctx.strokeStyle = '#88aaff';
-                ctx.strokeRect(
-                    Math.round(e.x + off.x - e.hitW / 2) + 0.5,
-                    Math.round(e.y + off.y - e.hitH) + 0.5,
-                    e.hitW,
-                    e.hitH
-                );
-            } else if (e.kind === 'unholy') {
-                ctx.strokeStyle = '#aa55aa';
-                ctx.strokeRect(
-                    Math.round(e.x + off.x - e.hitW / 2) + 0.5,
-                    Math.round(e.y + off.y - e.hitH / 2) + 0.5,
-                    e.hitW,
-                    e.hitH
-                );
-            }
+            const rect = getNecroSkillHitRect(e);
+            if (!rect) continue;
+            const color = e.kind === 'explosion' ? '#ff8888' : e.kind === 'lightning' ? '#88aaff' : '#aa55aa';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(
+                Math.round(rect.x + off.x) + 0.5,
+                Math.round(rect.y + off.y) + 0.5,
+                Math.round(rect.w),
+                Math.round(rect.h)
+            );
         }
 
         for (const entry of this._reaperPlacementLog) {
@@ -1970,6 +2097,9 @@ export class GameEngine {
         // Boss Necromancer: IA, animação, fase de invocação e efeitos ativos.
         this._updateNecromancer(dt);
 
+        // Boss Skeleton_Axe do Núcleo: IA + animação próprios.
+        this._updateSkeletonAxeBoss(dt);
+
         // Shop interaction detection (Ally NPC on Mars Surface)
         this.interactableShop = null;
         this.shopPrompt = '';
@@ -2100,6 +2230,29 @@ export class GameEngine {
                 }
             }
 
+            // Boss Skeleton_Axe do Núcleo também é alvo válido das balas.
+            if (!consumed && this.skeletonAxeBoss) {
+                const ab = this.skeletonAxeBoss;
+                if (!ab.isDead) {
+                    const abRectBoss = {
+                        x: ab.x - ab.colliderHalfW,
+                        y: ab.y - ab.colliderHalfH,
+                        w: ab.colliderHalfW * 2,
+                        h: ab.colliderHalfH * 2
+                    };
+                    if (rectsOverlap(abRectBoss, bRect)) {
+                        if (this._bulletCanDamage(bullet, 'enemy', ab)) {
+                            ab.takeDamage(bullet.damage, bullet.x, bullet.y);
+                            if (ab.isDead && !ab._coinAwarded) {
+                                ab._coinAwarded = true;
+                                this._awardEnemyCoins(ab.x, ab.y, 30);
+                            }
+                        }
+                        consumed = true;
+                    }
+                }
+            }
+
             if (!consumed && !this.player.isDead) {
                 const p = this.player;
                 const pRect = {
@@ -2168,6 +2321,11 @@ export class GameEngine {
         // 2.8 Boss Necromancer por cima de Reapers/atores, antes dos projéteis
         if (this.necromancerBoss) {
             this.necromancerBoss.render(ctx, this.camera);
+        }
+
+        // 2.9 Boss Skeleton_Axe do Núcleo (mesma camada do Necromancer)
+        if (this.skeletonAxeBoss) {
+            this.skeletonAxeBoss.render(ctx, this.camera);
         }
 
         // 3. Render Bullets
@@ -2341,7 +2499,7 @@ export class GameEngine {
 
         ctx.font = '8px "Press Start 2P", monospace';
 
-        CATACOMBS_SKELETON_AXE_SPAWNS.forEach((spawn, i) => {
+        CATACOMBS_SKELETON_WARRIOR_SPAWNS.forEach((spawn, i) => {
             const sx = Math.round(spawn.x + off.x);
             const sy = Math.round(spawn.y + off.y);
 
@@ -2353,7 +2511,22 @@ export class GameEngine {
             // Text block — id, current map and LOCAL coordinates.
             ctx.textAlign = 'center';
             ctx.fillStyle = '#00ff66';
-            ctx.fillText(`Skeleton_Axe_${i + 1}`, sx, sy - 12);
+            ctx.fillText(`Skeleton_Warrior_${i + 1}`, sx, sy - 12);
+            ctx.fillText(`MAP: ${this.currentMapId}`, sx, sy + 18);
+            ctx.fillText(`LOCAL: ${spawn.x}, ${spawn.y}`, sx, sy + 28);
+        });
+
+        CATACOMBS_SKELETON_ARCHER_SPAWNS.forEach((spawn, i) => {
+            const sx = Math.round(spawn.x + off.x);
+            const sy = Math.round(spawn.y + off.y);
+
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillRect(sx - 5, sy - 1, 10, 2);
+            ctx.fillRect(sx - 1, sy - 5, 2, 10);
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText(`Skeleton_Archer_${i + 1}`, sx, sy - 12);
             ctx.fillText(`MAP: ${this.currentMapId}`, sx, sy + 18);
             ctx.fillText(`LOCAL: ${spawn.x}, ${spawn.y}`, sx, sy + 28);
         });

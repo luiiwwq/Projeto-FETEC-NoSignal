@@ -258,7 +258,9 @@ export class SkeletonAxe {
     _startAttack(player) {
         this._attackTarget = player;
         this.attackHitApplied = false;
-        this.attackCooldown = SKELETON_ATTACK_COOLDOWN;
+        // Cooldown per-instância: o boss do Núcleo usa um valor menor
+        // (attackCooldownDuration) para atacar bem mais rápido.
+        this.attackCooldown = this.attackCooldownDuration ?? SKELETON_ATTACK_COOLDOWN;
         this.vx = 0;
         this.vy = 0;
         this._setState(SKELETON_STATES.ATTACK, true);
@@ -348,7 +350,9 @@ export class SkeletonAxe {
         const cfg = ANIM_CONFIG[this.state];
         if (!cfg) return;
 
-        this.animTime += dt;
+        // Multiplicador de velocidade por instância (boss ataca bem mais
+        // rápido); esqueletos comuns ficam em 1x (FRAME_DURATION base).
+        this.animTime += dt * (this.animSpeedMul ?? 1);
         while (this.animTime >= FRAME_DURATION) {
             this.animTime -= FRAME_DURATION;
 
@@ -374,25 +378,29 @@ export class SkeletonAxe {
     }
 
     /* ── Rendering ───────────────────────────────────────── */
-    render(ctx, camera) {
-        const screen = camera.worldToScreen(this.x, this.y);
-        const cfg = ANIM_CONFIG[this.state];
-        const sheet = getSheet(this.state);
-
-        const drawW = Math.round(cfg.fw * SKELETON_RENDER_SCALE);
-        const drawH = Math.round(cfg.fh * SKELETON_RENDER_SCALE);
-        // The artwork is bottom-anchored: pin the feet to the bottom of the
-        // hitbox and let the body rise above it.
-        const feetY = screen.y + this.colliderHalfH;
-        const drawY = Math.round(feetY - drawH);
-
-        // Ground shadow.
+    _groundShadow(ctx, screen, feetY) {
         ctx.save();
         ctx.fillStyle = 'rgba(10, 5, 5, 0.45)';
         ctx.beginPath();
         ctx.ellipse(screen.x, feetY - 4, 26, 10, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+    }
+
+    render(ctx, camera) {
+        const screen = camera.worldToScreen(this.x, this.y);
+        const cfg = ANIM_CONFIG[this.state];
+        const sheet = getSheet(this.state);
+
+        const renderScale = this.renderScale ?? SKELETON_RENDER_SCALE;
+        const drawW = Math.round(cfg.fw * renderScale);
+        const drawH = Math.round(cfg.fh * renderScale);
+        // The artwork is bottom-anchored: pin the feet to the bottom of the
+        // hitbox and let the body rise above it.
+        const feetY = screen.y + this.colliderHalfH;
+        const drawY = Math.round(feetY - drawH);
+
+        this._groundShadow(ctx, screen, feetY);
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
@@ -400,11 +408,15 @@ export class SkeletonAxe {
         if (this._facing < 0) ctx.scale(-1, 1);
         if (sheet) {
             const srcX = Math.min(this.currentFrame, cfg.frames - 1) * cfg.fw;
+            // Filtro de cor só sobre o asset (usado pelo boss do Núcleo). O
+            // save/restore do bloco abaixo já restaura o filtro ao final.
+            if (this._renderFilter) ctx.filter = this._renderFilter;
             ctx.drawImage(
                 sheet,
                 srcX, 0, cfg.fw, cfg.fh,
                 Math.round(-drawW / 2), drawY, drawW, drawH
             );
+            ctx.filter = 'none';
         } else {
             // Fallback placeholder while the sheet is loading.
             ctx.fillStyle = '#7a7560';

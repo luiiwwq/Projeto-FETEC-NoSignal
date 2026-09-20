@@ -48,6 +48,7 @@ export const gameState = {
 
     // Estado permanente de chefes e áreas da sessão
     necromancerDefeated: false,
+    skeletonAxeBossDefeated: false,
     catacombsCleared: false,
 
     addCoins(amount) {
@@ -71,6 +72,7 @@ export const gameState = {
         this.inventory = [];
         this.upgrades = [];
         this.necromancerDefeated = false;
+        this.skeletonAxeBossDefeated = false;
         this.catacombsCleared = false;
         try {
             localStorage.removeItem('noSignal_allyBossHelpPurchased');
