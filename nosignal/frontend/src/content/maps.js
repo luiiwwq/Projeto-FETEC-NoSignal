@@ -134,19 +134,72 @@ const shopNpc = {
     sprite: 'Map/shop_npc.png',
 };
 
-// Enemy spaceship — static prop (Map/enemie_spaceship.png) parked on the
-// surface. The sprite is 1024×1024 with transparent margins; `source` crops to
-// the opaque hull (694×570) and it is scaled down to roughly the shop NPC size
-// (300×246) so the AABB below is small and tight. Center ≈ (3261, 2050).
+// Enemy spaceship — static prop (Map/spaceship_enemy.png) parked on the
+// surface. The whole 1371×1148 sprite is drawn scaled to the 450×369 box
+// (1.5x do tamanho original 300×246), centrado no mesmo ponto. A colisão
+// contorna a silhueta do casco com 20 caixas (ainda menor que o rect de
+// desenho, "recortado" de forma natural). Center ≈ (3261, 2050).
 const enemySpaceship = {
     id: 'enemy-spaceship',
     kind: 'npc',
-    x: 3111,
-    y: 1927,
-    w: 300,
-    h: 246,
-    source: { x: 157, y: 204, w: 694, h: 570 },
-    sprite: 'Map/enemie_spaceship.png',
+    x: 3036,
+    y: 1865.5,
+    w: 450,
+    h: 369,
+    collisionBoxes: [
+        { dx: 280, dy: 20, w: 60, h: 20 },
+        { dx: 240, dy: 40, w: 80, h: 20 },
+        { dx: 100, dy: 61, w: 40, h: 20 },
+        { dx: 200, dy: 61, w: 120, h: 20 },
+        { dx: 60, dy: 81, w: 240, h: 20 },
+        { dx: 40, dy: 101, w: 300, h: 20 },
+        { dx: 20, dy: 122, w: 420, h: 20 },
+        { dx: 100, dy: 142, w: 340, h: 20 },
+        { dx: 60, dy: 162, w: 360, h: 20 },
+        { dx: 60, dy: 182, w: 380, h: 20 },
+        { dx: 60, dy: 203, w: 380, h: 20 },
+        { dx: 40, dy: 223, w: 400, h: 20 },
+        { dx: 40, dy: 243, w: 400, h: 20 },
+        { dx: 20, dy: 284, w: 300, h: 20 },
+        { dx: 340, dy: 284, w: 100, h: 20 },
+        { dx: 0, dy: 304, w: 260, h: 20 },
+        { dx: 360, dy: 304, w: 60, h: 20 },
+        { dx: 0, dy: 324, w: 240, h: 20 },
+        { dx: 360, dy: 324, w: 20, h: 20 },
+        { dx: 0, dy: 344, w: 140, h: 20 },
+    ],
+    sprite: 'Map/spaceship_enemy.png',
+};
+
+// Mission spaceship — prop amigável (Map/spaceship_mission.png) pairando em
+// cima do spawn inicial da superfície. Desenhada SEM crop (o sprite ocupa quase
+// todo o canvas 1754×896; recortar cortava o bico), num pouco abaixo do fator
+// de escala da nave inimiga: 1754×896 × 0.36 ≈ 631×323. Colisão também
+// contornada na silhueta: 14 caixas recortando as margens do quadrado.
+const missionSpaceship = {
+    id: 'mission-spaceship',
+    kind: 'npc',
+    x: 154,
+    y: 337,
+    w: 631,
+    h: 323,
+    collisionBoxes: [
+        { dx: 423, dy: 40, w: 181, h: 20 },
+        { dx: 363, dy: 61, w: 242, h: 20 },
+        { dx: 322, dy: 81, w: 282, h: 20 },
+        { dx: 242, dy: 101, w: 363, h: 20 },
+        { dx: 181, dy: 121, w: 443, h: 20 },
+        { dx: 141, dy: 141, w: 484, h: 20 },
+        { dx: 101, dy: 162, w: 524, h: 20 },
+        { dx: 101, dy: 182, w: 484, h: 20 },
+        { dx: 60, dy: 202, w: 484, h: 20 },
+        { dx: 40, dy: 222, w: 484, h: 20 },
+        { dx: 20, dy: 242, w: 443, h: 20 },
+        { dx: 20, dy: 262, w: 383, h: 20 },
+        { dx: 60, dy: 283, w: 282, h: 20 },
+        { dx: 121, dy: 303, w: 141, h: 20 },
+    ],
+    sprite: 'Map/spaceship_mission.png',
 };
 
 
@@ -157,9 +210,9 @@ export const marsSurfaceMap = {
     height: 3200,
     tileSize: TILE,
     dust: true,
-    spawn: { x: 420, y: 700 },
+    spawn: { x: 470, y: 700 },
     spawnPoints: {
-        'mars-start': { x: 420, y: 700 },
+        'mars-start': { x: 470, y: 700 },
         'cave-return': { x: 1615, y: 1500 },
         'castle-return': { x: 3650, y: 895 },
     },
@@ -172,6 +225,7 @@ export const marsSurfaceMap = {
         ...surfaceBorderRocks,
         shopNpc,
         enemySpaceship,
+        missionSpaceship,
         caveRockOuterLeft,
         cavePillarLeft,
         caveArchTop,

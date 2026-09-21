@@ -43,7 +43,10 @@ export const gameState = {
 
     // Economia e loja
     coins: 50, // Saldo inicial generoso para permitir testes imediatos
-    inventory: [], // IDs de itens comprados
+    inventory: [], // (legado) IDs de itens já comprados
+    itemPurchases: {}, // itemId -> nº de compras (máx 3; consumíveis com uso infinito)
+    hotbarOrder: [], // ordem de compra dos consumíveis: [0]=slot 1, [1]=slot 2, [2]=slot 3
+    itemCooldowns: {}, // itemId -> segundos restantes da recarga de 15s
     allyBossHelpPurchased: (() => { try { return localStorage.getItem('noSignal_allyBossHelpPurchased') === 'true'; } catch { return false; } })(),
 
     // Estado permanente de chefes e áreas da sessão
@@ -64,12 +67,43 @@ export const gameState = {
         return false;
     },
 
+    // Itens consumíveis: uso infinito após a 1ª compra, limite de 3 compras.
+    getItemPurchases(itemId) {
+        return this.itemPurchases[itemId] || 0;
+    },
+    addItemPurchase(itemId) {
+        if (!this.itemPurchases[itemId]) this.itemPurchases[itemId] = 0;
+        this.itemPurchases[itemId]++;
+        if (!this.hotbarOrder.includes(itemId)) this.hotbarOrder.push(itemId);
+        return this.itemPurchases[itemId];
+    },
+    // Slot do hotbar (1-3) preenchido pela ORDEM de compra (como os upgrades).
+    getHotbarItemId(slot) {
+        return this.hotbarOrder[slot - 1] || null;
+    },
+    getItemCooldown(itemId) {
+        return this.itemCooldowns[itemId] || 0;
+    },
+    setItemCooldown(itemId, seconds) {
+        this.itemCooldowns[itemId] = Math.max(0, seconds);
+    },
+    tickItemCooldowns(dt) {
+        for (const id in this.itemCooldowns) {
+            if (this.itemCooldowns[id] > 0) {
+                this.itemCooldowns[id] = Math.max(0, this.itemCooldowns[id] - dt);
+            }
+        }
+    },
+
     reset() {
         this.playerHp = 105;
         this.maxPlayerHp = 105;
         this.currentScene = 'TITLE';
         this.coins = 50;
         this.inventory = [];
+        this.itemPurchases = {};
+        this.hotbarOrder = [];
+        this.itemCooldowns = {};
         this.upgrades = [];
         this.necromancerDefeated = false;
         this.skeletonAxeBossDefeated = false;

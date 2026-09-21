@@ -197,6 +197,10 @@ export function playWalkSound() {
     const ctx = _getAudioCtx();
     if (!ctx || !walkBuffer) return;
 
+    // Autoplay policy: se o contexto ainda estiver suspenso (criado antes do
+    // gesto do usuário), retoma no primeiro passo.
+    if (ctx.state === 'suspended') ctx.resume();
+
     const source = ctx.createBufferSource();
     source.buffer = walkBuffer;
     source.start(0, walkOnset, Math.min(WALK.sliceDuration, walkBuffer.duration - walkOnset));

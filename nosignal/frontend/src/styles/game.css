@@ -1197,6 +1197,44 @@
     letter-spacing: 1px;
 }
 
+/* ─── Espaço reservado para o sprite asset do item ─── */
+.shop-card-sprite {
+    width: 54px;
+    height: 54px;
+    background: #0e0709;
+    border: 2px dashed #4d1d15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    line-height: 1;
+    color: #8a5a40;
+    margin-bottom: 2px;
+    transition: border-color 0.15s;
+}
+
+.shop-card-sprite[data-item-id="cura_alienigena"] {
+    border-color: #22c55e;
+    color: #86efac;
+}
+
+.shop-card-sprite[data-item-id="energia_duna"] {
+    border-color: #38bdf8;
+    color: #7dd3fc;
+}
+
+.shop-card-sprite[data-item-id="item_slot_3"] {
+    border-color: #6b7280;
+    color: #9ca3af;
+}
+
+.shop-card-sprite[data-item-id="necro_ally_help"] {
+    border-color: #c084fc;
+    color: #f3e8ff;
+}
+
+
+
 .shop-card.shop-card-special .shop-card-badge {
     color: #c084fc;
 }

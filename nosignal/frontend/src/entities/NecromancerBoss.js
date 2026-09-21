@@ -12,7 +12,7 @@
 
 /* ── Combate ─────────────────────────────────────────────── */
 export const NECROMANCER_MAX_HP = 1000;
-export const NECROMANCER_ATTACK_DAMAGE = 35;
+export const NECROMANCER_ATTACK_DAMAGE = 25;
 export const NECROMANCER_ATTACK_COOLDOWN = 1.2;
 export const NECROMANCER_MELEE_RANGE = 100;
 export const NECROMANCER_ENGAGE_RANGE = 920;
@@ -24,6 +24,12 @@ export const NECROMANCER_HIT_FRAME = 6;
 export const NECROMANCER_SUMMON_DURATION = 2.6;
 // Invocação única assim que o boss chega a 500 de vida (50% dos 1000 de HP).
 export const NECROMANCER_SUMMON_AT_HP = 500;
+
+// Frames da poça unholy em que ela já está CRESCIDA (índices 0-base no array
+// de frames; arquivos 11..34 = poça crescida). Fora dessa janela a poça ainda
+// está reduzida na animação e NÃO dá dano — o hitbox só ativa com o visual.
+export const UNHOLY_GROWN_FRAME_INDEX = [10, 33];
+export const UNHOLY_FRAME_HZ = 0.09;
 
 /* ── Hitbox & render ─────────────────────────────────────── */
 export const NECROMANCER_COLLIDER_HALF_W = 28;
@@ -150,9 +156,10 @@ export const NECRO_FIREBALL_DAMAGE = 25;
 
 // Dano das skills do Necromancer conforme o suporte do NPC:
 // - SEM ajuda (allyBossHelpPurchased false): lightning/fireball/explosion
-//   alinhados no mesmo dano (~15) e unholy em 35.
+//   alinhados no mesmo dano (~15) e unholy em 15 por tick (até 4 ticks por
+//   poça = ~60 de zona de negação, equilibrado com o melee de 25).
 // - COM ajuda comprada na loja: mantém o dano original da luta.
-const NECRO_SKILL_DMG_SOLO = { fireball: 15, lightning: 15, explosion: 15, unholy: 35 };
+const NECRO_SKILL_DMG_SOLO = { fireball: 15, lightning: 15, explosion: 15, unholy: 15 };
 const NECRO_SKILL_DMG_ASSISTED = { fireball: NECRO_FIREBALL_DAMAGE, lightning: 35, explosion: 30, unholy: 12 };
 
 export function getNecroSkillDamage(kind) {
@@ -161,12 +168,14 @@ export function getNecroSkillDamage(kind) {
 }
 
 /* ── Hitboxes das skills desenhadas a partir dos sprites ──
- * Cada bbox é [l, t, r, b] NORMALIZADO (0..1) sobre o frame do sprite,
- * medido da área não-transparente real. As hitboxes usam os MESMOS
- * transforms do render:
- *   - explosion: 64x55 x4, centrada em (e.x, e.y)
- *   - lightning: 100x208 x3, bottom-anchored em e.y (frame por variante)
- *   - unholy:    300x256 x2, bottom-anchored em e.y (união da poça crescida)
+ * A explosion usa bbox [l, t, r, b] NORMALIZADO (0..1) sobre o frame do sprite,
+ * medida da área não-transparente real, com os MESMOS transforms do render
+ * (64x55 x4, centrada em e.x/e.y).
+ * Já lightning e unholy têm hitbox fixa de 1/3 do asset:
+ *   - lightning: coluna 100x208 x3 âncora-bottom; o raio CAI de cima e a zona
+ *     de perigo é só o terço inferior (dar um pulo por cima não deve acertar).
+ *   - unholy: poça 300x256 x2 âncora-bottom; hitbox só no terço central-inferior,
+ *     onde a poça visivelmente pica, sem pegar quem passa na borda/longe.
  */
 const SKILL_SPRITE_LAYOUT = {
     explosion: { w: 64, h: 55, scale: 4, anchor: 'center' },
@@ -174,45 +183,33 @@ const SKILL_SPRITE_LAYOUT = {
     unholy:    { w: 300, h: 256, scale: 2, anchor: 'bottom' },
 };
 
-// União dos frames "poça crescida" (11-17 e 19-34) de unholy_ground_size_reduction.
-const UNHOLY_POOL_BBOX = [0.0167, 0.0586, 0.8467, 0.9688];
-
-// União dos 3 frames por variante (01..09) de lightning_variantXX.
-const LIGHTNING_VARIANT_BBOX = {
-    1: [0.0800, 0.0337, 0.8100, 0.9519],
-    2: [0.0200, 0.0192, 0.8800, 0.9663],
-    3: [0.0700, 0.0913, 0.8700, 0.9615],
-    4: [0.0400, 0.0288, 0.8700, 0.9567],
-    5: [0.0400, 0.0288, 0.8800, 0.9615],
-    6: [0.0500, 0.0481, 0.8900, 0.9663],
-    7: [0.0800, 0.0337, 0.9000, 0.9663],
-    8: [0.0800, 0.0337, 0.8100, 0.9327],
-    9: [0.0900, 0.1058, 0.8000, 0.8942],
-};
-
 // União dos 6 frames de explosion_simple.
 const EXPLOSION_BBOX = [0.0000, 0.0000, 0.9688, 1.0000];
 
 /**
- * Retorna o retângulo de colisão em coordenadas de MUNDO que reproduz
- * exatamente a área visível do sprite desenhado (mesmo anchor+scale do
- * render). null para ataques sem área própria (fireball é projétil).
+ * Retorna o retângulo de colisão em coordenadas de MUNDO que reproduz a área
+ * de perigo de cada skill (mesmo anchor+scale do render). null para ataques
+ * sem área própria (fireball é projétil).
  */
 export function getNecroSkillHitRect(e) {
-    let bb = null;
-    if (e.kind === 'lightning') {
-        bb = LIGHTNING_VARIANT_BBOX[e.variant] || LIGHTNING_VARIANT_BBOX[1];
-    } else if (e.kind === 'explosion') {
-        bb = EXPLOSION_BBOX;
-    } else if (e.kind === 'unholy') {
-        bb = UNHOLY_POOL_BBOX;
-    }
-    if (!bb) return null;
-
-    const { w, h, scale: cfgScale, anchor } = SKILL_SPRITE_LAYOUT[e.kind];
+    const layout = SKILL_SPRITE_LAYOUT[e.kind];
+    if (!layout) return null;
+    const { w, h, scale: cfgScale, anchor } = layout;
     const scale = e.kind === 'unholy' ? (e.scale || cfgScale) : cfgScale;
     const drawW = w * scale;
     const drawH = h * scale;
+
+    if (e.kind === 'lightning' || e.kind === 'unholy') {
+        // Terço inferior central: raio acerta na base e a poça no núcleo.
+        return {
+            x: e.x - drawW / 6,
+            y: e.y - drawH / 3,
+            w: drawW / 3,
+            h: drawH / 3,
+        };
+    }
+
+    const bb = EXPLOSION_BBOX;
     const left = e.x - drawW / 2;
     const top = anchor === 'center' ? e.y - drawH / 2 : e.y - drawH;
     return {
@@ -252,11 +249,11 @@ export class NecromancerProjectile extends Bullet {
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         if (imgs) {
-            // A caveira aponta para a direita por padrão: espelha na horizontal
-            // quando o projétil voa para a esquerda (angle fora dos 0..PI).
-            const flip = Math.cos(this.angle) < 0 ? -1 : 1;
+            // A caveira aponta para a direita por padrão: rotaciona o sprite para
+            // acompanhar a direção de voo (direita = 0, esquerda = PI, cima =
+            // -PI/2, baixo = PI/2...).
             ctx.translate(Math.round(screen.x), Math.round(screen.y));
-            ctx.scale(flip, 1);
+            ctx.rotate(this.angle);
             ctx.drawImage(
                 imgs[Math.min(this.frame, imgs.length - 1)],
                 -Math.round(drawW / 2),
@@ -292,7 +289,7 @@ export class NecromancerBoss {
 
         this.team = 'enemy';
         this.role = 'boss';
-        this.name = 'NECROMANCER';
+        this.name = 'Necro, King of Duna';
 
         this.maxHp = NECROMANCER_MAX_HP;
         this.hp = this.maxHp;
@@ -493,9 +490,19 @@ export class NecromancerBoss {
             // skill.vx/vy já são os deltas até o jogador (tx - this.x / ty - this.y);
             // o ângulo aponta direto no alvo para a bola de fogo ser desviável.
             const angle = Math.atan2(skill.vy, skill.vx);
-            // Nasce um pouco à frente do corpo (fora do pilar/trono) para não ser
-            // engolido por obstáculo no primeiro frame.
-            const dist = this.colliderHalfW + 26 + 4;
+            // A bola nasce um pouco à frente do corpo; se o ponto cair dentro de um
+            // obstáculo ela seria engolida no primeiro frame (ataque invisível), então
+            // varremos o raio até achar o primeiro ponto livre antes de spawnar.
+            const obstacles = engine.currentMap ? engine.currentMap.obstacles || [] : [];
+            let dist = this.colliderHalfW + 26 + 4;
+            const step = 10;
+            for (let i = 0; i < 8 && obstacles.length > 0; i++) {
+                const cx = this.x + Math.cos(angle) * dist;
+                const cy = this.y + Math.sin(angle) * dist;
+                const box = { x: cx - 10, y: cy - 10, w: 20, h: 20 };
+                if (!this._overlapsAnyObstacle(box, obstacles)) break;
+                dist += step;
+            }
             const spawnX = this.x + Math.cos(angle) * dist;
             const spawnY = this.y + Math.sin(angle) * dist;
             const proj = new NecromancerProjectile(spawnX, spawnY, angle, this, getNecroSkillDamage('fireball'));
@@ -541,6 +548,36 @@ export class NecromancerBoss {
                 scale: 2,
             });
         }
+    }
+
+    _overlapsAnyObstacle(box, obstacles) {
+        for (const o of obstacles) {
+            if (o.x < box.x + box.w && o.x + o.w > box.x && o.y < box.y + box.h && o.y + o.h > box.y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    _hasLineOfSight(target) {
+        const map = this._engine ? this._engine.currentMap : null;
+        const obstacles = map ? map.obstacles || [] : [];
+        if (obstacles.length === 0) return true;
+        const sx = this.x;
+        const sy = this.y - this.colliderHalfH;
+        const ex = target.x;
+        const ey = target.y - (target.colliderHalfH || 0);
+        const dx = ex - sx;
+        const dy = ey - sy;
+        const dist = Math.hypot(dx, dy) || 1;
+        const steps = Math.max(1, Math.ceil(dist / 24));
+        for (let i = 1; i < steps; i++) {
+            const px = sx + (dx * i) / steps;
+            const py = sy + (dy * i) / steps;
+            const box = { x: px - 8, y: py - 8, w: 16, h: 16 };
+            if (this._overlapsAnyObstacle(box, obstacles)) return false;
+        }
+        return true;
     }
 
     _startSummon(player) {
@@ -608,7 +645,7 @@ export class NecromancerBoss {
             const target = this._attackTarget;
             if (target && !target.isDead && typeof target.takeDamage === 'function') {
                 const reach = NECROMANCER_MELEE_RANGE + 20;
-                if (Math.hypot(target.x - this.x, target.y - this.y) <= reach) {
+                if (Math.hypot(target.x - this.x, target.y - this.y) <= reach && this._hasLineOfSight(target)) {
                     target.takeDamage(this.attackDamage, this.x, this.y);
                 }
             }

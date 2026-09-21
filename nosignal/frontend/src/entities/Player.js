@@ -100,6 +100,16 @@ export class Player {
         // Health & combat stats
         this.maxHp = 105;
         this.hp = 105;
+
+        // Energy reserve (tiros): a barra de energia só alimenta os disparos.
+        // Esvazia durante rajadas contínuas e recarrega rapidamente depois.
+        this.maxEnergy = 100;
+        this.baseMaxEnergy = 100; // valor padrão (Energia de Duna eleva temporariamente)
+        this.energy = this.maxEnergy;
+        this.energyRegen = 40; // /seg -> recarga completa em ~2.5s (só após cessar o fogo)
+        this.energyDelay = 0;  // recarga fica bloqueada logo após cada disparo
+        this.energyCost = this.weapon?.energyCost ?? 15;
+        this.energyOverdrive = 0; // segundos restantes do boost de energia
         this.bulletDamage = this.weapon?.damage ?? 14;
         this.damageMultiplier = 1.0;
         this.speedMultiplier = 1.0;
@@ -308,6 +318,14 @@ export class Player {
 
     shoot(aimAngle, bulletManager) {
         const weapon = this.weapon || {};
+
+        // Energia: cada disparo do jogador drena a barra; sem energia, não atira.
+        if (this.team === 'player' && this.role === 'player') {
+            if (this.energy < this.energyCost) return;
+            this.energy = Math.max(0, this.energy - this.energyCost);
+        this.energyDelay = 0.5;
+        }
+
         this.shootCooldown = weapon.cooldown ?? 0.22; // Cadence
         this.updateDirectionFromAngle(aimAngle);
         this.setState(PlayerState.SHOOTING, true);
@@ -323,11 +341,11 @@ export class Player {
 
         // Spawn bullet projectile(s)
         if (bulletManager) {
-            const spawnDist = 24;
+            // Ponto do cano: fica A FORA da própria hitbox em qualquer direção,
+            // inclusive para sul. A leve elevação (-10) evita tungar o chão.
+            const spawnDist = Math.max(this.colliderHalfW, this.colliderHalfH) + 12;
             const spawnX = this.x + Math.cos(aimAngle) * spawnDist;
-            // Spawn from the upper body so south-facing bullets never
-            // clip into the ground/collision box on the first frame.
-            const spawnY = this.y - 20 + Math.sin(aimAngle) * spawnDist * 0.35;
+            const spawnY = this.y + Math.sin(aimAngle) * spawnDist - 10;
 
             const bulletDamage = Number(((this.weapon?.damage ?? this.bulletDamage) * (this.damageMultiplier ?? 1.0)).toFixed(1));
             const bulletOpts = {
@@ -403,7 +421,7 @@ export class Player {
         this.setState(PlayerState.DEAD, true);
     }
 
-    respawn(x = 0, y = 0) {
+respawn(x = 0, y = 0) {
         this.x = x;
         this.y = y;
         this.vx = 0;
@@ -411,6 +429,11 @@ export class Player {
         this.hp = this.maxHp;
         this.isDead = false;
         this.invulnerableTimer = 0.5;
+        // Remove qualquer boost de energia ativo (energia volta ao padrão)
+        this.energyOverdrive = 0;
+        this.maxEnergy = this.baseMaxEnergy;
+        this.energy = this.maxEnergy;
+        this.energyDelay = 0;
         this.setState(PlayerState.IDLE, true);
     }
 
@@ -426,6 +449,43 @@ export class Player {
         } else if (this.hp > this.maxHp) {
             this.hp = this.maxHp;
         }
+
+        // Energia: o upgrade de movimentação também eleva o máximo para 120
+        // (+20 na barra), somando a diferença em vez de recarregar do zero.
+        const prevBaseEnergy = this.baseMaxEnergy;
+        const targetBaseEnergy = upgrades.includes('movespeed_up') ? 120 : 100;
+        this.baseMaxEnergy = targetBaseEnergy;
+
+        // Com a Energia de Duna ativa, o máximo temporário é preservado;
+        // apenas o padrão de base (usado no renascimento) muda.
+        if (this.energyOverdrive > 0) return;
+
+        if (targetBaseEnergy > prevBaseEnergy) {
+            this.maxEnergy = targetBaseEnergy;
+            this.energy = Math.min(this.maxEnergy, this.energy + (targetBaseEnergy - prevBaseEnergy));
+        } else if (this.maxEnergy !== targetBaseEnergy) {
+            this.maxEnergy = targetBaseEnergy;
+            this.energy = Math.min(this.energy, this.maxEnergy);
+        }
+    }
+
+    // Cura instantânea (poção Cura Alienígena): nunca ultrapassa a vida máxima.
+    heal(amount) {
+        if (this.isDead) return 0;
+        const before = this.hp;
+        this.hp = Math.min(this.maxHp, this.hp + amount);
+        return this.hp - before;
+    }
+
+    // Boost de energia (poção Energia de Duna): energia sobre para `target`
+    // durante `duration` segundos e depois volta ao padrão (100).
+    boostEnergy(target, duration) {
+        if (this.energyOverdrive <= 0) {
+            this.baseMaxEnergy = this.maxEnergy;
+        }
+        this.maxEnergy = target;
+        this.energy = target;
+        this.energyOverdrive = duration;
     }
 
     update(dt) {
@@ -434,6 +494,27 @@ export class Player {
         if (this.punchCooldown > 0) this.punchCooldown -= dt;
         if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
         if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+
+        // Energia recarrega rápido, mas SÓ depois que o jogador deixa de atirar
+        // (delay bloqueia a recarga durante o fogo contra o spam infinito).
+        if (this.team === 'player' && this.role === 'player') {
+            if (this.energyDelay > 0) {
+                this.energyDelay -= dt;
+            } else if (this.energy < this.maxEnergy) {
+                this.energy = Math.min(this.maxEnergy, this.energy + this.energyRegen * dt);
+            }
+        }
+
+        // Energia de Duna: overdrive temporário (150 de energia). Ao acabar,
+        // o máximo volta ao padrão e a energia é limitada de volta a ele.
+        if (this.energyOverdrive > 0) {
+            this.energyOverdrive -= dt;
+            if (this.energyOverdrive <= 0) {
+                this.energyOverdrive = 0;
+                this.maxEnergy = this.baseMaxEnergy;
+                this.energy = Math.min(this.energy, this.maxEnergy);
+            }
+        }
 
         // Footstep cadence enquanto corre (apenas o jogador controlado).
         // Só toca quando realmente há movimento; pool único reutilizado a cada

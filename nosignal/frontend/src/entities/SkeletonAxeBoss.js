@@ -29,9 +29,22 @@ export const SKELETON_AXE_BOSS_MAX_HP = 750;
 // A CADÊNCIA é bem mais rápida: cooldown de 0.5s e animação 2.5x veloz.
 export const SKELETON_AXE_BOSS_ATTACK_DAMAGE = SKELETON_ATTACK_DAMAGE;
 export const SKELETON_AXE_BOSS_ATTACK_COOLDOWN = 0.5;      // segundos entre golpes
-export const SKELETON_AXE_BOSS_ANIM_SPEED_MUL = 2.5;       // animação 2.5x mais rápida
+export const SKELETON_AXE_BOSS_ANIM_SPEED_MUL = 2.5;       // animação 2.5x mais rápida (corrida/reação)
+// Velocidade da animação de ATAQUE do boss (independente da corrida): mais
+// lenta que os 2.5x para o golpe ficar pesado, sem mudar o cooldown.
+export const SKELETON_AXE_BOSS_ATTACK_ANIM_SPEED_MUL = 1.2;
+// Ataque com alcance maior que os esqueletos (42 px): o machado enorme do
+// guardião atinge o jogador mesmo sem ele estar colado no boss.
+export const SKELETON_AXE_BOSS_ATTACK_RANGE = 125;
+// Perseguição mais veloz que os esqueletos comuns (70 px/s * 1.55 ≈ 108 px/s).
+export const SKELETON_AXE_BOSS_SPEED_MUL = 1.55;
 export const SKELETON_AXE_BOSS_COLLIDER_HALF_W = SKELETON_COLLIDER_HALF_W;
 export const SKELETON_AXE_BOSS_COLLIDER_HALF_H = SKELETON_COLLIDER_HALF_H;
+// Hitbox de ACERTO maior que o collider de movimento: como o render é 13x, o
+// corpo desenhado é muito maior que os 48px do collider físico. Essa meia-largura
+// extra (só comprimento — altura continua a mesma) é usada para as balas
+// acertarem o corpo todo do guardião.
+export const SKELETON_AXE_BOSS_HIT_HALF_W = 100; // 200px de largura de acerto
 // 4x: boss bem grande no Núcleo (golpe fica com ~168px de altura).
 export const SKELETON_AXE_BOSS_RENDER_SCALE = 13.0;
 
@@ -50,7 +63,7 @@ export class SkeletonAxeBoss extends SkeletonAxe {
     constructor(x = 0, y = 0, { id = null } = {}) {
         super(x, y, { id });
 
-        this.name = 'SKELETON_AXE_BOSS';
+        this.name = 'OLD DUNA GUARDIAN';
         this.maxHp = SKELETON_AXE_BOSS_MAX_HP;
         this.hp = this.maxHp;
         this.attackDamage = SKELETON_AXE_BOSS_ATTACK_DAMAGE;
@@ -58,6 +71,11 @@ export class SkeletonAxeBoss extends SkeletonAxe {
         // Ataques rápidos: cooldown curto + animação 2.5x (lido pelo render base)
         this.attackCooldownDuration = SKELETON_AXE_BOSS_ATTACK_COOLDOWN;
         this.animSpeedMul = SKELETON_AXE_BOSS_ANIM_SPEED_MUL;
+        this.attackAnimSpeedMul = SKELETON_AXE_BOSS_ATTACK_ANIM_SPEED_MUL;
+        this.attackRange = SKELETON_AXE_BOSS_ATTACK_RANGE;
+
+        // Hitbox de acerto (largura maior que o collider de movimento)
+        this.hitHalfW = SKELETON_AXE_BOSS_HIT_HALF_W;
 
         // Rendering
         this.renderScale = SKELETON_AXE_BOSS_RENDER_SCALE;
@@ -65,7 +83,7 @@ export class SkeletonAxeBoss extends SkeletonAxe {
         this._coinAwarded = false;
 
         // O boss permanece no posto mesmo quando o jogador tenta fugir.
-        this.speedMul = 1;
+        this.speedMul = SKELETON_AXE_BOSS_SPEED_MUL;
     }
 
     updateAi(dt, engine) {
@@ -129,6 +147,10 @@ export class SkeletonAxeBoss extends SkeletonAxe {
         ctx.fill();
         ctx.restore();
     }
+
+    // O boss NÃO exibe a barrinha de vida flutuante sobre o corpo — o
+    // cabeçalho escuro do boss (no rodapé da tela) já comunica a vida.
+    _renderHealthBar() {}
 }
 
 // Preload dos sprites: o boss usa exatamente as folhas do Skeleton_Axe, que já

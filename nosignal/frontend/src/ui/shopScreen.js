@@ -25,32 +25,38 @@ function _markAllyHelpPermanentlyPurchased() {
 
 export const SHOP_ITEMS = [
     {
-        id: 'item_slot_1',
-        name: 'Item 1',
-        description: 'Espaço reservado para futuro item.',
-        price: 10,
-        type: 'placeholder'
+        id: 'cura_alienigena',
+        name: 'Cura Alienígena',
+        description: 'Poção marciana: restaura 30 de vida instantaneamente. Uso infinito · recarga 15s.',
+        price: 20,
+        type: 'consumable',
+        effect: 'heal_30',
+        sprite: '✚'
     },
     {
-        id: 'item_slot_2',
-        name: 'Item 2',
-        description: 'Espaço reservado para futuro item.',
-        price: 10,
-        type: 'placeholder'
+        id: 'energia_duna',
+        name: 'Energia de Duna',
+        description: 'Poção da tempestade: eleva a ENERGIA a 150 durante 4.5 segundos. Uso infinito · recarga 15s.',
+        price: 20,
+        type: 'consumable',
+        effect: 'energy_boost',
+        sprite: '⚡'
     },
     {
         id: 'item_slot_3',
         name: 'Item 3',
-        description: 'Espaço reservado para futuro item.',
+        description: 'Espaço reservado para um futuro item.',
         price: 10,
-        type: 'placeholder'
+        type: 'placeholder',
+        sprite: '?'
     },
     {
         id: 'necro_ally_help',
         name: 'Ajuda no Boss Necromancer',
         description: 'O aliado surge na Sala do Rei para uma aparição rápida desferindo rajadas devastadoras no Boss.',
         price: 50,
-        type: 'boss_assist'
+        type: 'boss_assist',
+        sprite: '★'
     }
 ];
 
@@ -60,6 +66,46 @@ let engineRef = null;
 
 export function isShopOpen() {
     return isOpen;
+}
+
+/**
+ * Retorna o item associado ao slot do hotbar (1, 2 ou 3).
+ * Os slots são preenchidos pela ORDEM de compra (igual aos upgrades):
+ * o primeiro consumível comprado vai para o slot 1, o segundo para o 2, etc.
+ */
+export function getSlotItem(slot) {
+    const itemId = gameState.getHotbarItemId(slot);
+    return SHOP_ITEMS.find((it) => it.id === itemId) || null;
+}
+
+/**
+ * Consome o item do slot (teclas 1/2/3). Uso infinito após a compra, mas
+ * cada item tem recarga de 15s entre usos.
+ * Retorna { used, message } para o engine dar o feedback no HUD.
+ */
+export function consumeInventorySlot(slot, player) {
+    const item = getSlotItem(slot);
+    if (!item || item.type !== 'consumable') return { used: false, message: '' };
+    if (gameState.getItemPurchases(item.id) < 1) return { used: false, message: '' };
+
+    // Recarga de 15s por item (uso infinito, mas sem spam)
+    if (gameState.getItemCooldown(item.id) > 0) {
+        const secs = Math.ceil(gameState.getItemCooldown(item.id));
+        return { used: false, message: `${item.name}: recarregando ${secs}s` };
+    }
+
+    gameState.setItemCooldown(item.id, 15);
+
+    let message = '';
+    if (item.effect === 'heal_30') {
+        player.heal(30);
+        message = `${item.name}: +30 VIDA`;
+    } else if (item.effect === 'energy_boost') {
+        player.boostEnergy(150, 4.5);
+        message = `${item.name}: ENERGIA 150 · 4.5s`;
+    }
+
+    return { used: true, message };
 }
 
 export function openShopScreen(container, engine) {
@@ -110,23 +156,52 @@ export function openShopScreen(container, engine) {
 }
 
 function _renderItemCard(item, index) {
-    const isPurchased = item.type === 'boss_assist'
-        ? _isAllyHelpPermanentlyPurchased()
-        : (gameState.inventory && gameState.inventory.includes(item.id));
-
     const isSpecial = item.type === 'boss_assist';
+    const isPlaceholder = item.type === 'placeholder';
+    const isConsumable = item.type === 'consumable';
+
+    const isPurchased = isSpecial
+        ? _isAllyHelpPermanentlyPurchased()
+        : (isConsumable && gameState.getItemPurchases(item.id) >= 1);
+    const purchaseCount = isConsumable ? gameState.getItemPurchases(item.id) : 0;
+    const isMaxed = isConsumable && purchaseCount >= 3;
+
+    // Campo "compra única permanente" ou "limite 3/3" / contador
+    const badgeText = isSpecial
+        ? '★ ESPECIAL'
+        : isPlaceholder
+            ? 'EM BREVE'
+            : `${purchaseCount}/3`;
+
+    let btnText;
+    let btnDisabled = false;
+    if (isPlaceholder) {
+        btnText = 'EM BREVE';
+        btnDisabled = true;
+    } else if (isSpecial && isPurchased) {
+        btnText = '✔ ADQUIRIDO';
+        btnDisabled = true;
+    } else if (isConsumable && isMaxed) {
+        btnText = `✔ MÁXIMO (${purchaseCount}/3)`;
+        btnDisabled = true;
+    } else {
+        btnText = `COMPRAR (${item.price} 🪙)`;
+    }
 
     return `
-        <div class="shop-card ${isSpecial ? 'shop-card-special' : ''} ${isPurchased ? 'is-bought' : ''}" data-item-id="${item.id}">
-            <div class="shop-card-badge">${isSpecial ? '★ ESPECIAL' : `SLOT ${index + 1}`}</div>
+        <div class="shop-card ${isSpecial ? 'shop-card-special' : ''} ${isMaxed || (isSpecial && isPurchased) ? 'is-bought' : ''}" data-item-id="${item.id}">
+            <div class="shop-card-sprite" data-item-id="${item.id}">
+                <span>${item.sprite || '?'}</span>
+            </div>
+            <div class="shop-card-badge">${badgeText}</div>
             <div class="shop-card-name">${item.name}</div>
             <div class="shop-card-desc">${item.description}</div>
             <div class="shop-card-price">
                 <span class="price-tag">VALOR:</span>
                 <span class="price-val">🪙 ${item.price}</span>
             </div>
-            <button class="shop-buy-btn ${isPurchased ? 'bought' : ''}" data-buy-id="${item.id}" ${isPurchased ? 'disabled' : ''}>
-                ${isPurchased ? '✔ ADQUIRIDO' : `COMPRAR (${item.price} 🪙)`}
+            <button class="shop-buy-btn ${btnDisabled ? 'bought' : ''}" data-buy-id="${item.id}" ${btnDisabled ? 'disabled' : ''}>
+                ${btnText}
             </button>
         </div>
     `;
@@ -174,50 +249,74 @@ function _handlePurchase(itemId) {
     const item = SHOP_ITEMS.find((it) => it.id === itemId);
     if (!item) return;
 
-    const isPurchased = item.type === 'boss_assist'
-        ? _isAllyHelpPermanentlyPurchased()
-        : (gameState.inventory && gameState.inventory.includes(item.id));
-
-    if (isPurchased) {
-        _showShopMessage('Você já adquiriu este item!', 'warning');
+    if (item.type === 'placeholder') {
+        _showShopMessage('Este item chega em breve!', 'warning');
         return;
     }
 
+    if (item.type === 'boss_assist') {
+        if (_isAllyHelpPermanentlyPurchased()) {
+            _showShopMessage('Você já adquiriu este item!', 'warning');
+            return;
+        }
+        if ((gameState.coins || 0) < item.price) {
+            _showShopMessage('Moedas insuficientes!', 'error');
+            return;
+        }
+        gameState.spendCoins(item.price);
+        playClickButtonSound();
+        gameState.allyBossHelpPurchased = true;
+        _markAllyHelpPermanentlyPurchased();
+        _showShopMessage('Apoio Tático contratado! O aliado entrará na Sala do Rei. (Compra única permanente)', 'success');
+
+        _refreshShopPurchaseState(item, true);
+        _updateWallet();
+        return;
+    }
+
+    // Consumável: uso infinito, limite de 3 compras
+    const purchases = gameState.getItemPurchases(item.id);
+    if (purchases >= 3) {
+        _showShopMessage(`${item.name}: limite de compra atingido (3/3)!`, 'warning');
+        return;
+    }
     if ((gameState.coins || 0) < item.price) {
         _showShopMessage('Moedas insuficientes!', 'error');
         return;
     }
 
-    // Processa compra
     gameState.spendCoins(item.price);
     playClickButtonSound();
+    const newCount = gameState.addItemPurchase(item.id);
 
-    if (item.type === 'boss_assist') {
-        gameState.allyBossHelpPurchased = true;
-        _markAllyHelpPermanentlyPurchased();
-        _showShopMessage('Apoio Tático contratado! O aliado entrará na Sala do Rei. (Compra única permanente)', 'success');
-    } else {
-        if (!gameState.inventory) gameState.inventory = [];
-        gameState.inventory.push(item.id);
-        _showShopMessage(`${item.name} adquirido com sucesso!`, 'success');
-    }
+    _showShopMessage(`${item.name}: ${newCount}/3 adquirido!`, 'success');
+    _updateWallet();
+    _refreshShopPurchaseState(item, newCount >= 3);
+}
 
-    // Atualiza carteira na tela
+function _updateWallet() {
     const walletEl = shopOverlay?.querySelector('#shop-wallet-val');
     if (walletEl) {
         walletEl.textContent = `🪙 ${gameState.coins}`;
     }
+}
 
-    // Atualiza botão do item
+// Atualiza card + botão na tela após uma compra sem re-renderizar tudo.
+function _refreshShopPurchaseState(item, isMaxed) {
     const card = shopOverlay?.querySelector(`[data-item-id="${item.id}"]`);
-    if (card) {
+    if (!card) return;
+    const btn = card.querySelector('.shop-buy-btn');
+    if (!btn) return;
+
+    card.querySelector('.shop-card-badge').textContent = isMaxed ? '3/3' : `${gameState.getItemPurchases(item.id)}/3`;
+
+    if (isMaxed) {
         card.classList.add('is-bought');
-        const btn = card.querySelector('.shop-buy-btn');
-        if (btn) {
-            btn.classList.add('bought');
-            btn.setAttribute('disabled', 'true');
-            btn.textContent = '✔ ADQUIRIDO';
-        }
+        btn.classList.add('bought');
+        btn.setAttribute('disabled', 'true');
+        btn.textContent = `✔ MÁXIMO (${gameState.getItemPurchases(item.id)}/3)`;
+    } else {
+        btn.textContent = `COMPRAR (${item.price} 🪙)`;
     }
 }
 

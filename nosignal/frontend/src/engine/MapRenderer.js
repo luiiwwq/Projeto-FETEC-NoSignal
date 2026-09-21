@@ -492,14 +492,6 @@ export class MapRenderer {
 
     // ═══════════════════════ SURFACE PIPELINE ═══════════════════════
 
-    _isPlatformZone(wx, wy) {
-        const padHalf = 192;
-        return (
-            Math.abs(wx - this.map.spawn.x) <= padHalf &&
-            Math.abs(wy - this.map.spawn.y) <= padHalf
-        );
-    }
-
     _macroAt(lc, lr) {
         // The dark 'iron' macro (collisionless rock clusters scattered over the
         // surface) was removed by request: every logical tile is dune terrain.
@@ -524,10 +516,6 @@ export class MapRenderer {
     }
 
     _surfaceGroundStyle(wx, wy) {
-        if (this._isPlatformZone(wx, wy)) {
-            const even = (Math.round(wx / RENDER_TILE) + Math.round(wy / RENDER_TILE)) % 2 === 0;
-            return { base: even ? P.platformLight : P.platformDark };
-        }
         const macro = this._macroAt(Math.floor(wx / LOGICAL_TILE), Math.floor(wy / LOGICAL_TILE));
         let base;
         if (macro === 'iron') base = P.iron;
@@ -537,38 +525,14 @@ export class MapRenderer {
 
     _drawSurfaceGroundCell(ctx, sx, sy, wx, wy) {
         const pattern = this._ensureMapSurfacePattern(ctx);
-        if (pattern && !this._isPlatformZone(wx, wy)) {
+        if (pattern) {
             // Ground texture already painted by the single world-anchored fill in
-            // _renderSurface; nothing extra to draw for this cell.
+            // _renderSurface; nothing extra to draw for this cell (spawn included).
             return;
         }
         const g = this._surfaceGroundStyle(wx, wy);
         ctx.fillStyle = g.base;
         ctx.fillRect(sx, sy, RENDER_TILE, RENDER_TILE);
-    }
-
-    _drawSurfaceFeature(ctx, offset, lc, lr) {
-        const x = lc * LOGICAL_TILE;
-        const y = lr * LOGICAL_TILE;
-        const cx = Math.round(x + offset.x);
-        const cy = Math.round(y + offset.y);
-        const s = LOGICAL_TILE;
-
-        if (this._isPlatformZone(x + s / 2, y + s / 2)) {
-            ctx.fillStyle = P.platformBolt;
-            ctx.fillRect(cx + 4, cy + 4, 2, 2);
-            ctx.fillRect(cx + s - 6, cy + 4, 2, 2);
-            ctx.fillRect(cx + 4, cy + s - 6, 2, 2);
-            ctx.fillRect(cx + s - 6, cy + s - 6, 2, 2);
-            return;
-        }
-
-        const macro = this._macroAt(lc, lr);
-        if (macro === 'iron') {
-            // Dark collisionless rock clusters removed by request. Kept as a
-            // guard so no iron rock is ever drawn even if _macroAt changes.
-            return;
-        }
     }
 
     _drawSurfaceProps(ctx, offset, viewW, viewH) {
@@ -1053,21 +1017,7 @@ export class MapRenderer {
             }
         }
 
-        // LAYER 1b — macro terrain features on the LOGICAL_TILE grid
-        // (platform bolts).
-        const minLC = Math.max(0, Math.floor(-offset.x / LOGICAL_TILE));
-        const maxLC = Math.min(this.cols - 1, Math.ceil((viewW - offset.x) / LOGICAL_TILE));
-        const minLR = Math.max(0, Math.floor(-offset.y / LOGICAL_TILE));
-        const maxLR = Math.min(this.rows - 1, Math.ceil((viewH - offset.y) / LOGICAL_TILE));
-        for (let lr = minLR; lr <= maxLR; lr++) {
-            for (let lc = minLC; lc <= maxLC; lc++) {
-                this._drawSurfaceFeature(ctx, offset, lc, lr);
-            }
-        }
-
-        this._drawLandingPad(ctx, offset);
-
-        // LAYER 3 — props (rocks, cave formation, castle sprite, edge riffs).
+        // LAYER 2 — props (rocks, cave formation, castle sprite, edge riffs).
         this._drawSurfaceProps(ctx, offset, viewW, viewH);
 
         // Map transition markers on top.

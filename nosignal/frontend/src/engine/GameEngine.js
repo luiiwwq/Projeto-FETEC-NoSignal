@@ -50,6 +50,8 @@ import {
     NECROMANCER_REAPER_OFFSETS,
     getSkillImages,
     getNecroSkillHitRect,
+    UNHOLY_GROWN_FRAME_INDEX,
+    UNHOLY_FRAME_HZ,
     preloadNecromancerSprites,
 } from '../entities/NecromancerBoss.js';
 import {
@@ -66,7 +68,7 @@ import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionS
 import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
-import { openShopScreen, closeShopScreen, isShopOpen } from '../ui/shopScreen.js';
+import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem } from '../ui/shopScreen.js';
 import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings } from '../state/stateStorage.js';
@@ -124,8 +126,30 @@ function subtractZoneFromObstacles(list, zx, zy, zw, zh) {
     return out;
 }
 
+// Obstáculos podem declarar uma colisão mais natural que o rect de desenho
+// (ex.: naves cuja silhueta não é um quadrado). O campo `collisionBoxes` é uma
+// lista de rects RELATIVOS ao topo-esquerdo do prop: { dx, dy, w, h }. Várias
+// caixas pequenas contornando a silhueta substituem o box cheio por algo
+// "recortado" e natural. Sem o campo, o rect do obstáculo vale como colisão.
+function obstacleCollisionRects(o) {
+    if (o && Array.isArray(o.collisionBoxes) && o.collisionBoxes.length) {
+        return o.collisionBoxes.map((b) => ({
+            x: o.x + (b.dx || 0),
+            y: o.y + (b.dy || 0),
+            w: b.w,
+            h: b.h,
+        }));
+    }
+    return [o];
+}
+
 function buildCollisionObstacles(map, halfW, halfH) {
-    let list = map.obstacles;
+    let list = [];
+    for (const o of map.obstacles || []) {
+        const rects = obstacleCollisionRects(o);
+        if (rects.length === 1 && rects[0] === o) list.push(o);
+        else list.push(...rects);
+    }
     for (const z of map.freeMoveZones || []) {
         list = subtractZoneFromObstacles(list, z.x, z.y - halfH, z.w, z.h + halfH * 2);
     }
@@ -201,12 +225,18 @@ export class GameEngine {
         this.shopPrompt = '';
         this.floatingTexts = [];
 
+        // Feedback de uso de item no HUD (mensagem transitória)
+        this.hudMessage = '';
+        this.hudMessageTimer = 0;
+
         // Assistência tática do Aliado no Necromancer
         this.allyBossHelpTriggered = false;
         this.bossAssistAlly = null;
         this.bossAssistTimer = 0;
         this.bossAssistShotCooldown = 0;
         this.bossAssistDamageBudget = 0;
+        this.bossAssistSpawnPoint = null; // guarda a posição da 1ª aparição
+        this._allyHelpArenaTime = 0; // tempo vivo dentro da arena (mínimo 1s)
 
         // Morte estilo Dark Souls: mensagem central + respawn adiado (não
         // teletransporta de volta na hora) sem resetar chefe/esqueletos.
@@ -370,6 +400,8 @@ export class GameEngine {
         this.interactableShop = null;
         this.bossAssistAlly = null;
         this.allyBossHelpTriggered = false;
+        this.bossAssistSpawnPoint = null;
+        this._allyHelpArenaTime = 0;
 
         // (Re)create non-player characters for this map
         this._setupCharacterRoles(map);
@@ -547,7 +579,7 @@ export class GameEngine {
                 return true;
             }
             for (const o of map.obstacles) {
-                if (rectsOverlap(o, rect)) return true;
+if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             }
             const p = this.player;
             if (p && !p.isDead) {
@@ -716,7 +748,7 @@ export class GameEngine {
         }
 
         for (const o of map.obstacles) {
-            if (rectsOverlap(o, box)) return false;
+            if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, box))) return false;
         }
 
         for (const exit of map.exits || []) {
@@ -807,7 +839,7 @@ export class GameEngine {
                 w: boss.colliderHalfW * 2,
                 h: boss.colliderHalfH * 2,
             };
-            const clash = (map.obstacles || []).some((o) => rectsOverlap(o, box));
+            const clash = (map.obstacles || []).some((o) => obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, box)));
             console.info(
                 `[Necromancer] spawn local (${NECROMANCER_SPAWN.x},${NECROMANCER_SPAWN.y}) ` +
                 `centro (${boss.x},${boss.y}); overlap obstáculo: ${clash}`
@@ -848,7 +880,7 @@ export class GameEngine {
                 w: boss.colliderHalfW * 2,
                 h: boss.colliderHalfH * 2,
             };
-            const clash = (map.obstacles || []).some((o) => rectsOverlap(o, box));
+            const clash = (map.obstacles || []).some((o) => obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, box)));
             console.info(
                 `[SkeletonAxeBoss] spawn local (${spawn.x},${spawn.y}) ` +
                 `centro (${boss.x},${boss.y}); overlap obstáculo: ${clash}`
@@ -948,7 +980,7 @@ export class GameEngine {
         if (box.x < 0 || box.y < 0 || box.x + box.w > map.width || box.y + box.h > map.height) return false;
 
         for (const o of map.obstacles || []) {
-            if (rectsOverlap(o, box)) return false;
+            if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, box))) return false;
         }
         for (const exit of map.exits || []) {
             const area = exit.area
@@ -1061,9 +1093,17 @@ export class GameEngine {
         const roles = resolveCharacterRoles(selectedId);
         const allyId = roles.ally || DEFAULT_CHARACTER_ID;
 
-        // Spawna à esquerda ou direita do jogador dentro da sala
-        const spawnX = Math.max(80, Math.min(this.currentMap.width - 80, this.player.x - 70));
-        const spawnY = Math.max(80, Math.min(this.currentMap.height - 80, this.player.y));
+        // Posição fixa do aliado: à direita e no meio da arena. A primeira
+        // aparição define o ponto (fora da porta), e as aparições seguintes
+        // (pós-morte) repetem o MESMO lugar em vez de renascer na porta.
+        if (!this.bossAssistSpawnPoint) {
+            this.bossAssistSpawnPoint = {
+                x: Math.round(this.currentMap.width * 0.75),
+                y: Math.round(this.currentMap.height * 0.5),
+            };
+        }
+        const spawnX = this.bossAssistSpawnPoint.x;
+        const spawnY = this.bossAssistSpawnPoint.y;
 
         this._spawnTeleportFx(spawnX, spawnY);
         this._nightBannerText = 'ALIADO: "FOGO DE COBERTURA! SEGURA AÍ!"';
@@ -1212,15 +1252,23 @@ export class GameEngine {
         this.bossAssistDamageBudget = 0;
         this._allyHelpRetry = false;
         this.allyBossHelpTriggered = false;
+        this._allyHelpArenaTime = 0; // após morrer, exige 1s de novo em arena
     }
 
     _updateNecromancer(dt) {
         const boss = this.necromancerBoss;
 
+        // Conta o tempo vivo dentro da arena: o aliado só pode entrar após o
+        // personagem ficar pelo menos 1 segundo em campo (não conta a tela de
+        // morte nem o respawn na porta).
+        if (boss && !boss.isDead && this.player && !this.player.isDead) {
+            this._allyHelpArenaTime += dt;
+        }
+
         // Disparo da ajuda do aliado comprado na loja (compra única permanente)
         // Nunca na tela de morte e somente 0.5s após o respawn.
         if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead &&
-            !this.player.isDead && this._allyHelpRetryTimer <= 0) {
+            !this.player.isDead && this._allyHelpRetryTimer <= 0 && this._allyHelpArenaTime >= 1) {
             const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
             if (distToBoss <= 520 || boss.hp < boss.maxHp || this._allyHelpRetry) {
                 this.allyBossHelpTriggered = true;
@@ -1321,8 +1369,14 @@ export class GameEngine {
                     this.necromancerEffects.splice(i, 1);
                 }
             } else if (e.kind === 'unholy') {
+                // Só dá dano enquanto a animação mostra a poça CRESCIDA (frames
+                // 11..34). Nas fases de crescimento/redução a poça é pequena no
+                // visual — hitbox fora dessa janela deixaria o ataque "invisível".
+                const aimgs = getSkillImages('unholy');
+                const aFrame = aimgs ? Math.floor(e.t / UNHOLY_FRAME_HZ) % aimgs.length : -1;
+                const aGrown = aFrame >= UNHOLY_GROWN_FRAME_INDEX[0] && aFrame <= UNHOLY_GROWN_FRAME_INDEX[1];
                 e.tickCd -= dt;
-                if (e.tickCd <= 0) {
+                if (aGrown && e.tickCd <= 0) {
                     e.tickCd = e.tickEvery;
                     this._applyNecromancerDamage(e);
                 }
@@ -1384,7 +1438,7 @@ export class GameEngine {
                 const scale = e.scale || 2;
                 const drawW = 300 * scale;
                 const drawH = 256 * scale;
-                const frame = Math.floor(e.t / 0.09) % imgs.length;
+                const frame = Math.floor(e.t / UNHOLY_FRAME_HZ) % imgs.length;
                 const sx = Math.round(e.x + off.x);
                 const sy = Math.round(e.y + off.y);
                 ctx.save();
@@ -1400,7 +1454,7 @@ export class GameEngine {
         if (!boss) return;
 
         const isAxeBoss = this.skeletonAxeBoss === boss;
-        const label = isAxeBoss ? 'SKELETON AXE' : 'NECROMANCER';
+        const label = (boss.name || (isAxeBoss ? 'SKELETON AXE' : 'NECROMANCER')).replace(/_/g, ' ');
         const accent = isAxeBoss ? '#f6c885' : '#d7a45d';
         const fill = isAxeBoss ? '#c84b1c' : '#8f1821';
         const numeric = isAxeBoss ? '#f6c885' : '#f6c885';
@@ -1535,7 +1589,7 @@ export class GameEngine {
         const titles = {
             'damage_up': 'UPGRADE: DANO +20%!',
             'life_up': 'UPGRADE: VIDA MÁXIMA +25!',
-            'movespeed_up': 'UPGRADE: VELOCIDADE +10%!'
+            'movespeed_up': 'UPGRADE: VELOCIDADE +10% | ENERGIA +20!'
         };
         this._nightBannerText = titles[upgradeId] || `UPGRADE: ${upgradeId.toUpperCase()}`;
         this._nightBannerTimer = 4.0;
@@ -1691,7 +1745,7 @@ export class GameEngine {
             return true;
         }
         for (const o of map.obstacles) {
-            if (rectsOverlap(o, rect)) return true;
+            if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         }
         for (const exit of map.exits || []) {
             if (exit.area && rectsOverlap(exit.area, rect)) return true;
@@ -1896,13 +1950,22 @@ export class GameEngine {
             } else {
                 this.player.setState(PlayerState.PUSH_PULL, true);
             }
-        } else if (e.code === 'KeyR') {
-            const spawn = this.currentMap.spawn;
-            this.player.respawn(spawn.x, spawn.y);
-            this.player.applyUpgrades(gameState.upgrades || []);
-            this.camera.follow(spawn.x, spawn.y, true);
-            // Mantém o aliado reaparecendo 0.5s após o respawn manual também.
-            this._allyHelpRetryTimer = 0.5;
+        }
+
+        // Itens consumíveis do inventário (estilo Dark Souls): teclas 1/2/3
+        // consomem o item do slot correspondente quando está no inventário.
+        const slotMap = { Digit1: 1, Digit2: 2, Digit3: 3 };
+        const itemSlot = slotMap[e.code];
+        if (itemSlot) {
+            if (!this.player.isDead) {
+                const result = consumeInventorySlot(itemSlot, this.player);
+                if (result.message) {
+                    if (result.used) playClickButtonSound();
+                    this.hudMessage = result.message;
+                    this.hudMessageTimer = 1.8;
+                }
+            }
+            return;
         }
     }
 
@@ -2014,6 +2077,15 @@ export class GameEngine {
         this.player.handleInput(this.input, this.camera, this);
         this.player.update(dt);
         this._handlePlayerDeath(dt);
+
+        // Timer do feedback de item consumido no HUD
+        if (this.hudMessageTimer > 0) {
+            this.hudMessageTimer -= dt;
+            if (this.hudMessageTimer <= 0) this.hudMessage = '';
+        }
+
+        // Recarga (cooldown de 15s) dos itens consumíveis
+        gameState.tickItemCooldowns(dt);
 
         // Conta o tempo das mensagens em tela cheia (VOCÊ MORREU / vitórias).
         if (this._soulsMessage) {
@@ -2168,7 +2240,7 @@ export class GameEngine {
 
             // Bullets stop against solid obstacles (walls, rocks, towers)
             for (const o of this.currentMap.obstacles) {
-                if (rectsOverlap(o, bRect)) {
+                if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, bRect))) {
                     consumed = true;
                     break;
                 }
@@ -2185,6 +2257,8 @@ export class GameEngine {
                         h: actor.colliderHalfH * 2
                     };
                     if (rectsOverlap(aRect, bRect)) {
+                        // Projétil ignora a própria hitbox (sem consumir a bala)
+                        if (actor === bullet.owner) continue;
                         if (this._bulletCanDamage(bullet, actor.team, actor)) {
                             actor.takeDamage(bullet.damage, bullet.x, bullet.y);
                             if (actor.isDead) {
@@ -2218,14 +2292,16 @@ export class GameEngine {
                         h: b.colliderHalfH * 2
                     };
                     if (rectsOverlap(bRectBoss, bRect)) {
-                        if (this._bulletCanDamage(bullet, 'enemy', b)) {
-                            b.takeDamage(bullet.damage, bullet.x, bullet.y);
-                            if (b.isDead && !b._coinAwarded) {
-                                b._coinAwarded = true;
-                                this._awardEnemyCoins(b.x, b.y, 30);
+                        if (b !== bullet.owner) {
+                            if (this._bulletCanDamage(bullet, 'enemy', b)) {
+                                b.takeDamage(bullet.damage, bullet.x, bullet.y);
+                                if (b.isDead && !b._coinAwarded) {
+                                    b._coinAwarded = true;
+                                    this._awardEnemyCoins(b.x, b.y, 30);
+                                }
                             }
+                            consumed = true;
                         }
-                        consumed = true;
                     }
                 }
             }
@@ -2234,21 +2310,26 @@ export class GameEngine {
             if (!consumed && this.skeletonAxeBoss) {
                 const ab = this.skeletonAxeBoss;
                 if (!ab.isDead) {
+                    // Usa a hitHalfW (largura de acerto) quando definida — o
+                    // corpo do guardião é maior que o collider de movimento.
+                    const abHalfW = ab.hitHalfW || ab.colliderHalfW;
                     const abRectBoss = {
-                        x: ab.x - ab.colliderHalfW,
+                        x: ab.x - abHalfW,
                         y: ab.y - ab.colliderHalfH,
-                        w: ab.colliderHalfW * 2,
+                        w: abHalfW * 2,
                         h: ab.colliderHalfH * 2
                     };
                     if (rectsOverlap(abRectBoss, bRect)) {
-                        if (this._bulletCanDamage(bullet, 'enemy', ab)) {
-                            ab.takeDamage(bullet.damage, bullet.x, bullet.y);
-                            if (ab.isDead && !ab._coinAwarded) {
-                                ab._coinAwarded = true;
-                                this._awardEnemyCoins(ab.x, ab.y, 30);
+                        if (ab !== bullet.owner) {
+                            if (this._bulletCanDamage(bullet, 'enemy', ab)) {
+                                ab.takeDamage(bullet.damage, bullet.x, bullet.y);
+                                if (ab.isDead && !ab._coinAwarded) {
+                                    ab._coinAwarded = true;
+                                    this._awardEnemyCoins(ab.x, ab.y, 30);
+                                }
                             }
+                            consumed = true;
                         }
-                        consumed = true;
                     }
                 }
             }
@@ -2262,10 +2343,14 @@ export class GameEngine {
                     h: p.colliderHalfH * 2
                 };
                 if (rectsOverlap(pRect, bRect)) {
-                    if (this._bulletCanDamage(bullet, 'player', p)) {
-                        p.takeDamage(bullet.damage, bullet.x, bullet.y);
+                    // Projétil do próprio jogador não colide e não é consumido
+                    // pela própria hitbox (tiro para sul sai limpo).
+                    if (bullet.owner !== p) {
+                        if (this._bulletCanDamage(bullet, 'player', p)) {
+                            p.takeDamage(bullet.damage, bullet.x, bullet.y);
+                        }
+                        consumed = true;
                     }
-                    consumed = true;
                 }
             }
 
@@ -2446,15 +2531,18 @@ export class GameEngine {
         if (!this.currentMap) return;
         const off = this.camera.getRenderOffset();
 
-        // Solid obstacles (walls, pillars, blocked background) — red.
+        // Solid obstacles (walls, pillars, blocked background) — red. Naves com
+        // `collisionBoxes` mostram cada caixa do contorno (não o rect de desenho).
         ctx.fillStyle = 'rgba(255, 60, 60, 0.55)';
         for (const o of this.currentMap.obstacles || []) {
-            ctx.fillRect(
-                Math.round(o.x + off.x),
-                Math.round(o.y + off.y),
-                Math.round(o.w),
-                Math.round(o.h)
-            );
+            for (const cr of obstacleCollisionRects(o)) {
+                ctx.fillRect(
+                    Math.round(cr.x + off.x),
+                    Math.round(cr.y + off.y),
+                    Math.round(cr.w),
+                    Math.round(cr.h)
+                );
+            }
         }
 
         // Door / interaction areas — blue.
@@ -2573,7 +2661,7 @@ export class GameEngine {
         const hudX = 24;
         const hudY = 24;
         const panelW = 340;
-        const panelH = 126;
+        const panelH = 150;
 
         // Frame backing
         ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
@@ -2622,12 +2710,40 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.fillText(`${Math.round(this.player.hp)} / ${this.player.maxHp}`, barX + barW + 12, barY + 13);
 
+        // ENERGIA Label (munição dos tiros) — logo abaixo da vitalidade
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#e07228';
+        ctx.fillText('ENERGIA', hudX + 16, hudY + 88);
+
+        // Energy Bar — mais fina que a vitalidade, verde clara
+        const eBarW = barW;
+        const eBarH = 7;
+        const eBarX = barX;
+        const eBarY = hudY + 97;
+
+        ctx.fillStyle = '#0b1a10';
+        ctx.fillRect(eBarX, eBarY, eBarW, eBarH);
+        ctx.strokeStyle = '#1f7a34';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(eBarX, eBarY, eBarW, eBarH);
+
+        const energyPercent = Math.max(0, this.player.energy / this.player.maxEnergy);
+        const eFillW = Math.round((eBarW - 4) * energyPercent);
+        if (eFillW > 0) {
+            ctx.fillStyle = '#3ee76b';
+            ctx.fillRect(eBarX + 2, eBarY + 2, eFillW, eBarH - 4);
+        }
+
+        // Energy Text — to the right of the thin bar
+        ctx.fillStyle = '#a9f3bc';
+        ctx.fillText(`${Math.round(this.player.energy)} / ${this.player.maxEnergy}`, eBarX + eBarW + 12, eBarY + 6);
+
         // Telemetry Subtext
         ctx.fillStyle = '#c5975b';
         const areaText = `AREA: ${MAP_LABELS[this.currentMapId] || this.currentMapId.toUpperCase()}`;
         const stateText = `ESTADO: ${this.player.state} | DIR: ${this.player.direction.toUpperCase()}`;
-        ctx.fillText(areaText, hudX + 16, hudY + 98);
-        ctx.fillText(stateText, hudX + 16, hudY + 116);
+        ctx.fillText(areaText, hudX + 16, hudY + 122);
+        ctx.fillText(stateText, hudX + 16, hudY + 139);
 
         // DAY / NIGHT INDICATOR — directly below the vitals panel so it never
         // covers the health bar
@@ -2665,12 +2781,116 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'center';
         ctx.fillText(
-            '[WASD] Mover  [SHIFT] Correr  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [ESC] Menu',
+            '[WASD] Mover  [SHIFT] Correr  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [1/2/3] Itens  [ESC] Menu',
             this.width / 2,
             barBottomY + 23
         );
 
+        // Mensagem transitória ao consumir item (estilo Dark Souls)
+        if (this.hudMessageTimer > 0 && this.hudMessage) {
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, this.hudMessageTimer);
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#f6c885';
+            ctx.fillText(this.hudMessage, this.width / 2, barBottomY - 86);
+            ctx.restore();
+        }
+
+        // HOTBAR DE ITENS (Dark Souls) — canto inferior esquerdo
+        this._renderItemHotbar(ctx, barBottomY);
+
         ctx.restore();
+    }
+
+    _renderItemHotbar(ctx, barBottomY) {
+        const slotSize = 46;
+        const slotGap = 8;
+        const startX = 24;
+        const startY = barBottomY - slotSize - 16;
+        const paletteByItem = {
+            'cura_alienigena': { border: '#22c55e', glyph: '#86efac', label: 'CURA' },
+            'energia_duna': { border: '#38bdf8', glyph: '#7dd3fc', label: 'DUNA' }
+        };
+
+        for (let slot = 1; slot <= 3; slot++) {
+            const bx = startX + (slot - 1) * (slotSize + slotGap);
+            const item = getSlotItem(slot);
+            const owned = !!item;
+            const palette = (item && paletteByItem[item.id]) || { border: '#888', glyph: '#999', label: '---' };
+            const cooldown = owned ? gameState.getItemCooldown(item.id) : 0;
+            const onCooldown = cooldown > 0;
+
+            ctx.save();
+
+            // Socket vazio/fundo
+            ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
+            ctx.fillRect(bx, startY, slotSize, slotSize);
+            ctx.strokeStyle = owned ? palette.border : '#4d1d15';
+            ctx.lineWidth = owned ? 1.5 : 1;
+            ctx.strokeRect(bx + 0.5, startY + 0.5, slotSize - 1, slotSize - 1);
+
+            // Número da tecla (canto superior)
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillStyle = owned && !onCooldown ? '#f6c885' : '#6b5a44';
+            ctx.fillText(String(slot), bx + 6, startY + 14);
+
+            if (owned && item) {
+                // Durante a recarga o item fica apagado e mostra o tempo restante
+                if (onCooldown) ctx.globalAlpha = 0.35;
+                this._drawItemGlyph(ctx, bx, startY, slotSize, item.sprite, palette.glyph);
+
+                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = palette.glyph;
+                ctx.fillText(palette.label, bx + slotSize / 2, startY + slotSize - 6);
+
+                ctx.globalAlpha = 1;
+
+                if (onCooldown) {
+                    ctx.fillStyle = 'rgba(10, 8, 14, 0.55)';
+                    ctx.fillRect(bx + 2, startY + 2, slotSize - 4, slotSize - 4);
+                    ctx.font = '8px "Press Start 2P", monospace';
+                    ctx.fillStyle = '#f6c885';
+                    ctx.fillText(`${Math.ceil(cooldown)}s`, bx + slotSize / 2, startY + slotSize / 2 + 3);
+                }
+            }
+
+            ctx.restore();
+        }
+    }
+
+    // Desenha o ícone do item dentro do socket (shapes vetoriais: nenhum asset
+    // de sprite de item existe ainda — quando existirem, troca-se por imagem).
+    _drawItemGlyph(ctx, bx, by, size, glyph, color) {
+        const cx = bx + size / 2;
+        const cy = by + size / 2 - 2;
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        if (glyph === '✚') {
+            const r = 11;
+            ctx.fillRect(cx - 2, cy - r, 4, r * 2);
+            ctx.fillRect(cx - r, cy - 2, r * 2, 4);
+        } else if (glyph === '⚡') {
+            ctx.beginPath();
+            ctx.moveTo(cx + 2, cy - 10);
+            ctx.lineTo(cx - 6, cy + 1);
+            ctx.lineTo(cx - 1, cy + 1);
+            ctx.lineTo(cx - 2, cy + 10);
+            ctx.lineTo(cx + 6, cy - 3);
+            ctx.lineTo(cx + 1, cy - 3);
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.font = '13px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(glyph || '?', cx, cy + 1);
+            ctx.textBaseline = 'alphabetic';
+        }
     }
 
     _renderDayNightIndicator(ctx, x, y) {
@@ -2746,7 +2966,7 @@ export class GameEngine {
                     desc = 'VIDA MÁX: +25 (130)';
                 } else if (upgradeId === 'movespeed_up') {
                     borderColor = '#38bdf8';
-                    desc = 'VELOCIDADE: +10%';
+                    desc = 'VELOCIDADE: +10% (ENERGIA +20)';
                 }
 
                 ctx.strokeStyle = borderColor;

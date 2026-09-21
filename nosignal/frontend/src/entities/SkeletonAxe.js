@@ -124,6 +124,7 @@ export class SkeletonAxe {
         this.attackDamage = SKELETON_ATTACK_DAMAGE;
         this.attackCooldown = 0;
         this.attackHitApplied = false;
+        this.attackRange = SKELETON_ATTACK_RANGE; // alcance do golpe (override p/ boss)
         this._attackTarget = null;
         this._playerNear = false;
         this._reacted = false;
@@ -180,8 +181,10 @@ export class SkeletonAxe {
         this._playerNear = dist <= 260;
         this._facing = dx < 0 ? -1 : 1;
 
+        const attackRange = this.attackRange ?? SKELETON_ATTACK_RANGE;
+
         // In reach: attack on cooldown, otherwise spread to avoid clumping.
-        if (dist <= SKELETON_ATTACK_RANGE) {
+        if (dist <= attackRange) {
             this._stopAndIdle();
             if (this.attackCooldown <= 0) {
                 this._startAttack(player);
@@ -320,7 +323,7 @@ export class SkeletonAxe {
             this.attackHitApplied = true;
             const target = this._attackTarget;
             if (target && !target.isDead && typeof target.takeDamage === 'function') {
-                const reach = SKELETON_ATTACK_RANGE + 16;
+                const reach = (this.attackRange ?? SKELETON_ATTACK_RANGE) + 16;
                 if (Math.hypot(target.x - this.x, target.y - this.y) <= reach) {
                     target.takeDamage(this.attackDamage, this.x, this.y);
                 }
@@ -352,7 +355,13 @@ export class SkeletonAxe {
 
         // Multiplicador de velocidade por instância (boss ataca bem mais
         // rápido); esqueletos comuns ficam em 1x (FRAME_DURATION base).
-        this.animTime += dt * (this.animSpeedMul ?? 1);
+        // O ataque tem multiplicador próprio (attackAnimSpeedMul) para o boss
+        // poder ter giro rápido com golpe pesado/mais lento, independente.
+        const stateMul = this.state === SKELETON_STATES.ATTACK
+            ? (this.attackAnimSpeedMul ?? this.animSpeedMul ?? 1)
+            : (this.animSpeedMul ?? 1);
+
+        this.animTime += dt * stateMul;
         while (this.animTime >= FRAME_DURATION) {
             this.animTime -= FRAME_DURATION;
 
