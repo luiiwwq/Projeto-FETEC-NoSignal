@@ -60,6 +60,13 @@ import {
     REAPER_COLLIDER_HALF_H,
     preloadReaperSprites,
 } from '../entities/Reaper.js';
+import { DroppedItem } from '../entities/DroppedItem.js';
+import {
+    SPACESHIP_ITEM_DEFS,
+    MISSION_ITEM_ORDER,
+    preloadMissionItemSprites,
+    getMissionItemImage,
+} from '../content/missionItems.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
@@ -72,6 +79,7 @@ import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getS
 import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings } from '../state/stateStorage.js';
+import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
 
 const DAY_NIGHT_ICON_PATH = {
     [DAY_NIGHT_PERIOD.DAY]: './src/assets/sprites/Night_Day_System/sun_sprite.png',
@@ -79,10 +87,10 @@ const DAY_NIGHT_ICON_PATH = {
 };
 
 const MAP_LABELS = {
-    [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE MARTE',
-    [MAP_IDS.MARS_CAVE]: 'CAVERNA DE MARTE',
-    [MAP_IDS.MARS_CORE]: 'NUCLEO DE MARTE',
-    [MAP_IDS.MARS_CATACOMBS]: 'CATACUMBAS MARCIANAS',
+    [MAP_IDS.MARS_SURFACE]: 'SUPERFICIE DE DUNA',
+    [MAP_IDS.MARS_CAVE]: 'CAVERNA DE DUNA',
+    [MAP_IDS.MARS_CORE]: 'NUCLEO DE DUNA',
+    [MAP_IDS.MARS_CATACOMBS]: 'CATACUMBAS DE DUNA',
     [MAP_IDS.CASTLE_PRINCIPAL_ROOM]: 'SALA PRINCIPAL',
     [MAP_IDS.CASTLE_KING_ROOM]: 'SALA DO REI',
 };
@@ -125,6 +133,10 @@ function subtractZoneFromObstacles(list, zx, zy, zw, zh) {
     }
     return out;
 }
+
+// Duração (s) da animação "risco verde + ✓" do log de missões antes da
+// próxima quest da nave ser liberada.
+export const QUEST_FLASH_DURATION = 1.3;
 
 // Obstáculos podem declarar uma colisão mais natural que o rect de desenho
 // (ex.: naves cuja silhueta não é um quadrado). O campo `collisionBoxes` é uma
@@ -219,11 +231,22 @@ export class GameEngine {
         this.mapTransitionCooldown = 0;
         this.interactableExit = null;
         this.promptText = '';
+        // Porta de arena de boss bloqueada até o chefe ser derrotado
+        // (Sala do Rei / Núcleo de Marte). Guarda a posição do aviso.
+        this.lockedExitPrompt = null;
 
         // Shop NPC interaction & Floating coin texts
         this.interactableShop = null;
         this.shopPrompt = '';
         this.floatingTexts = [];
+
+        // Itens da missão principal (peças da nave) no mundo
+        this.worldItems = [];
+        this.interactableMissionItem = null;
+
+        // Animação de "quest concluída" do log de missões (risco verde + ✓).
+        this._questFlashId = null;
+        this._questFlashT = 0;
 
         // Feedback de uso de item no HUD (mensagem transitória)
         this.hudMessage = '';
@@ -245,6 +268,7 @@ export class GameEngine {
         this._soulsMessage = null; // { text, color, timer } exibido em tela cheia
         this._allyHelpRetry = false; // aliado reaparece após morte do jogador
         this._allyHelpRetryTimer = 0; // espera 0.5s após o respawn para reaparecer
+        this._cutsceneActive = false; // flag enquanto uma cutscene de introdução está em reprodução
 
         // Input state
         this.input = {
@@ -310,7 +334,7 @@ export class GameEngine {
         // Aplica configurações persistidas (ex.: brilho ajustado na tela inicial)
         this._applyStoredSettings();
 
-// Warm the golem + day/night sprite caches once for the whole session.
+        // Warm the golem + day/night sprite caches once for the whole session.
         preloadGolemSprites();
         preloadAmongUsSprites();
         preloadSkeletonAxeSprites();
@@ -319,6 +343,7 @@ export class GameEngine {
         preloadSkeletonSpearmanSprites();
         preloadNecromancerSprites();
         preloadReaperSprites();
+        preloadMissionItemSprites();
         this._loadDayNightIcons();
         this._loadUpgradeIcons();
 
@@ -397,7 +422,9 @@ export class GameEngine {
         this.floatingTexts = [];
         this.mapTransitionCooldown = 0.4;
         this.interactableExit = null;
+        this.lockedExitPrompt = null;
         this.interactableShop = null;
+        this.interactableMissionItem = null;
         this.bossAssistAlly = null;
         this.allyBossHelpTriggered = false;
         this.bossAssistSpawnPoint = null;
@@ -451,6 +478,10 @@ export class GameEngine {
         if (mapId === MAP_IDS.MARS_CORE && !gameState.skeletonAxeBossDefeated) {
             this._spawnSkeletonAxeBoss(map);
         }
+
+        // Itens da missão principal presentes neste mapa (chefes já derrotados
+        // podem ter soltado peças; o meio da nave já nasce na superfície).
+        this._respawnMissionWorldItems();
 
         if (this.player) {
             this.player.applyUpgrades(gameState.upgrades || []);
@@ -579,7 +610,7 @@ export class GameEngine {
                 return true;
             }
             for (const o of map.obstacles) {
-if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
+                if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             }
             const p = this.player;
             if (p && !p.isDead) {
@@ -1041,6 +1072,9 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             boss._coinAwarded = true;
             this._awardEnemyCoins(boss.x, boss.y, 30);
         }
+        // A ponta da nave cai no chão da Sala do Rei, saltitante (não é
+        // apanhada na hora — o jogador precisa apertar E para coletar).
+        this._dropBossMissionItem('ponta', boss);
         for (const r of this.reapers) {
             if (r.isDead || r.shouldRemove) continue;
             r.takeDamage(r.maxHp + 9999, boss.x, boss.y);
@@ -1070,6 +1104,9 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             boss._coinAwarded = true;
             this._awardEnemyCoins(boss.x, boss.y, 30);
         }
+        // O motor da nave cai no chão do Núcleo, saltitante (mesma regra da
+        // ponta: só é coletado quando o jogador aperta E perto dele).
+        this._dropBossMissionItem('motor', boss);
         for (let i = 0; i < 30; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 50 + Math.random() * 150;
@@ -1172,6 +1209,105 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         });
     }
 
+    /* ── Missão principal: itens da nave ───────────────────── */
+    // Solta a peça de um chefe derrotado no chão do mapa atual. A peça NÃO é
+    // apanhada na hora: vira um DroppedItem saltitante que só é coletado com E.
+    _dropBossMissionItem(itemId, boss) {
+        const def = SPACESHIP_ITEM_DEFS[itemId];
+        if (!def) return;
+        if (gameState.hasMissionItem(itemId)) return;
+        if (!boss) return;
+
+        const feetX = Math.round(boss.x);
+        const feetY = Math.round(boss.y + (boss.colliderHalfH || 0));
+        gameState.missionDrops[itemId] = { mapId: this.currentMapId, x: feetX, y: feetY };
+        this.worldItems.push(new DroppedItem(itemId, feetX, feetY, this.currentMapId));
+    }
+
+    // (Re)cria no mapa atual todos os itens de missão que devem estar nele:
+    //  - o meio da nave já nasce na superfície nas coordenadas X00942/Y02103;
+    //  - as peças soltas pelos chefes aparecem no mapa em que foram dropadas.
+    _respawnMissionWorldItems() {
+        this.worldItems = [];
+        const mapId = this.currentMapId;
+
+        // Meio da nave: item do mundo fixo (não vem de chefe).
+        const meio = SPACESHIP_ITEM_DEFS.meio;
+        if (meio && mapId === meio.mapId && !gameState.hasMissionItem('meio')) {
+            if (!gameState.missionDrops.meio) {
+                gameState.missionDrops.meio = { mapId, x: meio.x, y: meio.y };
+            }
+            const drop = gameState.missionDrops.meio;
+            this.worldItems.push(new DroppedItem('meio', drop.x, drop.y, mapId));
+        }
+
+        // Peças dropadas pelos chefes (motor no Núcleo, ponta na Sala do Rei).
+        // O meio da nave é um item fixo do mundo e já foi tratado acima — por isso
+        // é pulado aqui (senão spawmava DUPLICADO na superfície).
+        for (const itemId of MISSION_ITEM_ORDER) {
+            if (itemId === 'meio') continue;
+            if (gameState.hasMissionItem(itemId)) continue;
+            const drop = gameState.missionDrops[itemId];
+            if (drop && drop.mapId === mapId) {
+                this.worldItems.push(new DroppedItem(itemId, drop.x, drop.y, mapId));
+            }
+        }
+    }
+
+    // Coleta uma peça da nave: marca no estado, remove do mundo, dá feedback
+    // e — com as 3 peças — dispara o fim da missão (nave consertada).
+    _collectMissionItem(item) {
+        if (!item || item.collected) return;
+        item.collected = true;
+        gameState.addMissionItem(item.id);
+
+        this.worldItems = this.worldItems.filter((wi) => wi !== item);
+        this.interactableMissionItem = null;
+
+        // Anima o "risco verde + ✓" do log de missões antes de liberar a próxima quest.
+        this._questFlashId = item.id;
+        this._questFlashT = QUEST_FLASH_DURATION;
+
+        playClickButtonSound();
+        const name = item.def ? item.def.name.toUpperCase() : 'PEÇA DA NAVE';
+        this.hudMessage = `PEÇA COLETADA: ${name}`;
+        this.hudMessageTimer = 2.2;
+        this.floatingTexts.push({
+            x: item.x,
+            y: item.y - 34,
+            text: `${name} OBTIDO!`,
+            life: 1.5,
+            maxLife: 1.5,
+            vy: -30,
+        });
+
+        if (gameState.isMissionComplete() && !gameState.spaceshipRepaired) {
+            gameState.spaceshipRepaired = true;
+            this._showSoulsMessage('NAVE CONSERTADA!', '#7fe0a0');
+            this._nightBannerText = 'NAVE CONSERTADA! TODAS AS PEÇAS FORAM INSTALADAS';
+            this._nightBannerTimer = 4.0;
+        }
+    }
+
+    // Quebra um texto em linhas que cabem em maxWidth (usado nos pop-ups e no
+    // indicador de missão, que usam fontes pixeladas grandes).
+    _wrapHudText(ctx, text, maxWidth) {
+        const words = String(text).split(' ');
+        const lines = [];
+        let cur = '';
+        for (const w of words) {
+            const test = cur ? `${cur} ${w}` : w;
+            if (ctx.measureText(test).width <= maxWidth || !cur) {
+                cur = test;
+            } else {
+                lines.push(cur);
+                cur = w;
+            }
+        }
+        if (cur) lines.push(cur);
+        return lines;
+    }
+
     // Mensagem central em tela cheia estilo Dark Souls (VOCÊ MORREU, vitórias).
     _showSoulsMessage(text, color = '#e62424') {
         this._soulsMessage = { text, color, timer: 3.0 };
@@ -1259,15 +1395,15 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         const boss = this.necromancerBoss;
 
         // Conta o tempo vivo dentro da arena: o aliado só pode entrar após o
-        // personagem ficar pelo menos 1 segundo em campo (não conta a tela de
-        // morte nem o respawn na porta).
-        if (boss && !boss.isDead && this.player && !this.player.isDead) {
+        // personagem ficar pelo menos 1 segundo em campo (não conta durante a cutscene,
+        // nem na tela de morte ou no respawn).
+        if (boss && !boss.isDead && !boss._cutscenePlaying && this.player && !this.player.isDead) {
             this._allyHelpArenaTime += dt;
         }
 
         // Disparo da ajuda do aliado comprado na loja (compra única permanente)
-        // Nunca na tela de morte e somente 0.5s após o respawn.
-        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead &&
+        // Nunca na tela de morte, somente 0.5s após respawn e após o fim da cutscene.
+        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead && !boss._cutscenePlaying &&
             !this.player.isDead && this._allyHelpRetryTimer <= 0 && this._allyHelpArenaTime >= 1) {
             const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
             if (distToBoss <= 520 || boss.hp < boss.maxHp || this._allyHelpRetry) {
@@ -1340,6 +1476,69 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
     _updateSkeletonAxeBoss(dt) {
         const boss = this.skeletonAxeBoss;
         if (!boss) return;
+
+        // Conta o tempo vivo dentro da arena: o aliado só pode entrar após o
+        // personagem ficar pelo menos 1 segundo em campo (não conta durante a cutscene,
+        // nem na tela de morte ou no respawn).
+        if (boss && !boss.isDead && !boss._cutscenePlaying && this.player && !this.player.isDead) {
+            this._allyHelpArenaTime += dt;
+        }
+
+        // Disparo da ajuda do aliado comprado na loja (compra única permanente)
+        // Nunca na tela de morte, somente 0.5s após respawn e após o fim da cutscene.
+        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead && !boss._cutscenePlaying &&
+            !this.player.isDead && this._allyHelpRetryTimer <= 0 && this._allyHelpArenaTime >= 1) {
+            const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
+            if (distToBoss <= 520 || boss.hp < boss.maxHp || this._allyHelpRetry) {
+                this.allyBossHelpTriggered = true;
+                this._allyHelpRetry = false;
+                this._triggerAllyBossHelp(boss);
+            }
+        }
+
+        // Simulação ativa da aparição rápida do aliado no boss
+        if (this.bossAssistAlly) {
+            const ally = this.bossAssistAlly;
+            this.bossAssistTimer -= dt;
+            this.bossAssistShotCooldown -= dt;
+
+            if (boss && !boss.isDead) {
+                const dx = boss.x - ally.x;
+                const dy = boss.y - ally.y;
+                const aimAngle = Math.atan2(dy, dx);
+                ally.updateDirectionFromAngle(aimAngle);
+
+                if (this.bossAssistShotCooldown <= 0 && this.bossAssistDamageBudget > 0) {
+                    const shotDamage = Math.min(40, this.bossAssistDamageBudget);
+                    this.bossAssistShotCooldown = 0.3; // rajada rápida
+                    this.bossAssistDamageBudget -= shotDamage;
+                    ally.setState(PlayerState.SHOOTING, true);
+
+                    boss.takeDamage(shotDamage, ally.x, ally.y);
+                    this._spawnHitSparks(boss.x, boss.y);
+
+                    const spawnDist = 24;
+                    const spawnX = ally.x + Math.cos(aimAngle) * spawnDist;
+                    const spawnY = ally.y - 18 + Math.sin(aimAngle) * 8;
+                    const bulletOpts = {
+                        team: 'player',
+                        owner: ally,
+                        damage: 0
+                    };
+                    const bullet = new Bullet(spawnX, spawnY, aimAngle, 680, ally.weapon, bulletOpts);
+                    this.bullets.push(bullet);
+                }
+            }
+
+            if (this.bossAssistTimer <= 0 || (boss && boss.isDead) || this.bossAssistDamageBudget <= 0) {
+                this._nightBannerText = 'ALIADO: "BATERIA ESGOTADA! O RESTO É COM VOCÊ!"';
+                this._nightBannerTimer = 2.6;
+                this._spawnTeleportFx(ally.x, ally.y);
+                this.actors = this.actors.filter((a) => a !== ally);
+                this.bossAssistAlly = null;
+            }
+        }
+
         if (!boss.isDead) boss.updateAi(dt, this);
         boss.update(dt);
         if (boss.shouldRemove) {
@@ -1589,7 +1788,7 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         const titles = {
             'damage_up': 'UPGRADE: DANO +20%!',
             'life_up': 'UPGRADE: VIDA MÁXIMA +25!',
-            'movespeed_up': 'UPGRADE: VELOCIDADE +10% | ENERGIA +20!'
+            'movespeed_up': 'UPGRADE: VELOCIDADE +10% | ENERGIA +30!'
         };
         this._nightBannerText = titles[upgradeId] || `UPGRADE: ${upgradeId.toUpperCase()}`;
         this._nightBannerTimer = 4.0;
@@ -1652,8 +1851,67 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         }
     }
 
-    changeMap(targetMapId, spawnId) {
+    async changeMap(targetMapId, spawnId) {
+        let cutsceneSrc = null;
+        let isNecroIntro = false;
+        let isAxeIntro = false;
+
+        // Cutscene do Necromancer (Sala do Rei): toca na primeira entrada da partida
+        // (não repete após morte/retry do jogador).
+        if (targetMapId === MAP_IDS.CASTLE_KING_ROOM && !gameState.necroIntroDone && !gameState.necromancerDefeated) {
+            cutsceneSrc = './src/assets/cutscenes/necro/cutscene_necro.mp4';
+            isNecroIntro = true;
+        } else if (targetMapId === MAP_IDS.MARS_CORE && !gameState.axeBossIntroDone && !gameState.skeletonAxeBossDefeated) {
+            // Cutscene do Old Guardian (Núcleo de Marte): toca na primeira entrada da partida
+            cutsceneSrc = './src/assets/cutscenes/oldguardian/cutscene_old_guardian.mp4';
+            isAxeIntro = true;
+        }
+
         this._loadMap(targetMapId, spawnId);
+
+        if (cutsceneSrc) {
+            this._cutsceneActive = true;
+            if (this.input) this.input.keys = {};
+
+            const boss = isNecroIntro ? this.necromancerBoss : this.skeletonAxeBoss;
+            if (boss) {
+                boss._cutscenePlaying = true;
+            }
+            if (isNecroIntro) gameState.necroIntroDone = true;
+            if (isAxeIntro) gameState.axeBossIntroDone = true;
+
+            // Zera o tempo vivo na arena para o aliado não entrar antes da hora
+            this._allyHelpArenaTime = 0;
+            this.allyBossHelpTriggered = false;
+
+            try {
+                await playBossCutscene(this.container, cutsceneSrc);
+            } catch (err) {
+                console.error('[Cutscene] Erro ao reproduzir vídeo:', err);
+            } finally {
+                this._cutsceneActive = false;
+                if (this.input) this.input.keys = {};
+                const activeBoss = isNecroIntro ? this.necromancerBoss : this.skeletonAxeBoss;
+                if (activeBoss) {
+                    activeBoss._cutscenePlaying = false;
+                }
+                this._allyHelpArenaTime = 0;
+                this.mapTransitionCooldown = 0.5;
+            }
+        }
+    }
+
+    // A saída de uma arena de boss fica bloqueada enquanto o chefe ainda não
+    // foi derrotado: na Sala do Rei (Necromancer) e no Núcleo de Marte
+    // (Skeleton_Axe) o jogador não pode sair da sala até matar o boss.
+    shouldLockBossRoomExit() {
+        if (this.currentMapId === MAP_IDS.CASTLE_KING_ROOM) {
+            return !gameState.necromancerDefeated;
+        }
+        if (this.currentMapId === MAP_IDS.MARS_CORE) {
+            return !gameState.skeletonAxeBossDefeated;
+        }
+        return false;
     }
 
     /* ── Among Us easter egg ─────────────────────────────── */
@@ -1855,6 +2113,9 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
     }
 
     _handleKeyDown(e) {
+        // Enquanto uma cutscene estiver ativa, não processa comandos de jogo
+        if (this._cutsceneActive) return;
+
         // Ignore key events while the user is typing in a form field
         const target = e.target;
         if (target instanceof HTMLElement && (
@@ -1904,6 +2165,12 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         if (e.code === 'KeyE' && this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
             playClickButtonSound();
             openShopScreen(this.container, this);
+            return;
+        }
+
+        // Coleta de peça da nave ([E] perto de um item da missão principal)
+        if (e.code === 'KeyE' && this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
+            this._collectMissionItem(this.interactableMissionItem);
             return;
         }
 
@@ -2066,6 +2333,9 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
     }
 
     update(dt) {
+        // Durante a exibição da cutscene, congela o mundo, IA e entidades
+        if (this._cutsceneActive) return;
+
         // Advance the day/night clock first so a wave spawned on a night
         // transition is simulated in the same frame.
         this._updateDayNight(dt);
@@ -2189,6 +2459,7 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         // Map transition interaction detection
         this.mapTransitionCooldown = Math.max(0, this.mapTransitionCooldown - dt);
         this.interactableExit = null;
+        this.lockedExitPrompt = null;
         this.promptText = '';
         const playerRect = {
             x: this.player.x - this.player.colliderHalfW,
@@ -2201,9 +2472,41 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
                 ? rectsOverlap(playerRect, exit.area)
                 : pointInCircle(this.player.x, this.player.y, exit);
             if (triggered) {
+                // Arena de boss: a porta fica "trancada" (sem prompt [E] e sem
+                // troca de mapa) até o chefe ser derrotado.
+                if (this.shouldLockBossRoomExit()) {
+                    this.lockedExitPrompt = {
+                        x: exit.promptX !== undefined ? exit.promptX : (exit.area ? exit.area.x + exit.area.w / 2 : exit.x),
+                        y: exit.promptY !== undefined ? exit.promptY : (exit.area ? exit.area.y + exit.area.h / 2 + 10 : exit.y - 70),
+                    };
+                    this.interactableExit = null;
+                    break;
+                }
                 this.interactableExit = exit;
                 this.promptText = exit.label;
                 break;
+            }
+        }
+
+        // Update dos itens de missão no mundo + detecção de coleta ([E]).
+        for (const wi of this.worldItems) {
+            wi.update(dt);
+        }
+        if (this._questFlashT > 0) {
+            this._questFlashT -= dt;
+            if (this._questFlashT <= 0) {
+                this._questFlashT = 0;
+                this._questFlashId = null;
+            }
+        }
+        this.interactableMissionItem = null;
+        if (!this.player.isDead) {
+            for (const wi of this.worldItems) {
+                if (wi.collected) continue;
+                if (wi.isPlayerNear(this.player)) {
+                    this.interactableMissionItem = wi;
+                    break;
+                }
             }
         }
 
@@ -2428,6 +2731,12 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             ctx.fillRect(Math.round(screen.x), Math.round(screen.y), p.size, p.size);
         }
 
+        // 5.55 Itens de missão no mundo (peças da nave saltitando)
+        for (const wi of this.worldItems) {
+            if (wi.collected) continue;
+            wi.render(ctx, this.camera);
+        }
+
         // 5.6 Render Floating coin texts (+🪙)
         for (const ft of this.floatingTexts) {
             const screen = this.camera.worldToScreen(ft.x, ft.y);
@@ -2471,9 +2780,20 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
             this._renderExitPrompt(ctx, this.interactableExit);
         }
 
+        // 10.1. Aviso de porta bloqueada por boss (Sala do Rei / Núcleo) —
+        // sem o [E] de interação até o chefe ser derrotado.
+        if (this.lockedExitPrompt && this.mapTransitionCooldown <= 0) {
+            this._renderLockedExitPrompt(ctx, this.lockedExitPrompt);
+        }
+
         // 10.5. Render Shop Prompt ([E]) when near the Ally NPC on surface
         if (this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
             this._renderShopPrompt(ctx, this.interactableShop);
+        }
+
+        // 10.6. Render pop-up de coleta do item de missão ([E] + nome + descrição)
+        if (this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
+            this._renderMissionItemPrompt(ctx, this.interactableMissionItem);
         }
     }
 
@@ -2494,6 +2814,55 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
 
         ctx.fillStyle = '#ffd440';
         ctx.fillText(text, screen.x, screen.y + 4);
+        ctx.restore();
+    }
+
+    // Pop-up próximo ao item de missão quando o jogador está ao alcance:
+    // mostra "[E] COLETAR", o NOME e a DESCRIÇÃO da peça.
+    _renderMissionItemPrompt(ctx, item) {
+        const def = item.def;
+        if (!def) return;
+        const screen = this.camera.worldToScreen(item.x, item.y);
+
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        ctx.font = '8px "Press Start 2P", monospace';
+        const promptW = ctx.measureText('[E] COLETAR').width;
+
+        ctx.font = '8px "Press Start 2P", monospace';
+        const descLines = this._wrapHudText(ctx, def.description.toUpperCase(), 250);
+        const descW = Math.max(...descLines.map((l) => ctx.measureText(l).width));
+        const nameW = ctx.measureText(def.name.toUpperCase()).width;
+
+        const boxW = Math.max(promptW, nameW, descW) + 24;
+        const boxH = 14 + 16 + descLines.length * 13 + 4;
+        const bx = Math.round(screen.x - boxW / 2);
+        const by = Math.round(screen.y - 74 - descLines.length * 12);
+
+        // Painel
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.92)';
+        ctx.fillRect(bx, by, boxW, boxH);
+        ctx.strokeStyle = '#ffd440';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx + 0.5, by + 0.5, boxW - 1, boxH - 1);
+
+        // Linha 1 — ação
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffd440';
+        ctx.fillText('[E] COLETAR', bx + boxW / 2, by + 14);
+
+        // Linha 2 — nome
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(def.name.toUpperCase(), bx + boxW / 2, by + 33);
+
+        // Linhas 3+ — descrição (quebrada)
+        ctx.fillStyle = '#c5975b';
+        descLines.forEach((line, i) => {
+            ctx.fillText(line, bx + boxW / 2, by + 46 + i * 13);
+        });
+
         ctx.restore();
     }
 
@@ -2521,6 +2890,37 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
 
         ctx.fillStyle = '#f6c885';
         ctx.fillText(text, screen.x, screen.y + 3);
+        ctx.restore();
+    }
+
+    // Aviso da porta travada numa arena de boss: mostra "SAÍDA BLOQUEADA"
+    // + dica sem disponibilizar a interação [E] de troca de mapa.
+    _renderLockedExitPrompt(ctx, prompt) {
+        const screen = this.camera.worldToScreen(prompt.x, prompt.y);
+        const text = 'SAIDA BLOQUEADA';
+        const hint = 'DERROTE O CHEFE!';
+
+        ctx.save();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        const textW = ctx.measureText(text).width;
+        const hintW = ctx.measureText(hint).width;
+        const boxW = Math.max(textW, hintW) + 16;
+        const boxH = 30;
+
+        const bx = Math.round(screen.x - boxW / 2);
+        const by = Math.round(screen.y - 8);
+
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.9)';
+        ctx.fillRect(bx, by, boxW, boxH);
+        ctx.strokeStyle = '#e62424';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(bx + 0.5, by + 0.5, boxW - 1, boxH - 1);
+
+        ctx.fillStyle = '#e62424';
+        ctx.fillText(text, screen.x, by + 12);
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(hint, screen.x, by + 26);
         ctx.restore();
     }
 
@@ -2750,24 +3150,38 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
         this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
         this._renderUpgradeIndicators(ctx, hudX + 168 + 8, hudY + panelH + 10);
 
-        // TOP-RIGHT: Coordinates & Telemetry & Moedas
-        const trX = this.width - 240;
+        // TOP-RIGHT: Coordinates & Moedas (mesma largura da HUD da missão)
+        const coordsW = 244;
+        const coordsH = 48;
+        const trX = this.width - 24 - coordsW;
         const trY = 24;
         ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
-        ctx.fillRect(trX, trY, 216, 68);
+        ctx.fillRect(trX, trY, coordsW, coordsH);
         ctx.strokeStyle = '#e07228';
         ctx.lineWidth = 2;
-        ctx.strokeRect(trX + 0.5, trY + 0.5, 215, 67);
+        ctx.strokeRect(trX + 0.5, trY + 0.5, coordsW - 1, coordsH - 1);
 
-        ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
         const posX = Math.round(this.player.x);
         const posY = Math.round(this.player.y);
-        ctx.fillText(`COORD X: ${posX.toString().padStart(5, '0')}`, trX + 14, trY + 18);
-        ctx.fillText(`COORD Y: ${posY.toString().padStart(5, '0')}`, trX + 14, trY + 34);
+        const xLabel = `X: ${posX.toString().padStart(5, '0')}`;
+        const yLabel = `Y: ${posY.toString().padStart(5, '0')}`;
+
+        // X e Y lado a lado (mesma linha), número colado no rótulo; o grupo Y
+        // fica alinhado à direita para nunca sobrepor o X.
+        ctx.textAlign = 'left';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ffab5e';
+        ctx.fillText(xLabel, trX + 14, trY + 17);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillText(yLabel, trX + coordsW - 14, trY + 17);
+        ctx.textAlign = 'left';
 
         ctx.fillStyle = '#ffd440';
-        ctx.fillText(`MOEDAS:  🪙 ${gameState.coins ?? 0}`, trX + 14, trY + 52);
+        ctx.fillText(`MOEDAS:  🪙 ${gameState.coins ?? 0}`, trX + 14, trY + 38);
+
+        // Indicador da missão principal — logo abaixo da HUD de coordenadas
+        this._renderMissionHUD(ctx, trX, trY + coordsH + 10);
 
         // BOTTOM: Sci-Fi Controls Reference Bar
         const barBottomY = this.height - 38;
@@ -2799,6 +3213,221 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
 
         // HOTBAR DE ITENS (Dark Souls) — canto inferior esquerdo
         this._renderItemHotbar(ctx, barBottomY);
+
+        ctx.restore();
+    }
+
+    /* ── Missão principal: "Conserte a nave e saia de Duna" ──
+     * Log de quests NO canto superior direito, logo abaixo do painel de
+     * coordenadas. Mostra UMA quest por vez (desbloqueio sequencial):
+     * Motor da Nave → Meio da Nave → Ponta da Nave → CONSERTE A NAVE.
+     * Ao coletar a peça, um "risco verde + ✓" cruza o cartão compacto e a
+     * próxima quest assume o lugar. "PECAS" maior, colado à direita.      */
+    _renderMissionHUD(ctx, x, y) {
+        const collected = Array.isArray(gameState.missionCollected) ? gameState.missionCollected : [];
+        const hasAll = gameState.isMissionComplete();
+
+        // ── Sistema de desbloqueio: qual quest está ativa agora? ──
+        // Enquanto o flash dura, mostramos a quest que acabou de ser coletada
+        // (risco verde + ✓); ao terminar, a próxima quest (ou a final) assume.
+        const flashDef = this._questFlashId ? SPACESHIP_ITEM_DEFS[this._questFlashId] : null;
+        const nextId = hasAll ? null : MISSION_ITEM_ORDER.find((id) => !collected.includes(id));
+        const activeDef = flashDef || (nextId ? SPACESHIP_ITEM_DEFS[nextId] : null);
+        const finalQuest = !flashDef && !nextId;
+
+        // ── Geometria compacta do painel (borda direita = da HUD de coordenadas) ──
+        const rightEdge = x + 244;
+        const panelW = 244;
+        const panelX = rightEdge - panelW;
+        const headerH = 40;
+        const bodyH = 120;
+        const panelH = headerH + bodyH;
+
+        // Título de cada quest ganha uma cor própria (mais fácil de ler).
+        const questColors = {
+            motor: '#ffab5e',
+            meio: '#7dd3fc',
+            ponta: '#c4b5fd',
+        };
+
+        const flashOn = Boolean(this._questFlashId);
+        const flashProgress = flashOn ? 1 - Math.max(0, this._questFlashT / QUEST_FLASH_DURATION) : 0;
+
+        ctx.save();
+
+        // ── Frame (borda verde pulsante durante o flash) ──
+        ctx.fillStyle = 'rgba(10, 8, 14, 0.92)';
+        ctx.fillRect(panelX, y, panelW, panelH);
+        ctx.strokeStyle = flashOn ? `rgba(74, 222, 128, ${0.5 + 0.5 * flashProgress})` : '#e07228';
+        ctx.lineWidth = flashOn ? 2.5 : 2;
+        ctx.strokeRect(panelX + 0.5, y + 0.5, panelW - 1, panelH - 1);
+        ctx.fillStyle = flashOn ? '#4ade80' : '#e07228';
+        ctx.fillRect(panelX, y, 12, 4);
+        ctx.fillRect(panelX + panelW - 12, y, 12, 4);
+
+        // ── Cabeçalho: título + subtítulo (sem o ícone principal_mission) ──
+        const hiY = y + 6;
+        const hx = panelX + 10;
+        ctx.textAlign = 'left';
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText('CONSERTE A NAVE', hx, hiY + 11);
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#9a7ea8';
+        ctx.fillText('E SAIA DE DUNA', hx, hiY + 24);
+
+        // "PECAS", encostado na margem direita
+        ctx.textAlign = 'right';
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillStyle = hasAll ? '#4ade80' : '#e07228';
+        ctx.fillText('PECAS', rightEdge - 6, hiY + 11);
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText(`${collected.length}/3`, rightEdge - 6, hiY + 26);
+        ctx.textAlign = 'left';
+
+        // Divisor
+        ctx.strokeStyle = '#4d1d15';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(panelX + 6, y + headerH - 2);
+        ctx.lineTo(rightEdge - 6, y + headerH - 2);
+        ctx.stroke();
+
+        // ── Corpo: cartão da quest ativa ──
+        const bodyTop = y + headerH;
+        if (finalQuest) {
+            this._renderFinalQuestCard(ctx, panelX, bodyTop, panelW, bodyH);
+        } else if (activeDef) {
+            this._renderQuestCard(ctx, panelX, bodyTop, panelW, bodyH, activeDef, {
+                collected: flashOn,
+                flashProgress: flashOn ? flashProgress : 1,
+                accent: questColors[activeDef.id] || '#f6c885',
+            });
+        }
+
+        ctx.restore();
+    }
+
+    // Cartão compacto de uma quest (sprite, título e descrição ampliados).
+    // Quando `collected`, cruza um "risco verde" animado sobre o título e
+    // desenha um certinho (✓) sobre o sprite antes do cartão sair.
+    _renderQuestCard(ctx, px, py, panelW, panelH, def, opts) {
+        const imgH = 62;
+        const img = getMissionItemImage(def.id);
+        const imgX = px + 10;
+        const imgY = py + 10;
+
+        ctx.save();
+        ctx.textAlign = 'left';
+
+        let imgW = 62;
+        if (img && img.complete) {
+            const ratio = img.naturalWidth / img.naturalHeight;
+            imgW = Math.max(52, Math.min(62, Math.round(imgH * ratio)));
+            ctx.globalAlpha = opts.collected ? 0.5 : 1;
+            ctx.drawImage(img, imgX, imgY, imgW, imgH);
+            ctx.globalAlpha = 1;
+        } else {
+            ctx.fillStyle = opts.collected ? '#4f7a5e' : '#e07228';
+            ctx.fillRect(imgX, imgY, imgW, imgH);
+        }
+
+        const textX = imgX + imgW + 10;
+        const textW = Math.max(80, (px + panelW - 10) - textX);
+
+        // Título grande (cor própria da quest)
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillStyle = opts.collected ? '#7fe0a0' : opts.accent;
+        const title = def.name.toUpperCase();
+        ctx.fillText(title, textX, py + 18);
+
+        // Risco verde animado sobre o título (sweep esquerda → direita)
+        if (opts.collected) {
+            const titleW = ctx.measureText(title).width;
+            const reach = opts.flashProgress < 1 ? opts.flashProgress : 1;
+            ctx.strokeStyle = '#4ade80';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(textX, py + 16);
+            ctx.lineTo(textX + titleW * reach, py + 16);
+            ctx.stroke();
+        }
+
+        // Descrição (até 4 linhas)
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = opts.collected ? '#7fd4a6' : '#c8a165';
+        const descLines = this._wrapHudText(ctx, def.description.toUpperCase(), textW);
+        descLines.slice(0, 4).forEach((line, i) => ctx.fillText(line, textX, py + 34 + i * 12));
+
+        // Certinho (✓) com pop sobre o canto do sprite
+        if (opts.collected) {
+            const t = opts.flashProgress;
+            const badge = 22;
+            const bx = imgX + imgW - 10;
+            const by = imgY - 6;
+            const scale = 0.6 + 0.5 * t;
+            ctx.save();
+            ctx.translate(bx + badge / 2, by + badge / 2);
+            ctx.scale(scale, scale);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(-badge / 2, -badge / 2, badge, badge);
+            ctx.strokeStyle = '#052e16';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-badge / 2, -badge / 2, badge, badge);
+            ctx.fillStyle = '#04210e';
+            ctx.font = '14px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('✓', 0, 5);
+            ctx.restore();
+        }
+
+        // Objetivo / dica de localização (rodapé em LARGURA TOTAL — nunca corta
+        // coordenadas como "Y02103" da quest Meio da Nave)
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = opts.collected ? '#7fd4a6' : '#e07228';
+        const hintLines = this._wrapHudText(ctx, `>> ${def.hint.toUpperCase()}`, panelW - 20);
+        hintLines.slice(0, 2).forEach((line, i) => ctx.fillText(line, px + 10, py + 92 + i * 11));
+
+        ctx.restore();
+    }
+
+    // Cartão final do log: depois das 3 peças aparece "CONSERTE A NAVE"
+    // (layout só com texto — sem o ícone principal_mission).
+    _renderFinalQuestCard(ctx, px, py, panelW, panelH) {
+        const cx = px + panelW / 2;
+        const textW = panelW - 24;
+
+        ctx.save();
+        ctx.textAlign = 'center';
+
+        ctx.font = '12px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText('CONSERTE', cx, py + 20);
+        ctx.fillText('A NAVE', cx, py + 36);
+
+        // Divisor decorativo
+        ctx.strokeStyle = '#e07228';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 30, py + 44);
+        ctx.lineTo(cx + 30, py + 44);
+        ctx.stroke();
+
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#c8a165';
+        const lines = this._wrapHudText(
+            ctx,
+            'TODAS AS PEÇAS REUNIDAS. VÁ ATÉ A NAVE EM DUNA E INSTALE OS COMPONENTES.',
+            textW
+        );
+        lines.slice(0, 3).forEach((line, i) => ctx.fillText(line, cx, py + 58 + i * 12));
+
+        if (gameState.spaceshipRepaired) {
+            ctx.font = '9px "Press Start 2P", monospace';
+            ctx.fillStyle = '#4ade80';
+            ctx.fillText('✓ NAVE CONSERTADA!', cx, py + 106);
+        }
 
         ctx.restore();
     }
@@ -2966,7 +3595,7 @@ if (obstacleCollisionRects(o).some((cr) => rectsOverlap(cr, rect))) return true;
                     desc = 'VIDA MÁX: +25 (130)';
                 } else if (upgradeId === 'movespeed_up') {
                     borderColor = '#38bdf8';
-                    desc = 'VELOCIDADE: +10% (ENERGIA +20)';
+                    desc = 'VELOCIDADE: +10% | ENERGIA: +30';
                 }
 
                 ctx.strokeStyle = borderColor;

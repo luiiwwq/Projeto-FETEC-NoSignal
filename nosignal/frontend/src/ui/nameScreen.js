@@ -17,13 +17,13 @@ export function renderNameScreen(container) {
             <div class="name-modal-panel">
                 <div class="name-panel-header">
                     <span class="panel-icon">▲</span>
-                    <h2 class="panel-title">TELEMETRIA ORBITAL DE MARTE</h2>
+                    <h2 class="panel-title">TELEMETRIA ORBITAL DE DUNA</h2>
                     <span class="panel-icon">▲</span>
                 </div>
                 
                 <div class="name-panel-body">
                     <p class="mission-briefing">
-                        IDENTIFIQUE O ASTRONAUTA RESPONSÁVEL PELA OPERAÇÃO DE RECONHECIMENTO EM SOLO MARCIANO:
+                        IDENTIFIQUE O ASTRONAUTA RESPONSÁVEL PELA OPERAÇÃO DE RECONHECIMENTO EM SOLO DE DUNA:
                     </p>
 
                     <div class="input-container">
@@ -75,16 +75,8 @@ export function renderNameScreen(container) {
         gameState.playerName = enteredName;
         console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
 
-        // Registro assíncrono opcional no backend (não bloqueia caso MySQL/PHP esteja offline)
-        try {
-            fetch('http://localhost/nosignal/backend/public/index.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: enteredName }),
-            }).catch(() => {
-                // Silencioso se backend local não estiver rodando
-            });
-        } catch (_) {}
+        // O backend PHP/MySQL local foi descontinuado: o projeto roda como site
+        // estático (Cloudflare Pages). O nome fica salvo apenas na sessão local.
 
         // Transition to Crew Selection (character select) screen
         renderCharacterSelectScreen(container);

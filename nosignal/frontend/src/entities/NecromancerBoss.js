@@ -323,6 +323,10 @@ export class NecromancerBoss {
 
         this._pendingSkill = null;
         this._castOnComplete = null;
+
+        // Congelamento durante a cutscene de introdução: enquanto true, o boss
+        // permanece no estado IDLE e não executa nenhuma ação de IA.
+        this._cutscenePlaying = false;
     }
 
     /* Quando o jogador morre, o boss volta ao estado inicial da luta: HP cheio,
@@ -358,6 +362,8 @@ export class NecromancerBoss {
 
         this.vx = 0;
         this.vy = 0;
+        // _cutscenePlaying não é resetada no retry: a cutscene já foi exibida
+        // na entrada e não volta a tocar até reiniciar a partida.
     }
 
     setCollisionResolver(resolver) {
@@ -370,6 +376,9 @@ export class NecromancerBoss {
 
     /* ── IA ──────────────────────────────────────────────── */
     updateAi(dt, engine) {
+        // Congelado durante a cutscene de introdução: boss permanece parado.
+        if (this._cutscenePlaying) return;
+
         if (this.attackCooldown > 0) this.attackCooldown -= dt;
         if (this.skillCooldown > 0) this.skillCooldown -= dt;
         if (this.hurtCooldown > 0) this.hurtCooldown -= dt;

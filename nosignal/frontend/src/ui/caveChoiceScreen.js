@@ -4,7 +4,7 @@
  *
  * Aberta ao interagir com o exit "cave-entrance" ([E] ENTRAR NA CAVERNA) em
  * vez de transicionar direto para mars-cave. O jogador escolhe entre duas
- * entradas ("Núcleo de Marte" / "Catacumbas Marcianas") e só então a troca de
+ * entradas ("Núcleo de Duna" / "Catacumbas de Duna") e só então a troca de
  * mapa acontece. Pode ser cancelada com ESC, voltando ao jogo sem viajar.
  *
  * Padrões seguem pauseMenu.js / nameModal.js: overlay DOM em tela cheia,
@@ -83,14 +83,14 @@ function _applyBackground(el) {
 const HOTSPOTS = [
     {
         path: CAVE_PATHS.MARS_CORE,
-        label: 'NÚCLEO DE MARTE',
+        label: 'NÚCLEO DE DUNA',
         // centro ≈ (301, 396) em 1280×720
         cx: 0.235,
         cy: 0.55,
     },
     {
         path: CAVE_PATHS.CATACOMBS,
-        label: 'CATACUMBAS MARCIANAS',
+        label: 'CATACUMBAS DE DUNA',
         // centro ≈ (928, 396) em 1280×720
         cx: 0.725,
         cy: 0.55,
@@ -208,7 +208,7 @@ function _buildDOM() {
 
         <header class="cave-choice-header">
             <span id="cave-choice-title" class="cave-choice-title">ESCOLHA SEU CAMINHO</span>
-            <span class="cave-choice-sub">DOIS SINAIS AGUARDAM NAS PROFUNDEZAS DE MARTE</span>
+            <span class="cave-choice-sub">DOIS SINAIS AGUARDAM NAS PROFUNDEZAS DE DUNA</span>
         </header>
 
         <div class="cave-choice-hotspots">

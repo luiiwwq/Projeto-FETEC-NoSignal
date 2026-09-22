@@ -36,7 +36,7 @@ export const SHOP_ITEMS = [
     {
         id: 'energia_duna',
         name: 'Energia de Duna',
-        description: 'Poção da tempestade: eleva a ENERGIA a 150 durante 4.5 segundos. Uso infinito · recarga 15s.',
+        description: 'Poção da tempestade: soma +50 de ENERGIA durante 4.5 segundos. Uso infinito · recarga 15s.',
         price: 20,
         type: 'consumable',
         effect: 'energy_boost',
@@ -101,8 +101,8 @@ export function consumeInventorySlot(slot, player) {
         player.heal(30);
         message = `${item.name}: +30 VIDA`;
     } else if (item.effect === 'energy_boost') {
-        player.boostEnergy(150, 4.5);
-        message = `${item.name}: ENERGIA 150 · 4.5s`;
+        player.boostEnergy(50, 4.5);
+        message = `${item.name}: +50 ENERGIA · 4.5s`;
     }
 
     return { used: true, message };

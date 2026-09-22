@@ -103,8 +103,8 @@ export class Player {
 
         // Energy reserve (tiros): a barra de energia só alimenta os disparos.
         // Esvazia durante rajadas contínuas e recarrega rapidamente depois.
-        this.maxEnergy = 100;
-        this.baseMaxEnergy = 100; // valor padrão (Energia de Duna eleva temporariamente)
+        this.maxEnergy = 120;
+        this.baseMaxEnergy = 120; // valor padrão (Energia de Duna eleva temporariamente)
         this.energy = this.maxEnergy;
         this.energyRegen = 40; // /seg -> recarga completa em ~2.5s (só após cessar o fogo)
         this.energyDelay = 0;  // recarga fica bloqueada logo após cada disparo
@@ -450,10 +450,10 @@ respawn(x = 0, y = 0) {
             this.hp = this.maxHp;
         }
 
-        // Energia: o upgrade de movimentação também eleva o máximo para 120
-        // (+20 na barra), somando a diferença em vez de recarregar do zero.
+        // Energia: padrão 120; o upgrade de movimentação soma +30 (150) na barra,
+        // preservando a diferença em vez de recarregar do zero.
         const prevBaseEnergy = this.baseMaxEnergy;
-        const targetBaseEnergy = upgrades.includes('movespeed_up') ? 120 : 100;
+        const targetBaseEnergy = upgrades.includes('movespeed_up') ? 150 : 120;
         this.baseMaxEnergy = targetBaseEnergy;
 
         // Com a Energia de Duna ativa, o máximo temporário é preservado;
@@ -477,14 +477,15 @@ respawn(x = 0, y = 0) {
         return this.hp - before;
     }
 
-    // Boost de energia (poção Energia de Duna): energia sobre para `target`
-    // durante `duration` segundos e depois volta ao padrão (100).
-    boostEnergy(target, duration) {
+    // Boost de energia (poção Energia de Duna): soma `amount` fixos de energia
+    // ao máximo atual durante `duration` segundos; ao acabar, o máximo volta ao
+    // padrão de base (120 ou 150 com movimento).
+    boostEnergy(amount, duration) {
         if (this.energyOverdrive <= 0) {
             this.baseMaxEnergy = this.maxEnergy;
         }
-        this.maxEnergy = target;
-        this.energy = target;
+        this.maxEnergy = this.baseMaxEnergy + amount;
+        this.energy = this.maxEnergy;
         this.energyOverdrive = duration;
     }
 
@@ -505,7 +506,7 @@ respawn(x = 0, y = 0) {
             }
         }
 
-        // Energia de Duna: overdrive temporário (150 de energia). Ao acabar,
+        // Energia de Duna: overdrive temporário (+50 de energia). Ao acabar,
         // o máximo volta ao padrão e a energia é limitada de volta a ele.
         if (this.energyOverdrive > 0) {
             this.energyOverdrive -= dt;

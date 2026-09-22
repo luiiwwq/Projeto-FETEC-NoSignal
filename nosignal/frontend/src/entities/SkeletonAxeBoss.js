@@ -84,10 +84,16 @@ export class SkeletonAxeBoss extends SkeletonAxe {
 
         // O boss permanece no posto mesmo quando o jogador tenta fugir.
         this.speedMul = SKELETON_AXE_BOSS_SPEED_MUL;
+
+        // Congelamento durante a cutscene de introdução: enquanto true, o boss
+        // permanece parado e não executa nenhuma ação de IA.
+        this._cutscenePlaying = false;
     }
 
     updateAi(dt, engine) {
         this._engine = engine;
+        // Congelado durante a cutscene de introdução: boss permanece parado.
+        if (this._cutscenePlaying) return;
         super.updateAi(dt, engine);
     }
 

@@ -54,6 +54,40 @@ export const gameState = {
     skeletonAxeBossDefeated: false,
     catacombsCleared: false,
 
+    // Flags de sessão: cutscene de introdução já exibida (não persiste nem
+    // reseta em retry — só em nova partida). Impede que a cutscene toque de
+    // novo após o jogador morrer e retornar à sala do boss.
+    necroIntroDone: false,
+    axeBossIntroDone: false,
+
+    // Missão principal — "Conserte a nave e saia de Duna".
+    // missionCollected: ids ('motor' | 'meio' | 'ponta') já coletados.
+    // missionDrops:     itemId -> { mapId, x, y } para os itens dropados pelos
+    //                   chefes (persistem ao trocar de mapa; o item do meio da
+    //                   nave nasce já na superfície).
+    // spaceshipRepaired: true quando as 3 peças foram coletadas.
+    missionCollected: [],
+    missionDrops: {},
+    spaceshipRepaired: false,
+
+    hasMissionItem(id) {
+        return Array.isArray(this.missionCollected) && this.missionCollected.includes(id);
+    },
+
+    addMissionItem(id) {
+        if (!Array.isArray(this.missionCollected)) this.missionCollected = [];
+        if (!this.missionCollected.includes(id)) {
+            this.missionCollected.push(id);
+            return true;
+        }
+        return false;
+    },
+
+    isMissionComplete() {
+        const collected = Array.isArray(this.missionCollected) ? this.missionCollected : [];
+        return ['motor', 'meio', 'ponta'].every((id) => collected.includes(id));
+    },
+
     addCoins(amount) {
         this.coins = Math.max(0, (this.coins || 0) + amount);
         return this.coins;
@@ -108,6 +142,11 @@ export const gameState = {
         this.necromancerDefeated = false;
         this.skeletonAxeBossDefeated = false;
         this.catacombsCleared = false;
+        this.necroIntroDone = false;
+        this.axeBossIntroDone = false;
+        this.missionCollected = [];
+        this.missionDrops = {};
+        this.spaceshipRepaired = false;
         try {
             localStorage.removeItem('noSignal_allyBossHelpPurchased');
         } catch { /* sem suporte a localStorage */ }

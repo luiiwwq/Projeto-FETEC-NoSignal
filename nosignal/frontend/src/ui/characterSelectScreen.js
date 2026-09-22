@@ -24,7 +24,7 @@ export function renderCharacterSelectScreen(container) {
 
                 <div class="name-panel-body">
                     <p class="mission-briefing">
-                        ESCAPE PODS DETECTADOS NA SUPERFÍCIE DE MARTE. ESCOLHA QUEM DESCE
+                        ESCAPE PODS DETECTADOS NA SUPERFÍCIE DE DUNA. ESCOLHA QUEM DESCE
                         ÀS RUÍNAS PARA RESTABELECER O NO SIGNAL:
                     </p>
 

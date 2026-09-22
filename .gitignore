@@ -24,3 +24,21 @@ yarn-debug.log*
 # Variáveis de ambiente locais
 .env
 .env.local
+.env.*
+*.env
+*.local
+!.env.example
+
+# Backend PHP/MySQL local (não usado no deploy estático): dados e credenciais
+# locais do XAMPP nunca entram no repositório.
+nosignal/backend/.env
+nosignal/backend/storage/
+nosignal/backend/uploads/
+nosignal/backend/*.sql
+
+# Caches de build e ferramentas
+.cache/
+.cache
+.parcel-cache/
+.eslintcache
+npm-shrinkwrap.json.bak
