@@ -8,6 +8,7 @@ import { gameState } from '../state/gameState.js';
 import { CHARACTERS, CHARACTER_IDS, DEFAULT_CHARACTER_ID, getCharacterRotationPaths } from '../content/characters.js';
 import { renderLoadingScreen } from './loadingScreen.js';
 import { renderNameScreen } from './nameScreen.js';
+import { playStartGameCutscene } from './StartGameCutscenePlayer.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 export function renderCharacterSelectScreen(container) {
@@ -125,7 +126,9 @@ export function renderCharacterSelectScreen(container) {
     const handleConfirm = () => {
         gameState.selectedCharacter = selectedId;
         console.log(`[No Signal] Tripulante selecionado: ${selectedId}`);
-        renderLoadingScreen(container);
+        playStartGameCutscene(container).then(() => {
+            renderLoadingScreen(container);
+        });
     };
 
     const handleBack = () => {

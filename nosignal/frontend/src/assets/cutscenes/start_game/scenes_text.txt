@@ -1,0 +1,27 @@
+scene1: Frase 1:Em uma galáxia distante, no ano de 2167,
+Frase 2 (Continuação): existia um planeta chamado Kerbin, habitado por diversas formas de vida. 
+
+scene2: Frase 1: Décadas de exploração destruíram os recursos do planeta. 
+Frase 2 (Continuação): Milhões de vidas foram perdidas.
+
+scene3: Frase 1: Para salvar o que restava da população, a Asperance iniciou a Missão ARES-1.
+
+scene4: Frase 1: Três astronautas foram enviados em busca de um novo lar.
+
+scene5: Frase 1: Depois de meses de viagem, a ARES-1 chegou ao sistema de Duna.
+
+scene6: Frase 1: Antes da chegada, um dos astronautas entrou em uma nave de reconhecimento que foi enviada para pousar no planeta. Frase 2 (Continuação): Pouco depois, o contato foi perdido.
+
+scene7: Frase 1: Então, a ARES-1 entrou em um enorme cinturão de asteroides.
+
+scene8: Frase 1: A nave foi atingida e perdeu o controle.
+
+scene9: Frase 1: A nave ARES-1 caiu em Duna.
+
+scene10:Frase 1: Milagrosamente, os dois astronautas sobrevivem, Frase 2 (Continuação): mas percebem que o contato com Kerbin foi perdido.
+
+scene11: Frase 1: E o pior, o sistema de suporte de vida foi danificado e o oxigênio restante durará apenas cinco dias.
+
+scene12: Frase 1: Apesar da queda, o equipamento responsável pela terraformação permanece intacto.
+Frase 2 (Continuação): A missão ainda pode ser concluída. 
+
