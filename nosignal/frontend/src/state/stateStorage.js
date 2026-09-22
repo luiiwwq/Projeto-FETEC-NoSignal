@@ -20,12 +20,27 @@ function clampNum(value, min, max, fallback) {
     return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+// Fator real de brilho da tela: o valor 0% nunca apaga a tela (fica preto
+// total). 0% equivale a 45% de brilho e 100% equivale a brilho total (1.0),
+// com interpolação linear entre esses extremos.
+export function brightnessFactor(value) {
+    const v = clampNum(value, 0, 100, 100);
+    return 0.45 + (v / 100) * (1 - 0.45);
+}
+
+// Filtro CSS pronto a partir do valor do slider. Em 100% (fator 1.0) o
+// filtro é removido para não criar camada de renderização sem efeito.
+export function brightnessFilter(value) {
+    const factor = brightnessFactor(value);
+    return factor >= 1 ? '' : `brightness(${factor.toFixed(2)})`;
+}
+
 function sanitize(raw) {
     const out = { ...DEFAULT_SETTINGS };
     if (!raw || typeof raw !== 'object') return out;
     out.musicVolume = clampNum(raw.musicVolume, 0, 100, DEFAULT_SETTINGS.musicVolume);
     out.sfxVolume = clampNum(raw.sfxVolume, 0, 100, DEFAULT_SETTINGS.sfxVolume);
-    out.brightness = clampNum(raw.brightness, 50, 100, DEFAULT_SETTINGS.brightness);
+    out.brightness = clampNum(raw.brightness, 0, 100, DEFAULT_SETTINGS.brightness);
     out.fullscreen = raw.fullscreen === true;
     return out;
 }

@@ -78,7 +78,7 @@ import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '.
 import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem } from '../ui/shopScreen.js';
 import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
-import { loadSettings } from '../state/stateStorage.js';
+import { loadSettings, brightnessFilter } from '../state/stateStorage.js';
 import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
 
 const DAY_NIGHT_ICON_PATH = {
@@ -1340,11 +1340,18 @@ export class GameEngine {
 
         // Respawn após morrer: na Sala do Rei (boss Necromancer) o jogador
         // respawna na Sala Principal do castelo — não dentro da sala do boss.
+        // No Núcleo de Marte (guardião da duna), o jogador volta para a FRENTE
+        // da caverna (superfície) e escolhe se reentra para matar o boss de
+        // novo ou se segue outro caminho.
+        let respawnPoint = null;
         if (this.currentMapId === MAP_IDS.CASTLE_KING_ROOM) {
             this.changeMap(MAP_IDS.CASTLE_PRINCIPAL_ROOM, 'castle-principal-entry');
+        } else if (this.currentMapId === MAP_IDS.MARS_CORE) {
+            this.changeMap(MAP_IDS.MARS_SURFACE, 'cave-return');
+            respawnPoint = this.currentMap.spawnPoints['cave-return'] || null;
         }
 
-        const spawn = this.currentMap.spawn || { x: 0, y: 0 };
+        const spawn = respawnPoint || this.currentMap.spawn || { x: 0, y: 0 };
         this.player.respawn(spawn.x, spawn.y);
         this.player.applyUpgrades(gameState.upgrades || []);
         this.camera.follow(spawn.x, spawn.y, true);
@@ -2100,15 +2107,15 @@ export class GameEngine {
 
     /**
      * Aplica as configurações persistidas (tela inicial/pausa) ao game loop.
-     * O brilho ajusta o canvas; os volumes de áudio ficam disponíveis em
-     * loadSettings() para quando o sistema de som for implementado.
+     * O brilho ajusta o CONTÊINER RAIZ (#app) — que engloba o canvas do jogo
+     * e os overlays do menu — e não apenas o canvas, para escurecer a tela
+     * inteira (aplicado de novo ao iniciar a partida para refizer o estado).
      */
     _applyStoredSettings() {
         const settings = loadSettings();
-        if (this.canvas) {
-            this.canvas.style.filter = settings.brightness < 100
-                ? `brightness(${(settings.brightness / 100).toFixed(2)})`
-                : '';
+        const root = this.container || document.getElementById('app');
+        if (root) {
+            root.style.filter = brightnessFilter(settings.brightness);
         }
     }
 

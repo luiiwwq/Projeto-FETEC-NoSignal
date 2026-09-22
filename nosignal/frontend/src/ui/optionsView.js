@@ -7,7 +7,7 @@
  * preenchimento sempre acompanha a posição exata do polegar.
  */
 
-import { loadSettings, saveSettings } from '../state/stateStorage.js';
+import { loadSettings, saveSettings, brightnessFilter } from '../state/stateStorage.js';
 import { setMenuMusicVolume } from '../audio/menuMusic.js';
 import { setGameMusicVolume } from '../audio/gameMusic.js';
 
@@ -27,16 +27,15 @@ function fillPercent(slider) {
     return Math.round(((value - min) / (max - min)) * 100);
 }
 
-function applyBrightness(containerRef) {
+// Aplica o brilho ao CONTÊINER RAIZ (#app), que engloba o canvas do jogo e
+// todos os overlays do menu (título, pausa, opções). Assim o brilho escurece
+// a tela inteira — menu e gameplay — do mesmo jeito que o volume de música.
+// O 0% nunca apaga a tela: equivale a 45% de brilho (ver brightnessFilter).
+function applyBrightness() {
     const settings = loadSettings();
-    const canvas =
-        (containerRef ? containerRef.querySelector('#game-canvas') : null) ||
-        document.querySelector('#game-canvas');
-    if (canvas) {
-        canvas.style.filter = settings.brightness < 100
-            ? `brightness(${(settings.brightness / 100).toFixed(2)})`
-            : '';
-    }
+    const root = document.getElementById('app') || document.body;
+    if (!root) return;
+    root.style.filter = brightnessFilter(settings.brightness);
 }
 
 function refreshFullscreenButtons() {
@@ -151,7 +150,8 @@ function toggleFullscreen(containerRef) {
 /**
  * Constrói o corpo da tela de opções.
  * onBack: callback disparado ao clicar em "VOLTAR".
- * containerRef: elemento que contém o canvas do jogo (para aplicar o brilho).
+ * containerRef: elemento usado como alvo da tela cheia e de onde o brilho
+ * é calculado (o brilho em si é aplicado ao contêiner raiz #app).
  * Retorna o fragmento DOM já populado e vinculado.
  */
 export function createOptionsContent({ onBack, containerRef } = {}) {
@@ -200,7 +200,7 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
             const label = wrap.querySelector(`[data-value-for="${slider.dataset.setting}"]`);
             if (label) label.textContent = value + '%';
             saveSettings({ [slider.dataset.setting]: value });
-            applyBrightness(containerRef);
+            applyBrightness();
             // Volumes de música (menu e gameplay) seguem ao vivo, sem reiniciar.
             if (slider.dataset.setting === 'musicVolume') {
                 setMenuMusicVolume();
@@ -234,5 +234,5 @@ export function syncOptionsUI(wrap, containerRef) {
         if (label) label.textContent = value + '%';
     });
     refreshFullscreenButtons();
-    applyBrightness(containerRef);
+    applyBrightness();
 }
