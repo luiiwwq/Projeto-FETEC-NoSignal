@@ -3227,7 +3227,7 @@ export class GameEngine {
     /* ── Missão principal: "Conserte a nave e saia de Duna" ──
      * Log de quests NO canto superior direito, logo abaixo do painel de
      * coordenadas. Mostra UMA quest por vez (desbloqueio sequencial):
-     * Motor da Nave → Meio da Nave → Ponta da Nave → CONSERTE A NAVE.
+     * Motor da Nave → Combustível → Estabilizadores → CONSERTE A NAVE.
      * Ao coletar a peça, um "risco verde + ✓" cruza o cartão compacto e a
      * próxima quest assume o lugar. "PECAS" maior, colado à direita.      */
     _renderMissionHUD(ctx, x, y) {

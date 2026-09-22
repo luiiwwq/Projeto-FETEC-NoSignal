@@ -33,8 +33,8 @@ export const SPACESHIP_ITEM_DEFS = {
     meio: {
         id: 'meio',
         slot: 2,
-        name: 'Meio da Nave',
-        description: 'O meio da nave: todos os componentes centrais que ligam cada parte.',
+        name: 'Combustível',
+        description: 'O combustível: a energia que impulsiona a nave pela fuga de Duna.',
         hint: 'Procure pelas coordenadas X00942 E Y02103',
         sprite: './src/assets/sprites/Itens/spaceship_itens/spaceship_item2.png',
         dropFrom: null,
@@ -45,8 +45,8 @@ export const SPACESHIP_ITEM_DEFS = {
     ponta: {
         id: 'ponta',
         slot: 3,
-        name: 'Ponta da Nave',
-        description: 'A ponta da nave: a peça que falta para completar o conserto.',
+        name: 'Estabilizadores',
+        description: 'Os estabilizadores: a peça que falta para completar o conserto.',
         hint: 'Derrote o Rei',
         sprite: './src/assets/sprites/Itens/spaceship_itens/spaceship_item3.png',
         dropFrom: 'necromancerBoss',
