@@ -282,6 +282,7 @@ export class GameEngine {
             mouseX: this.width / 2,
             mouseY: this.height / 2,
             mouseLeft: false,
+            mouseMiddle: false,
             mouseRight: false
         };
 
@@ -370,6 +371,7 @@ export class GameEngine {
         this.canvas.addEventListener('mousemove', this._onMouseMove);
         this.canvas.addEventListener('mousedown', this._onMouseDown);
         window.addEventListener('mouseup', this._onMouseUp);
+        this.canvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
         this.canvas.addEventListener('contextmenu', this._onContextMenu);
         document.addEventListener('fullscreenchange', this._onFullscreenChange);
         document.addEventListener('webkitfullscreenchange', this._onFullscreenChange);
@@ -2290,13 +2292,6 @@ export class GameEngine {
             return;
         }
 
-        // Dash do personagem ([E] sem interação pendente): custa 25 de energia.
-        if (e.code === 'KeyE' && this.player && !this.player.isDead) {
-            if (this.player.dash(this.input)) {
-                this._spawnDashFx(this.player);
-            }
-            return;
-        }
 
         // Easter egg secreto: Ctrl+Shift+1+F faz o Among Us surgir na frente.
         // (Ctrl+1 puro é roubado pelo navegador, por isso o Shift.)
@@ -2363,6 +2358,15 @@ export class GameEngine {
     _handleMouseDown(e) {
         if (e.button === 0) {
             this.input.mouseLeft = true;
+        } else if (e.button === 1) {
+            // Scroll click (middle mouse) = Dash
+            e.preventDefault();
+            this.input.mouseMiddle = true;
+            if (this.player && !this.player.isDead && !this.paused && !this._cutsceneActive) {
+                if (this.player.dash(this.input, this.camera)) {
+                    this._spawnDashFx(this.player);
+                }
+            }
         } else if (e.button === 2) {
             this.input.mouseRight = true;
         }
@@ -2371,6 +2375,8 @@ export class GameEngine {
     _handleMouseUp(e) {
         if (e.button === 0) {
             this.input.mouseLeft = false;
+        } else if (e.button === 1) {
+            this.input.mouseMiddle = false;
         } else if (e.button === 2) {
             this.input.mouseRight = false;
         }
@@ -2378,6 +2384,44 @@ export class GameEngine {
 
     addBullet(bullet) {
         this.bullets.push(bullet);
+    }
+
+    // Dano melee do soco do jogador: varre todos os inimigos dentro do alcance
+    // e aplica dano a cada um que estiver no cone frontal do soco.
+    applyPlayerMeleeAttack(player, aimAngle, damage) {
+        const meleeRange = 55;
+        const meleeConeHalf = Math.PI / 3; // ±60° do ângulo de mira
+
+        const targets = [
+            ...this.actors.filter(a => a.team === 'enemy' && !a.isDead),
+            ...this.golems.filter(g => !g.isDead),
+            ...this.reapers.filter(r => !r.isDead),
+            ...(this.skeletons || []).filter(s => !s.isDead)
+        ];
+        if (this.necromancerBoss && !this.necromancerBoss.isDead) targets.push(this.necromancerBoss);
+        if (this.skeletonAxeBoss && !this.skeletonAxeBoss.isDead) targets.push(this.skeletonAxeBoss);
+
+        for (const target of targets) {
+            const dx = target.x - player.x;
+            const dy = target.y - player.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > meleeRange) continue;
+
+            const angleToTarget = Math.atan2(dy, dx);
+            let angleDiff = angleToTarget - aimAngle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            if (Math.abs(angleDiff) > meleeConeHalf) continue;
+
+            target.takeDamage(damage, player.x, player.y);
+            this._spawnHitSparks(target.x, target.y);
+
+            if (target.isDead && !target._coinAwarded && target.team === 'enemy') {
+                target._coinAwarded = true;
+                const reward = target.name === 'GOLEM' ? 5 : (target.name?.includes('SPEARMAN') ? 4 : 3);
+                this._awardEnemyCoins(target.x, target.y, reward);
+            }
+        }
     }
 
     // Team damage rules:
@@ -2479,7 +2523,7 @@ export class GameEngine {
         this.player.update(dt);
         this._handlePlayerDeath(dt);
 
-        // Fagulhas contínuas do dash (rastro ciano atrás do personagem).
+        // Fagulhas contínuas do dash (rastro branco/brilhante atrás do personagem).
         if (this.player.state === PlayerState.DASHING && this.player.dashTimer > 0) {
             for (let i = 0; i < 2; i++) {
                 this.particles.push({
@@ -2488,7 +2532,7 @@ export class GameEngine {
                     vx: -this.player.dashDirX * 45 + (Math.random() - 0.5) * 30,
                     vy: -this.player.dashDirY * 45 + (Math.random() - 0.5) * 30,
                     life: 0.12 + Math.random() * 0.16,
-                    color: Math.random() > 0.4 ? '#7fe7ff' : '#ffffff',
+                    color: Math.random() > 0.35 ? '#ffffff' : '#fef08a',
                     size: Math.random() > 0.5 ? 3 : 2
                 });
             }
@@ -3352,7 +3396,7 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'center';
         ctx.fillText(
-            '[WASD] Mover  [SHIFT] Correr  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [1/2/3] Itens  [ESC] Menu',
+            '[WASD] Mover  [SHIFT] Correr  [CLICK SCROLL] DASH  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [F e P] EMOTES  [1/2/3] Itens  [ESC] Menu',
             this.width / 2,
             barBottomY + 23
         );

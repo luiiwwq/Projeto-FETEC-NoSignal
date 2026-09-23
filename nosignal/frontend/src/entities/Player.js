@@ -157,7 +157,7 @@ export class Player {
         this.recoilY = 0;
 
         // Dash mechanics ([E], custa energia)
-        this.dashEnergyCost = 25;   // energia gasta por dash
+        this.dashEnergyCost = 50;   // energia gasta por dash
         this.dashDuration = 0.22;   // segundos do impulso
         this.dashSpeed = 620;       // px/seg do dash
         this.dashTimer = 0;
@@ -306,7 +306,7 @@ export class Player {
 
         // Punch Action (Right Click)
         if (input.mouseRight && this.punchCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
-            this.punch(aimAngle);
+            this.punch(aimAngle, bulletManager);
         }
 
         // Jump Action (Spacebar)
@@ -407,7 +407,7 @@ export class Player {
         }
     }
 
-    punch(aimAngle) {
+    punch(aimAngle, gameEngine = null) {
         this.punchCooldown = 0.38;
         this.updateDirectionFromAngle(aimAngle);
         this.setState(PlayerState.PUNCHING, true);
@@ -415,6 +415,12 @@ export class Player {
         // Forward impulse for punch
         this.recoilX = Math.cos(aimAngle) * 70;
         this.recoilY = Math.sin(aimAngle) * 70;
+
+        // Causa 15 de dano ao bater melee
+        if (gameEngine && typeof gameEngine.applyPlayerMeleeAttack === 'function') {
+            const damage = Math.round(15 * (this.damageMultiplier ?? 1.0));
+            gameEngine.applyPlayerMeleeAttack(this, aimAngle, damage);
+        }
     }
 
     jump() {
@@ -423,29 +429,42 @@ export class Player {
         this.setState(PlayerState.JUMPING, true);
     }
 
-    // Dash para frente ([E]). Direção: teclas WASD/setas se houver input de
-    // movimento; senão, usa a direção que o personagem está virado. Custa
-    // energia e tem um cooldown curto para não virar spam.
-    dash(input) {
+    // Dash para qualquer direção ([E]).
+    // - Se houver teclas de movimento (WASD/setas) pressionadas, usa essa direção (8 direções).
+    // - Se não houver teclas de movimento, usa a direção exata do cursor do mouse (360°).
+    // - Fallback: direção atual do personagem.
+    // Atualiza a orientação do sprite imediatamente e ativa o brilho sobre o asset.
+    dash(input, camera = null) {
         if (this.state === PlayerState.DEAD || this.isDead) return false;
         if (this.state === PlayerState.DASHING || this.dashCooldown > 0) return false;
 
         if (this.team === 'player' && this.role === 'player') {
             if (this.energy < this.dashEnergyCost) return false;
             this.energy = Math.max(0, this.energy - this.dashEnergyCost);
-            this.energyDelay = 0.5;
+            this.energyDelay = 0.4;
         }
 
         let dx = 0;
         let dy = 0;
-        if (input) {
+        if (input && input.keys) {
             if (input.keys['KeyW'] || input.keys['ArrowUp']) dy -= 1;
             if (input.keys['KeyS'] || input.keys['ArrowDown']) dy += 1;
             if (input.keys['KeyA'] || input.keys['ArrowLeft']) dx -= 1;
             if (input.keys['KeyD'] || input.keys['ArrowRight']) dx += 1;
         }
 
-        if (dx === 0 && dy === 0) {
+        if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy);
+            dx /= len;
+            dy /= len;
+            this.updateDirectionFromMovement(dx, dy);
+        } else if (input && camera && typeof input.mouseX === 'number' && typeof input.mouseY === 'number') {
+            const screenPos = camera.worldToScreen(this.x, this.y);
+            const aimAngle = Math.atan2(input.mouseY - screenPos.y, input.mouseX - screenPos.x);
+            dx = Math.cos(aimAngle);
+            dy = Math.sin(aimAngle);
+            this.updateDirectionFromAngle(aimAngle);
+        } else {
             const facing = {
                 'north': [0, -1],
                 'south': [0, 1],
@@ -456,18 +475,17 @@ export class Player {
                 'south-east': [Math.SQRT1_2, Math.SQRT1_2],
                 'south-west': [-Math.SQRT1_2, Math.SQRT1_2]
             };
-            const f = facing[this.direction] || [0, 0];
+            const f = facing[this.direction] || [0, 1];
             dx = f[0];
             dy = f[1];
-        } else if (dx !== 0 && dy !== 0) {
-            dx *= Math.SQRT1_2;
-            dy *= Math.SQRT1_2;
         }
 
         this.dashDirX = dx;
         this.dashDirY = dy;
         this.dashTimer = this.dashDuration;
-        this.dashCooldown = 0.55;
+        this.dashCooldown = 0.45;
+        this.invulnerableTimer = Math.max(this.invulnerableTimer, this.dashDuration);
+        this.dashTrail = [];
         this.vx = 0;
         this.vy = 0;
         this.setState(PlayerState.DASHING, true);
@@ -679,8 +697,16 @@ respawn(x = 0, y = 0) {
                     this.y += dashDy;
                 }
 
-                // Guarda um fantasma do rastro nesta posição.
-                this.dashTrail.push({ x: this.x, y: this.y, t: this.dashDuration });
+                // Guarda um ponto no rastro (silhueta branca brilhante esmaecendo)
+                this.dashTrail.push({
+                    x: this.x,
+                    y: this.y,
+                    t: 0.16,
+                    maxT: 0.16,
+                    clipName: this._animName(this.state),
+                    dir: this._resolveSpriteDir(this._animName(this.state), this.direction),
+                    frame: this.currentFrame
+                });
 
                 if (this.dashTimer <= 0) {
                     this.dashTimer = 0;
@@ -785,42 +811,31 @@ respawn(x = 0, y = 0) {
             ctx.restore();
         }
 
-        // Brilhozinho do dash: aura ciano atrás do personagem.
-        if (this.state === PlayerState.DASHING && this.dashTimer > 0) {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            const glow = ctx.createRadialGradient(screenPos.x, screenPos.y, 4, screenPos.x, screenPos.y, 42);
-            glow.addColorStop(0, 'rgba(127, 231, 255, 0.55)');
-            glow.addColorStop(1, 'rgba(127, 231, 255, 0)');
-            ctx.fillStyle = glow;
-            ctx.beginPath();
-            ctx.arc(screenPos.x, screenPos.y, 42, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
-
         // Render player sprite at nativeSize x scale
         // Character is centered horizontally, feet grounded
         const renderW = this.renderSize;
         const renderH = this.renderSize;
         const drawX = Math.round(screenPos.x - renderW / 2);
         const drawY = Math.round(screenPos.y - renderH / 2 - this.jumpHeight);
-        // Rastro do dash: silhuetas ciano do próprio asset esmaecendo para
-        // trás — mesma técnica do flash de dano, mas na cor do dash.
-        if (frameImg && this.dashTrail.length) {
+
+        // Rastro do dash: silhuetas brancas do próprio asset esmaecendo para trás
+        // (mesmo sistema de silhueta recortada do flash de dano)
+        if (this.dashTrail && this.dashTrail.length) {
             for (const g of this.dashTrail) {
-                const ghostAlpha = Math.max(0, Math.min(1, g.t / this.dashDuration));
-                const ghostPos = this.camera.worldToScreen(g.x, g.y);
+                const ghostAlpha = Math.max(0, Math.min(1, g.t / (g.maxT || 0.16)));
+                const ghostPos = camera.worldToScreen(g.x, g.y);
                 const gx = Math.round(ghostPos.x - renderW / 2);
                 const gy = Math.round(ghostPos.y - renderH / 2 - this.jumpHeight);
+                const gFrame = (g.clipName && g.dir && typeof g.frame === 'number')
+                    ? (assetLoader.getFrame(g.clipName, g.dir, g.frame, this.characterId) || frameImg)
+                    : frameImg;
 
-                ctx.save();
-                ctx.globalAlpha = ghostAlpha * 0.4;
-                ctx.drawImage(
-                    _getCyanSprite(frameImg),
-                    gx, gy, renderW, renderH
-                );
-                ctx.restore();
+                if (gFrame) {
+                    ctx.save();
+                    ctx.globalAlpha = ghostAlpha * 0.45;
+                    ctx.drawImage(_getWhiteSprite(gFrame), gx, gy, renderW, renderH);
+                    ctx.restore();
+                }
             }
         }
 
@@ -833,6 +848,16 @@ respawn(x = 0, y = 0) {
         }
 
         ctx.globalAlpha = 1.0;
+
+        // Brilho do dash: desenha a silhueta branca diretamente sobre o sprite
+        // do personagem (mesmo sistema do flash de dano) durante o impulso.
+        if (frameImg && this.state === PlayerState.DASHING && this.dashTimer > 0) {
+            const dashAlpha = Math.min(1.0, Math.max(0.4, (this.dashTimer / this.dashDuration) * 1.15));
+            ctx.save();
+            ctx.globalAlpha = dashAlpha;
+            ctx.drawImage(_getWhiteSprite(frameImg), drawX, drawY, renderW, renderH);
+            ctx.restore();
+        }
 
         // Brilho branco de dano: sobrescreve apenas os pixels do asset do
         // personagem com a silhueta branca, sumindo junto com o timer.
