@@ -72,6 +72,7 @@ export const gameState = {
     missionCollected: [],
     missionDrops: {},
     spaceshipRepaired: false,
+    missionConcluded: false,
 
     hasMissionItem(id) {
         return Array.isArray(this.missionCollected) && this.missionCollected.includes(id);
@@ -162,6 +163,7 @@ export const gameState = {
         this.missionCollected = [];
         this.missionDrops = {};
         this.spaceshipRepaired = false;
+        this.missionConcluded = false;
         try {
             localStorage.removeItem('noSignal_allyBossHelpPurchased');
         } catch { /* sem suporte a localStorage */ }

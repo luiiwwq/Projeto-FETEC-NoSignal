@@ -81,6 +81,8 @@ import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings, brightnessFilter } from '../state/stateStorage.js';
 import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
 import { playFinalGameCutscene } from '../ui/FinalGameCutscenePlayer.js';
+import { playNpcDialogue } from '../ui/npcDialogue.js';
+import { submitRankingResult } from '../services/ranking.js';
 
 const DAY_NIGHT_ICON_PATH = {
     [DAY_NIGHT_PERIOD.DAY]: './src/assets/sprites/Night_Day_System/sun_sprite.png',
@@ -250,6 +252,8 @@ export class GameEngine {
         // Itens da missão principal (peças da nave) no mundo
         this.worldItems = [];
         this.interactableMissionItem = null;
+        this.interactableMissionShip = false;
+        this._shipRepairFade = null;
 
         // Animação de "quest concluída" do log de missões (risco verde + ✓).
         this._questFlashId = null;
@@ -552,6 +556,20 @@ export class GameEngine {
         this.stop();
 
         playFinalGameCutscene(this.container, finalId, async () => {
+            // Registrar apenas depois que a cutscene do final termina (ou é pulada).
+            // Falha de rede não deve impedir o retorno ao menu.
+            try {
+                await submitRankingResult({
+                    nome: gameState.playerName,
+                    tempoSegundos: this.dayNight.elapsedTime,
+                    mortes: gameState.deaths || 0,
+                    moedas: gameState.coins,
+                    finalId
+                });
+            } catch (error) {
+                console.error('[Ranking] Não foi possível salvar o resultado:', error);
+            }
+
             this.container.innerHTML = '';
             gameState.activeEngine = null;
             gameState.activeEnding = null;
@@ -1321,9 +1339,8 @@ export class GameEngine {
         });
 
         if (gameState.isMissionComplete() && !gameState.spaceshipRepaired) {
-            gameState.spaceshipRepaired = true;
-            this._showSoulsMessage('NAVE CONSERTADA!', '#7fe0a0');
-            this._nightBannerText = 'NAVE CONSERTADA! TODAS AS PEÇAS FORAM INSTALADAS';
+            this._showSoulsMessage('MISSÃO CONCLUÍDA', '#7fe0a0');
+            this._nightBannerText = 'MISSÃO CONCLUÍDA! TODAS AS PEÇAS FORAM REUNIDAS';
             this._nightBannerTimer = 4.0;
         }
     }
@@ -1913,6 +1930,8 @@ export class GameEngine {
                     role: ActorRole.ENEMY
                 });
                 enemy.isEnemyNpc = true;
+                enemy._dialoguePending = true;
+                enemy._dialogueStarted = false;
                 enemy.setCollisionResolver(this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH));
                 enemy.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
                 this.actors.push(enemy);
@@ -2231,6 +2250,14 @@ export class GameEngine {
         // While paused, gameplay/debug actions must not execute
         if (this.paused) return;
 
+        // Dash ([Q]).
+        if (e.code === 'KeyQ' && !e.repeat && this.player && !this.player.isDead && !this._cutsceneActive) {
+            if (this.player.dash(this.input, this.camera)) {
+                this._spawnDashFx(this.player);
+            }
+            return;
+        }
+
         // Interação com a loja do NPC Aliado ([E] perto do aliado)
         if (e.code === 'KeyE' && this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
             playClickButtonSound();
@@ -2241,6 +2268,17 @@ export class GameEngine {
         // Coleta de peça da nave ([E] perto de um item da missão principal)
         if (e.code === 'KeyE' && this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
             this._collectMissionItem(this.interactableMissionItem);
+            return;
+        }
+
+        if (e.code === 'KeyE' && this.interactableMissionShip && !this.player.isDead && !this._shipRepairFade) {
+            playClickButtonSound();
+            if (!gameState.spaceshipRepaired) {
+                this._shipRepairFade = { elapsed: 0, duration: 2.4, repaired: false };
+            } else if (!gameState.missionConcluded) {
+                gameState.missionConcluded = true;
+                this._triggerEnding('final1');
+            }
             return;
         }
 
@@ -2328,14 +2366,8 @@ export class GameEngine {
         if (e.button === 0) {
             this.input.mouseLeft = true;
         } else if (e.button === 1) {
-            // Scroll click (middle mouse) = Dash
             e.preventDefault();
             this.input.mouseMiddle = true;
-            if (this.player && !this.player.isDead && !this.paused && !this._cutsceneActive) {
-                if (this.player.dash(this.input, this.camera)) {
-                    this._spawnDashFx(this.player);
-                }
-            }
         } else if (e.button === 2) {
             this.input.mouseRight = true;
         }
@@ -2485,6 +2517,17 @@ export class GameEngine {
         this._updateDayNight(dt);
         if (this._endingTriggered) return;
 
+        if (this._shipRepairFade) {
+            this._shipRepairFade.elapsed += dt;
+            const half = this._shipRepairFade.duration / 2;
+            if (!this._shipRepairFade.repaired && this._shipRepairFade.elapsed >= half) {
+                gameState.spaceshipRepaired = true;
+                this._shipRepairFade.repaired = true;
+                this._showSoulsMessage('NAVE CONSERTADA!', '#7fe0a0');
+            }
+            if (this._shipRepairFade.elapsed >= this._shipRepairFade.duration) this._shipRepairFade = null;
+        }
+
         // Among Us easter egg: só anima/spawna em gameplay, dentro de mapas elegíveis.
         this._updateAmongUs(dt);
 
@@ -2543,6 +2586,21 @@ export class GameEngine {
         // Update non-player characters (allies idle, enemies pursue & fire,
         // golems pursue & melee)
         for (const actor of this.actors) {
+            if (actor === this._enemyNpcActor && actor._dialoguePending && !actor._dialogueStarted &&
+                this.player && Math.hypot(this.player.x - actor.x, this.player.y - actor.y) <= 180) {
+                actor._dialogueStarted = true;
+                this._cutsceneActive = true;
+                if (this.input) this.input.keys = {};
+                const selectedId = CHARACTERS[gameState.selectedCharacter] ? gameState.selectedCharacter : DEFAULT_CHARACTER_ID;
+                playNpcDialogue(this.container, selectedId, actor.characterId)
+                    .catch((error) => console.error('[Dialogue] Falha ao exibir diálogo:', error))
+                    .finally(() => {
+                        actor._dialoguePending = false;
+                        this._cutsceneActive = false;
+                        if (this.input) this.input.keys = {};
+                    });
+                return;
+            }
             actor.updateAi(dt, this);
             actor.update(dt);
             if (actor.isDead) {
@@ -2675,6 +2733,17 @@ export class GameEngine {
                     this.interactableMissionItem = wi;
                     break;
                 }
+            }
+        }
+
+        this.interactableMissionShip = false;
+        if (this.currentMapId === MAP_IDS.MARS_SURFACE && gameState.isMissionComplete() && !this.player.isDead) {
+            const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
+            if (ship) {
+                this.interactableMissionShip = Math.hypot(
+                    this.player.x - (ship.x + ship.w / 2),
+                    this.player.y - (ship.y + ship.h)
+                ) <= 150;
             }
         }
 
@@ -2963,6 +3032,37 @@ export class GameEngine {
         if (this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
             this._renderMissionItemPrompt(ctx, this.interactableMissionItem);
         }
+        if (this.interactableMissionShip && !this.player.isDead && this.mapTransitionCooldown <= 0) {
+            this._renderMissionShipPrompt(ctx);
+        }
+        if (this._shipRepairFade) {
+            const half = this._shipRepairFade.duration / 2;
+            const progress = this._shipRepairFade.elapsed;
+            const alpha = progress < half ? progress / half : 1 - (progress - half) / half;
+            ctx.save();
+            ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0, Math.min(1, alpha))})`;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.restore();
+        }
+    }
+
+    _renderMissionShipPrompt(ctx) {
+        const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
+        if (!ship) return;
+        const screen = this.camera.worldToScreen(ship.x + ship.w / 2, ship.y - 8);
+        const text = gameState.spaceshipRepaired ? '[E] CONCLUA A MISSÃO' : '[E] CONSERTE A NAVE';
+        ctx.save();
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        const textW = ctx.measureText(text).width;
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.92)';
+        ctx.fillRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
+        ctx.strokeStyle = '#7fe0a0';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
+        ctx.fillStyle = '#7fe0a0';
+        ctx.fillText(text, screen.x, screen.y + 3);
+        ctx.restore();
     }
 
     _renderShopPrompt(ctx, ally) {
@@ -3366,7 +3466,7 @@ export class GameEngine {
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'center';
         ctx.fillText(
-            '[WASD] Mover  [SHIFT] Correr  [CLICK SCROLL] DASH  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [F e P] EMOTES  [1/2/3] Itens  [ESC] Menu',
+            '[WASD] Mover  [SHIFT] Correr  [Q] DASH  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [F e P] EMOTES  [1/2/3] Itens  [ESC] Menu',
             this.width / 2,
             barBottomY + 23
         );

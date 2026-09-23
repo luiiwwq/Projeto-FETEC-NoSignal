@@ -25,13 +25,14 @@ import {
     SURFACE_PALETTE,
 } from '../content/tilemap.js';
 import { tileAtlas } from './tileAtlas.js';
+import { gameState } from '../state/gameState.js';
 
 const P = SURFACE_PALETTE;
 
 // Visual facade of the distant castle (scale 0.90 = ~2x original / 1.5x reduced from 1.35).
 // Anchored at x: 3650, y: 1037 so the top of the 977px building sits
 // comfortably below the northern border rocks at y: 60.
-const CASTLE_SPRITE_PATH = './src/assets/sprites/Castle/castle_sprite.png?v=4';
+const CASTLE_SPRITE_PATH = './src/assets/sprites/Castle/castlesprite.png?v=4';
 const CASTLE_SPRITE_ANCHOR = { x: 3650, y: 1037, originX: 0.5, originY: 1.0, scale: 0.90 };
 
 // Cave entrance sprite (single monolithic rock with a dark mouth in its
@@ -260,7 +261,7 @@ export class MapRenderer {
                     );
                 }
             };
-            fallback.src = './src/assets/sprites/Castle/castle-sprite.png?v=4';
+            fallback.src = './src/assets/sprites/Castle/castlesprite.png?v=4';
         };
         img.src = CASTLE_SPRITE_PATH;
     }
@@ -576,7 +577,11 @@ export class MapRenderer {
             } else if (o.kind === 'edge-rock') {
                 this._drawEdgeRiff(ctx, sx, sy, o, seed);
             } else if (o.kind === 'npc') {
-                this._drawUndeadSprite(ctx, o, offset);
+                if (o.id === 'mission-spaceship' && gameState.spaceshipRepaired) {
+                    this._drawUndeadSprite(ctx, { ...o, sprite: 'Map/spaceship_mission_completed.png' }, offset);
+                } else {
+                    this._drawUndeadSprite(ctx, o, offset);
+                }
             } else {
                 this._drawBlock(ctx, sx, sy, o.w, o.h, o.kind);
             }

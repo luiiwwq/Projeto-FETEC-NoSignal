@@ -37,15 +37,15 @@ export const SKELETON_AXE_BOSS_ATTACK_ANIM_SPEED_MUL = 1.2;
 // Ataque com alcance maior que os esqueletos (42 px): o machado enorme do
 // guardião atinge o jogador mesmo sem ele estar colado no boss.
 export const SKELETON_AXE_BOSS_ATTACK_RANGE = 200;
+// Largura lateral do golpe do machado; o alcance frontal permanece inalterado.
+export const SKELETON_AXE_BOSS_ATTACK_HALF_WIDTH = 48;
 // Perseguição mais veloz que os esqueletos comuns (70 px/s * 1.55 ≈ 108 px/s).
 export const SKELETON_AXE_BOSS_SPEED_MUL = 1.55;
 export const SKELETON_AXE_BOSS_COLLIDER_HALF_W = SKELETON_COLLIDER_HALF_W;
 export const SKELETON_AXE_BOSS_COLLIDER_HALF_H = SKELETON_COLLIDER_HALF_H;
-// Hitbox de ACERTO maior que o collider de movimento: como o render é 13x, o
-// corpo desenhado é muito maior que os 48px do collider físico. Essa meia-largura
-// extra (só comprimento — altura continua a mesma) é usada para as balas
-// acertarem o corpo todo do guardião.
-export const SKELETON_AXE_BOSS_HIT_HALF_W = 100; // 200px de largura de acerto
+// Hitbox de acerto das balas: mais estreita que o sprite para evitar acertos
+// muito para os lados do guardião.
+export const SKELETON_AXE_BOSS_HIT_HALF_W = 60; // 120px de largura de acerto
 // 4x: boss bem grande no Núcleo (golpe fica com ~168px de altura).
 export const SKELETON_AXE_BOSS_RENDER_SCALE = 13.0;
 
@@ -74,6 +74,7 @@ export class SkeletonAxeBoss extends SkeletonAxe {
         this.animSpeedMul = SKELETON_AXE_BOSS_ANIM_SPEED_MUL;
         this.attackAnimSpeedMul = SKELETON_AXE_BOSS_ATTACK_ANIM_SPEED_MUL;
         this.attackRange = SKELETON_AXE_BOSS_ATTACK_RANGE;
+        this.attackHitHalfWidth = SKELETON_AXE_BOSS_ATTACK_HALF_WIDTH;
 
         // Hitbox de acerto (largura maior que o collider de movimento)
         this.hitHalfW = SKELETON_AXE_BOSS_HIT_HALF_W;

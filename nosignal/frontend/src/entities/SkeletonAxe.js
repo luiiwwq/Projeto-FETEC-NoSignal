@@ -324,7 +324,13 @@ export class SkeletonAxe {
             const target = this._attackTarget;
             if (target && !target.isDead && typeof target.takeDamage === 'function') {
                 const reach = (this.attackRange ?? SKELETON_ATTACK_RANGE) + 16;
-                if (Math.hypot(target.x - this.x, target.y - this.y) <= reach) {
+                const dx = target.x - this.x;
+                const dy = target.y - this.y;
+                const hitHalfWidth = this.attackHitHalfWidth;
+                const inAttackArea = hitHalfWidth !== undefined
+                    ? dx * this._facing >= 0 && Math.abs(dx) <= reach && Math.abs(dy) <= hitHalfWidth
+                    : Math.hypot(dx, dy) <= reach;
+                if (inAttackArea) {
                     target.takeDamage(this.attackDamage, this.x, this.y);
                 }
             }

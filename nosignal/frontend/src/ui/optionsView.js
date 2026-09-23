@@ -138,6 +138,7 @@ function toggleFullscreen(containerRef) {
         fsKeepRequested = false;
         fsManualExit = true;
         window.__noSignalKeepFullscreen = false;
+        unlockEscapeKey();
         exitFullscreen();
     } else {
         fsKeepRequested = true;

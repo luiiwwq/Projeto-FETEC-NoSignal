@@ -56,6 +56,14 @@ export class CharacterActor extends Player {
     // Allies are stationary and never attack.
     updateAi(dt, engine) {
         if (this.role !== ActorRole.ENEMY || this.isDead) return;
+        // NPC inimigo aguarda o jogador se aproximar para iniciar o diálogo;
+        // não persegue nem ataca até todas as falas terminarem.
+        if (this._dialoguePending) {
+            this.vx = 0;
+            this.vy = 0;
+            this.setState(PlayerState.IDLE);
+            return;
+        }
 
         const target = engine.player;
         if (!target || target.isDead) {

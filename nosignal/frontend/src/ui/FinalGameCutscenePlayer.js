@@ -106,7 +106,7 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
         overlay.style.cssText = `
             position:absolute;inset:0;width:100%;height:100%;background:#000;
             display:flex;align-items:center;justify-content:center;z-index:9500;
-            overflow:hidden;font-family:'Courier New','Lucida Console',monospace;
+            overflow:hidden;font-family:var(--font-pixel,'Press Start 2P',monospace);
         `;
 
         const image = document.createElement('img');
@@ -122,8 +122,8 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
             position:absolute;left:50%;bottom:96px;transform:translateX(-50%);
             width:min(860px,92%);box-sizing:border-box;background:rgba(5,6,12,.86);
             border:1.5px solid rgba(232,223,200,.3);border-left:4px solid #e07228;
-            border-radius:8px;padding:16px 22px;color:#e8dfc8;font-size:16px;
-            line-height:1.65;letter-spacing:.03em;text-align:center;white-space:pre-line;
+            border-radius:8px;padding:16px 22px;color:#e8dfc8;font-size:11px;
+            line-height:1.9;letter-spacing:.03em;text-align:center;white-space:pre-line;
             text-shadow:0 0 8px rgba(224,114,40,.25);box-shadow:0 6px 30px #0009;
             z-index:2;pointer-events:none;
         `;
@@ -140,7 +140,7 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
         skipButton.style.cssText = `
             position:absolute;right:32px;bottom:28px;background:rgba(10,8,16,.9);
             color:#e8dfc8;border:1.5px solid rgba(232,223,200,.4);border-radius:6px;
-            padding:8px 20px;font:700 13px 'Courier New',monospace;letter-spacing:.08em;
+            padding:10px 16px;font:700 9px var(--font-pixel,'Press Start 2P',monospace);letter-spacing:.04em;
             cursor:pointer;z-index:3;
         `;
 
@@ -204,7 +204,7 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
             for (const [index, line] of definition.terminalLines.entries()) {
                 const label = document.createElement('div');
                 label.textContent = line;
-                label.style.cssText = `font-size:${index === definition.terminalLines.length - 1 ? 24 : 16}px;letter-spacing:.08em;`;
+                label.style.cssText = `max-width:100%;overflow-wrap:anywhere;font-size:${index === definition.terminalLines.length - 1 ? 15 : 9}px;line-height:1.9;letter-spacing:.04em;`;
                 if (index === definition.terminalLines.length - 1) {
                     label.style.color = '#e07228';
                     label.style.fontWeight = 'bold';
@@ -218,7 +218,7 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
             menuButton.style.cssText = `
                 margin-top:18px;padding:10px 22px;color:#e8dfc8;background:#15121a;
                 border:1px solid rgba(232,223,200,.45);border-radius:4px;
-                font:700 13px 'Courier New',monospace;letter-spacing:.08em;cursor:pointer;
+                font:700 9px var(--font-pixel,'Press Start 2P',monospace);letter-spacing:.04em;cursor:pointer;
             `;
             menuButton.addEventListener('click', finish, { once: true });
             card.appendChild(menuButton);

@@ -28,8 +28,8 @@ export function renderTitleScreen(container) {
                         <button type="button" id="btn-start" class="menu-btn is-selected" tabindex="0">
                             NOVO JOGO
                         </button>
-                        <button type="button" id="btn-load" class="menu-btn" tabindex="0">
-                            CARREGAR JOGO
+                        <button type="button" id="btn-ranking" class="menu-btn" tabindex="0">
+                            RANKING
                         </button>
                         <button type="button" id="btn-options" class="menu-btn" tabindex="0">
                             OPÇÕES
@@ -103,7 +103,7 @@ function setupKeyboardNavigation() {
         if (!wrapper) return;
 
         // Overlays (opções/créditos) interceptam a navegação do menu
-        if (wrapper.querySelector('.credits-overlay, .title-options-overlay')) return;
+        if (wrapper.querySelector('.credits-overlay, .title-options-overlay, .ranking-overlay')) return;
 
         const currentButtons = Array.from(wrapper.querySelectorAll('.menu-btn'));
         if (currentButtons.length === 0) return;
