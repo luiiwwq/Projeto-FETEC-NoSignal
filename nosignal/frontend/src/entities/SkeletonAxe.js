@@ -387,15 +387,6 @@ export class SkeletonAxe {
     }
 
     /* ── Rendering ───────────────────────────────────────── */
-    _groundShadow(ctx, screen, feetY) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(10, 5, 5, 0.45)';
-        ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 4, 26, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-
     render(ctx, camera) {
         const screen = camera.worldToScreen(this.x, this.y);
         const cfg = ANIM_CONFIG[this.state];
@@ -408,8 +399,6 @@ export class SkeletonAxe {
         // hitbox and let the body rise above it.
         const feetY = screen.y + this.colliderHalfH;
         const drawY = Math.round(feetY - drawH);
-
-        this._groundShadow(ctx, screen, feetY);
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;

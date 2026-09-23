@@ -72,7 +72,7 @@ import { MAPS, MAP_IDS } from '../content/maps.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
 import { CHARACTER_ALLY_SHOP_POSITION, CHARACTER_ENEMY_SPAWNS, resolveCharacterRoles } from '../content/characterRoles.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
-import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
+import { DayNightSystem, DAY_NIGHT_PERIOD, OXYGEN_LIFETIME_SECONDS, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
 import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem, getItemIconPath, getItemFramePaths } from '../ui/shopScreen.js';
@@ -80,6 +80,7 @@ import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings, brightnessFilter } from '../state/stateStorage.js';
 import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
+import { playFinalGameCutscene } from '../ui/FinalGameCutscenePlayer.js';
 
 const DAY_NIGHT_ICON_PATH = {
     [DAY_NIGHT_PERIOD.DAY]: './src/assets/sprites/Night_Day_System/sun_sprite.png',
@@ -275,6 +276,7 @@ export class GameEngine {
         this._allyHelpRetry = false; // aliado reaparece após morte do jogador
         this._allyHelpRetryTimer = 0; // espera 0.5s após o respawn para reaparecer
         this._cutsceneActive = false; // flag enquanto uma cutscene de introdução está em reprodução
+        this._endingTriggered = false;
 
         // Input state
         this.input = {
@@ -535,6 +537,35 @@ export class GameEngine {
 
         gameState.dayNight = this.dayNight.getHudState();
         gameState.dayNight.waveCount = this._golemWaveCount;
+
+        if (this.dayNight.elapsedTime >= OXYGEN_LIFETIME_SECONDS && !gameState.spaceshipRepaired) {
+            this._triggerEnding('final1');
+        }
+    }
+
+    _triggerEnding(finalId) {
+        if (this._endingTriggered) return;
+        this._endingTriggered = true;
+        this._cutsceneActive = true;
+        gameState.activeEnding = finalId;
+        gameState.currentScene = 'ENDING';
+        this.stop();
+
+        playFinalGameCutscene(this.container, finalId, async () => {
+            this.container.innerHTML = '';
+            gameState.activeEngine = null;
+            gameState.activeEnding = null;
+            gameState.currentScene = 'TITLE';
+
+            const [{ renderTitleScreen }, { initMainMenu }, { startMenuMusic }] = await Promise.all([
+                import('../ui/titleScreen.js'),
+                import('../ui/screens.js'),
+                import('../audio/menuMusic.js')
+            ]);
+            renderTitleScreen(this.container);
+            initMainMenu();
+            startMenuMusic();
+        });
     }
 
     _startNight() {
@@ -1449,7 +1480,7 @@ export class GameEngine {
                     // Dano garantido: cada disparo do aliado acerta o boss sem
                     // depender de trajetória — nenhum tiro se perde em obstáculo
                     // ou desvio (total de 400 ao fim do assist).
-                    boss.takeDamage(shotDamage, ally.x, ally.y);
+                    boss.takeDamage(shotDamage, ally.x, ally.y, 'ally');
                     this._spawnHitSparks(boss.x, boss.y);
 
                     // Projétil apenas visual (dano 0 para não dobrar o dano).
@@ -1491,68 +1522,6 @@ export class GameEngine {
     _updateSkeletonAxeBoss(dt) {
         const boss = this.skeletonAxeBoss;
         if (!boss) return;
-
-        // Conta o tempo vivo dentro da arena: o aliado só pode entrar após o
-        // personagem ficar pelo menos 1 segundo em campo (não conta durante a cutscene,
-        // nem na tela de morte ou no respawn).
-        if (boss && !boss.isDead && !boss._cutscenePlaying && this.player && !this.player.isDead) {
-            this._allyHelpArenaTime += dt;
-        }
-
-        // Disparo da ajuda do aliado comprado na loja (compra única permanente)
-        // Nunca na tela de morte, somente 0.5s após respawn e após o fim da cutscene.
-        if (gameState.allyBossHelpPurchased && !this.allyBossHelpTriggered && boss && !boss.isDead && !boss._cutscenePlaying &&
-            !this.player.isDead && this._allyHelpRetryTimer <= 0 && this._allyHelpArenaTime >= 1) {
-            const distToBoss = Math.hypot(this.player.x - boss.x, this.player.y - boss.y);
-            if (distToBoss <= 520 || boss.hp < boss.maxHp || this._allyHelpRetry) {
-                this.allyBossHelpTriggered = true;
-                this._allyHelpRetry = false;
-                this._triggerAllyBossHelp(boss);
-            }
-        }
-
-        // Simulação ativa da aparição rápida do aliado no boss
-        if (this.bossAssistAlly) {
-            const ally = this.bossAssistAlly;
-            this.bossAssistTimer -= dt;
-            this.bossAssistShotCooldown -= dt;
-
-            if (boss && !boss.isDead) {
-                const dx = boss.x - ally.x;
-                const dy = boss.y - ally.y;
-                const aimAngle = Math.atan2(dy, dx);
-                ally.updateDirectionFromAngle(aimAngle);
-
-                if (this.bossAssistShotCooldown <= 0 && this.bossAssistDamageBudget > 0) {
-                    const shotDamage = Math.min(40, this.bossAssistDamageBudget);
-                    this.bossAssistShotCooldown = 0.3; // rajada rápida
-                    this.bossAssistDamageBudget -= shotDamage;
-                    ally.setState(PlayerState.SHOOTING, true);
-
-                    boss.takeDamage(shotDamage, ally.x, ally.y);
-                    this._spawnHitSparks(boss.x, boss.y);
-
-                    const spawnDist = 24;
-                    const spawnX = ally.x + Math.cos(aimAngle) * spawnDist;
-                    const spawnY = ally.y - 18 + Math.sin(aimAngle) * 8;
-                    const bulletOpts = {
-                        team: 'player',
-                        owner: ally,
-                        damage: 0
-                    };
-                    const bullet = new Bullet(spawnX, spawnY, aimAngle, 680, ally.weapon, bulletOpts);
-                    this.bullets.push(bullet);
-                }
-            }
-
-            if (this.bossAssistTimer <= 0 || (boss && boss.isDead) || this.bossAssistDamageBudget <= 0) {
-                this._nightBannerText = 'ALIADO: "BATERIA ESGOTADA! O RESTO É COM VOCÊ!"';
-                this._nightBannerTimer = 2.6;
-                this._spawnTeleportFx(ally.x, ally.y);
-                this.actors = this.actors.filter((a) => a !== ally);
-                this.bossAssistAlly = null;
-            }
-        }
 
         if (!boss.isDead) boss.updateAi(dt, this);
         boss.update(dt);
@@ -1797,7 +1766,7 @@ export class GameEngine {
     _loadItemSprites() {
         if (this._itemSpritesRequested || typeof Image === 'undefined') return;
         this._itemSpritesRequested = true;
-        const ITEM_IDS = ['cura_alienigena', 'energia_duna', 'cadencia_frenetica'];
+        const ITEM_IDS = ['cura_alienigena', 'energia_duna', 'cadencia_frenetica', 'necro_ally_help'];
         for (const id of ITEM_IDS) {
             const iconPath = getItemIconPath(id);
             if (iconPath) {
@@ -2514,6 +2483,7 @@ export class GameEngine {
         // Advance the day/night clock first so a wave spawned on a night
         // transition is simulated in the same frame.
         this._updateDayNight(dt);
+        if (this._endingTriggered) return;
 
         // Among Us easter egg: só anima/spawna em gameplay, dentro de mapas elegíveis.
         this._updateAmongUs(dt);
@@ -3641,7 +3611,8 @@ export class GameEngine {
         const paletteByItem = {
             'cura_alienigena': { border: '#22c55e', glyph: '#86efac' },
             'energia_duna': { border: '#ef4444', glyph: '#fca5a5' },
-            'cadencia_frenetica': { border: '#eab308', glyph: '#f9a8d4' }
+            'cadencia_frenetica': { border: '#eab308', glyph: '#f9a8d4' },
+            'necro_ally_help': { border: '#4dd2ff', glyph: '#d6f4ff' }
         };
 
         for (let slot = 1; slot <= 3; slot++) {
@@ -3705,7 +3676,7 @@ export class GameEngine {
     _drawItemGlyph(ctx, bx, by, size, item, color) {
         const icon = item ? this._itemFxIcons?.get(item.id) : null;
         if (icon && icon.complete && icon.naturalWidth > 0 && icon.naturalHeight > 0) {
-            const pad = 3;
+            const pad = item.id === 'necro_ally_help' ? 10 : 3;
             const inner = size - pad * 2;
             const ratio = icon.naturalWidth / icon.naturalHeight;
             let iw = inner;
@@ -3783,7 +3754,7 @@ export class GameEngine {
         ctx.textAlign = 'left';
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = isNight ? '#9fb4ff' : '#e07228';
-        ctx.fillText(isNight ? `NOITE ${this.dayNight.nightCount}` : 'DIA', x + 48, y + 16);
+        ctx.fillText(isNight ? `NOITE ${this.dayNight.nightCount}` : `DIA ${this.dayNight.dayCount}`, x + 48, y + 16);
 
         ctx.font = '12px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
@@ -3934,17 +3905,25 @@ export class GameEngine {
         ctx.textAlign = 'center';
 
         const text = this._nightBannerText;
-        ctx.font = '20px "Press Start 2P", monospace';
+        const isAllySpeech = text.startsWith('ALIADO:');
+        const isNightStart = /^NOITE \d+$/.test(text);
+        const isBottomMessage = isAllySpeech || isNightStart;
+        const fontSize = isAllySpeech ? 10 : 20;
+        const boxHeight = isAllySpeech ? 30 : 40;
+        const boxY = isBottomMessage ? this.height - boxHeight - 48 : this.height / 2 - 70;
+        const textY = boxY + boxHeight / 2 + fontSize * 0.35;
+
+        ctx.font = `${fontSize}px "Press Start 2P", monospace`;
         const textW = ctx.measureText(text).width;
 
-        ctx.fillStyle = 'rgba(5, 5, 18, 0.8)';
-        ctx.fillRect(this.width / 2 - textW / 2 - 20, this.height / 2 - 70, textW + 40, 40);
-        ctx.strokeStyle = '#5f7fd8';
+        ctx.fillStyle = 'rgba(5, 5, 18, 0.88)';
+        ctx.fillRect(this.width / 2 - textW / 2 - 20, boxY, textW + 40, boxHeight);
+        ctx.strokeStyle = isAllySpeech ? '#f6c885' : '#5f7fd8';
         ctx.lineWidth = 2;
-        ctx.strokeRect(this.width / 2 - textW / 2 - 20, this.height / 2 - 70, textW + 40, 40);
+        ctx.strokeRect(this.width / 2 - textW / 2 - 20, boxY, textW + 40, boxHeight);
 
-        ctx.fillStyle = '#cdd6ff';
-        ctx.fillText(text, this.width / 2, this.height / 2 - 40);
+        ctx.fillStyle = isAllySpeech ? '#f6c885' : '#cdd6ff';
+        ctx.fillText(text, this.width / 2, textY);
         ctx.restore();
     }
 

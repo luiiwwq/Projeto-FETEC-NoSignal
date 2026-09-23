@@ -12,6 +12,7 @@ export const gameState = {
     playerHp: 105,
     maxPlayerHp: 105,
     activeEngine: null,
+    activeEnding: null,
     currentMap: 'mars-surface',
     lastCavePath: null, // 'nucleo-marte' | 'catacumbas' — caminho de caverna escolhido no caveChoiceScreen
 
@@ -37,6 +38,7 @@ export const gameState = {
     dayNight: {
         period: DAY_NIGHT_PERIOD.DAY,
         remainingTime: DAY_NIGHT_DURATION,
+        dayCount: 1,
         nightCount: 0,
         waveCount: 0
     },
@@ -144,6 +146,7 @@ export const gameState = {
         this.playerHp = 105;
         this.maxPlayerHp = 105;
         this.currentScene = 'TITLE';
+        this.activeEnding = null;
         this.coins = 50;
         this.inventory = [];
         this.itemPurchases = {};
@@ -166,6 +169,7 @@ export const gameState = {
         this.dayNight = {
             period: DAY_NIGHT_PERIOD.DAY,
             remainingTime: DAY_NIGHT_DURATION,
+            dayCount: 1,
             nightCount: 0,
             waveCount: 0
         };

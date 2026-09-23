@@ -12,6 +12,8 @@
 
 /* ── Combate ─────────────────────────────────────────────── */
 export const NECROMANCER_MAX_HP = 1000;
+export const NECROMANCER_PLAYER_DAMAGE_MULTIPLIER = 0.5;
+export const NECROMANCER_PLAYER_DAMAGE_WITH_ALLY_MULTIPLIER = 0.25;
 export const NECROMANCER_ATTACK_DAMAGE = 25;
 export const NECROMANCER_ATTACK_COOLDOWN = 1.2;
 export const NECROMANCER_MELEE_RANGE = 100;
@@ -607,10 +609,16 @@ export class NecromancerBoss {
     }
 
     /* ── Dano ────────────────────────────────────────────── */
-    takeDamage(amount = 20, fromX = null, fromY = null) {
+    takeDamage(amount = 20, fromX = null, fromY = null, source = 'player') {
         if (this.isDead || this.state === NECROMANCER_STATES.DEATH) return;
 
-        this.hp = Math.max(0, this.hp - Math.round(amount));
+        const allyIsAssisting = Boolean(this._engine && this._engine.bossAssistAlly && !this._engine.bossAssistAlly.isDead);
+        const damageMultiplier = source === 'ally'
+            ? 1
+            : allyIsAssisting
+                ? NECROMANCER_PLAYER_DAMAGE_WITH_ALLY_MULTIPLIER
+                : NECROMANCER_PLAYER_DAMAGE_MULTIPLIER;
+        this.hp = Math.max(0, this.hp - Math.round(amount * damageMultiplier));
         this._hpBarTimer = 6;
 
         // Sem knockback: o boss permanece firme no posto de spawn.
@@ -741,14 +749,6 @@ export class NecromancerBoss {
         const drawH = 128 * NECROMANCER_RENDER_SCALE;
         const feetY = screen.y + this.colliderHalfH;
         const drawY = Math.round(feetY - drawH + (128 - NECROMANCER_ART_BOTTOM_ROW) * NECROMANCER_RENDER_SCALE);
-
-        // Sombra no chão.
-        ctx.save();
-        ctx.fillStyle = 'rgba(5, 2, 8, 0.5)';
-        ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 2, 52, 14, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;

@@ -1176,14 +1176,14 @@
 }
 
 .shop-card.shop-card-special {
-    border-color: #a855f7;
-    background: radial-gradient(circle at top, #260d2e 0%, #15081c 100%);
-    box-shadow: inset 0 0 12px rgba(168, 85, 247, 0.2);
+    border-color: #4dd2ff;
+    background: radial-gradient(circle at top, #0d2630 0%, #08151c 100%);
+    box-shadow: inset 0 0 12px rgba(77, 210, 255, 0.2);
 }
 
 .shop-card.shop-card-special:hover {
-    border-color: #c084fc;
-    box-shadow: inset 0 0 16px rgba(168, 85, 247, 0.35);
+    border-color: #8be3ff;
+    box-shadow: inset 0 0 16px rgba(77, 210, 255, 0.35);
 }
 
 .shop-card.is-bought {
@@ -1237,14 +1237,14 @@
 }
 
 .shop-card-sprite[data-item-id="necro_ally_help"] {
-    border-color: #c084fc;
-    color: #f3e8ff;
+    border-color: #4dd2ff;
+    color: #d6f4ff;
 }
 
 
 
 .shop-card.shop-card-special .shop-card-badge {
-    color: #c084fc;
+    color: #4dd2ff;
 }
 
 .shop-card-name {
@@ -1255,7 +1255,7 @@
 }
 
 .shop-card.shop-card-special .shop-card-name {
-    color: #f3e8ff;
+    color: #d6f4ff;
 }
 
 .shop-card-desc {

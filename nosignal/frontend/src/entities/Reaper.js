@@ -311,14 +311,6 @@ export class Reaper {
         const feetY = screen.y + this.colliderHalfH;
         const drawY = Math.round(feetY - drawH);
 
-        // Sombra no chão.
-        ctx.save();
-        ctx.fillStyle = 'rgba(5, 2, 8, 0.45)';
-        ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 3, 24, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
         ctx.save();
         if (this.state === REAPER_STATES.DIE) {
             ctx.globalAlpha = Math.max(0, Math.min(1, this._dieTimer / 0.45));

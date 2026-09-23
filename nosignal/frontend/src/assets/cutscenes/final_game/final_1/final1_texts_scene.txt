@@ -1,0 +1,13 @@
+scene1: Decidido a cumprir sua missão, o astronauta escolhe terraformar Duna, mesmo sabendo que com isso não poderá voltar para Kerbin.
+
+scene2: Ele monta o equipamento e dá início ao processo de terraformação.
+
+scene3: Os primeiros resultados da terraformação começam a aparecer, mas o astronauta não resiste e acaba morrendo por falta de oxigênio.
+
+scene4: Enquanto isso, Kerbin continua em colapso, sem saber o que aconteceu com a missão ou se a terraformação foi concluída.
+
+scene5: Com a terraformação, a sociedade que vivia abaixo do solo é extinta, incapaz de sobreviver às novas condições atmosféricas.
+
+scene6: Assim, Duna é terraformada, mas permanece intocada pela população de Kerbin.
+
+scene7: FIM.

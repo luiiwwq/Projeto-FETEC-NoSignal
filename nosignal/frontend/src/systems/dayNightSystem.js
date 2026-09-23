@@ -15,7 +15,13 @@
  * and the wave spawned on every 4th night (4, 8, 12 …) comes back buffed.
  */
 
-export const DAY_NIGHT_DURATION = 80; // seconds per period (day or night)
+export const DAY_DURATION = 30;
+export const NIGHT_DURATION = 40;
+// Compatibilidade para consumidores antigos que inicializam a HUD no dia.
+export const DAY_NIGHT_DURATION = DAY_DURATION;
+export const GAME_DAY_DURATION = DAY_DURATION + NIGHT_DURATION;
+export const OXYGEN_LIFETIME_DAYS = 5;
+export const OXYGEN_LIFETIME_SECONDS = GAME_DAY_DURATION * OXYGEN_LIFETIME_DAYS;
 
 export const DAY_NIGHT_PERIOD = {
     DAY: 'day',
@@ -32,9 +38,10 @@ export class DayNightSystem {
 
     reset() {
         this.period = DAY_NIGHT_PERIOD.DAY;
-        this.remainingTime = DAY_NIGHT_DURATION;
+        this.remainingTime = DAY_DURATION;
         this.elapsedTime = 0;
         this.cycleCount = 0;
+        this.dayCount = 1;
         this.nightCount = 0;
         this.waveCount = 0;
         this.lastEvent = null;
@@ -43,7 +50,7 @@ export class DayNightSystem {
     /**
      * Advance the clock.
      * @param {number} dt seconds since the last frame
-     * @returns {{type:'day-start'|'night-start', nightCount:number}|null}
+     * @returns {{type:'day-start'|'night-start', dayCount:number, nightCount:number}|null}
      *          the transition that happened this frame, or null.
      */
     update(dt) {
@@ -54,20 +61,21 @@ export class DayNightSystem {
 
         let event = null;
 
-        // Loop (instead of a single `if`) so a huge dt can never make the
-        // timer go negative: it consumes whole periods until it lands inside
-        // the current one. In practice dt is capped at 0.1s by the engine.
+        // Loop (instead of a single `if`) so a huge dt consumes every elapsed
+        // day/night period and lands inside the current one.
         while (this.remainingTime <= 0) {
-            this.remainingTime += DAY_NIGHT_DURATION;
             this.cycleCount += 1;
 
             if (this.period === DAY_NIGHT_PERIOD.DAY) {
                 this.period = DAY_NIGHT_PERIOD.NIGHT;
+                this.remainingTime += NIGHT_DURATION;
                 this.nightCount += 1;
-                event = { type: 'night-start', nightCount: this.nightCount };
+                event = { type: 'night-start', dayCount: this.dayCount, nightCount: this.nightCount };
             } else {
                 this.period = DAY_NIGHT_PERIOD.DAY;
-                event = { type: 'day-start', nightCount: this.nightCount };
+                this.remainingTime += DAY_DURATION;
+                this.dayCount += 1;
+                event = { type: 'day-start', dayCount: this.dayCount, nightCount: this.nightCount };
             }
         }
 
@@ -85,6 +93,7 @@ export class DayNightSystem {
         return {
             period: this.period,
             remainingTime: Math.max(0, this.remainingTime),
+            dayCount: this.dayCount,
             nightCount: this.nightCount,
             waveCount: this.waveCount
         };

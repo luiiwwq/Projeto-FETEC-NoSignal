@@ -351,14 +351,6 @@ export class Golem {
         const feetY = screen.y + this.colliderHalfH;
         const drawY = Math.round(feetY - fh);
 
-        // Ground shadow.
-        ctx.save();
-        ctx.fillStyle = 'rgba(10, 5, 5, 0.45)';
-        ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 2, 24, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
         ctx.save();
         ctx.translate(screen.x, 0);
         if (this._facing < 0) ctx.scale(-1, 1);

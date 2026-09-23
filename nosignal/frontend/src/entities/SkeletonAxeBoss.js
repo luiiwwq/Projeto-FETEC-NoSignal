@@ -4,7 +4,7 @@
  *
  * It inherits the full Skeleton_Axe behaviour (AI, melee profile, animation
  * sheets) and only overrides what makes it a boss:
- *   - 500 HP (vs 150 for a grunt)
+ *   - 1,000 HP (vs 150 for a grunt) and increased defense
  *   - bigger render scale (2.5x, up from the old 4x of the 22-43px frames)
  *   - an orange Mars-toned color filter applied to the artwork ONLY (drawn
  *     inside a ctx.save/ctx.filter/ctx.drawImage/ctx.restore block), a proper
@@ -24,7 +24,8 @@ import {
 } from './SkeletonAxe.js';
 
 /* ── Boss tuning ─────────────────────────────────────────── */
-export const SKELETON_AXE_BOSS_MAX_HP = 750;
+export const SKELETON_AXE_BOSS_MAX_HP = 1000;
+export const SKELETON_AXE_BOSS_PLAYER_DAMAGE_MULTIPLIER = 0.5;
 // Mesmo dano por golpe dos antigos esqueletos (40 de dano) com vida de boss.
 // A CADÊNCIA é bem mais rápida: cooldown de 0.5s e animação 2.5x veloz.
 export const SKELETON_AXE_BOSS_ATTACK_DAMAGE = SKELETON_ATTACK_DAMAGE;
@@ -35,7 +36,7 @@ export const SKELETON_AXE_BOSS_ANIM_SPEED_MUL = 2.5;       // animação 2.5x ma
 export const SKELETON_AXE_BOSS_ATTACK_ANIM_SPEED_MUL = 1.2;
 // Ataque com alcance maior que os esqueletos (42 px): o machado enorme do
 // guardião atinge o jogador mesmo sem ele estar colado no boss.
-export const SKELETON_AXE_BOSS_ATTACK_RANGE = 125;
+export const SKELETON_AXE_BOSS_ATTACK_RANGE = 200;
 // Perseguição mais veloz que os esqueletos comuns (70 px/s * 1.55 ≈ 108 px/s).
 export const SKELETON_AXE_BOSS_SPEED_MUL = 1.55;
 export const SKELETON_AXE_BOSS_COLLIDER_HALF_W = SKELETON_COLLIDER_HALF_W;
@@ -104,7 +105,7 @@ export class SkeletonAxeBoss extends SkeletonAxe {
     takeDamage(amount = SKELETON_ATTACK_DAMAGE, fromX = null, fromY = null) {
         if (this.isDead || this.state === SKELETON_STATES.DIE) return;
 
-        this.hp = Math.max(0, this.hp - amount);
+        this.hp = Math.max(0, this.hp - Math.round(amount * SKELETON_AXE_BOSS_PLAYER_DAMAGE_MULTIPLIER));
         this._hpBarTimer = 6;
 
         if (fromX !== null && fromY !== null) {
@@ -139,19 +140,6 @@ export class SkeletonAxeBoss extends SkeletonAxe {
         this.x = this.homeX;
         this.y = this.homeY;
         this._setState('idle', true);
-    }
-
-    /* ── Rendering ──────────────────────────────────────────
-     * Usa a folha do Skeleton_Axe (mesmo cache dos esqueletos comuns) mas com
-     * a escala maior e a sombra proporcionalmente maior sob os pés. O filtro
-     * laranja é aplicado pelo _renderFilter no render base da classe-mãe.    */
-    _groundShadow(ctx, screen, feetY) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(10, 5, 5, 0.5)';
-        ctx.beginPath();
-        ctx.ellipse(screen.x, feetY - 8, 62, 22, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
     }
 
     // O boss NÃO exibe a barrinha de vida flutuante sobre o corpo — o

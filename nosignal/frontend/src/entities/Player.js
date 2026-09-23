@@ -795,22 +795,6 @@ respawn(x = 0, y = 0) {
             ctx.globalAlpha = 0.45;
         }
 
-        // Soft shadow underneath feet
-        if (this.state !== PlayerState.DEAD && this.state !== PlayerState.FLOATING) {
-            ctx.save();
-            ctx.fillStyle = 'rgba(10, 5, 5, 0.45)';
-            ctx.beginPath();
-            ctx.ellipse(
-                screenPos.x,
-                screenPos.y + 22,
-                Math.max(10, 24 - this.jumpHeight * 0.1),
-                Math.max(4, 9 - this.jumpHeight * 0.04),
-                0, 0, Math.PI * 2
-            );
-            ctx.fill();
-            ctx.restore();
-        }
-
         // Render player sprite at nativeSize x scale
         // Character is centered horizontally, feet grounded
         const renderW = this.renderSize;

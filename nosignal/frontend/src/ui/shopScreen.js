@@ -68,7 +68,8 @@ export const SHOP_ITEMS = [
         description: 'O aliado surge na Sala do Rei para uma aparição rápida desferindo rajadas devastadoras no Boss.',
         price: 50,
         type: 'boss_assist',
-        sprite: '★'
+        sprite: 'A',
+        iconPath: './src/assets/sprites/Itens/helper_ally/ally_helper.png'
     }
 ];
 
