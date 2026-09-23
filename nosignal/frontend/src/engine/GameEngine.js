@@ -3675,22 +3675,25 @@ export class GameEngine {
                 ctx.globalAlpha = 1;
 
                 if (onCooldown) {
-                    ctx.fillStyle = 'rgba(10, 8, 14, 0.55)';
+                    ctx.fillStyle = 'rgba(10, 8, 14, 0.65)';
                     ctx.fillRect(bx + 2, startY + 2, slotSize - 4, slotSize - 4);
                     ctx.font = '8px "Press Start 2P", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
                     ctx.fillStyle = '#f6c885';
-                    ctx.fillText(`${Math.ceil(cooldown)}s`, bx + slotSize / 2, startY + slotSize / 2 + 3);
+                    ctx.fillText(`${Math.ceil(cooldown)}s`, bx + slotSize / 2, startY + slotSize / 2);
                 }
             }
 
             ctx.restore();
 
-            // Estoque de doses (compras): X/3 abaixo do socket, centralizado
+            // Estoque de doses (compras): X/3 abaixo do socket, centralizado (cor branca)
             const ownedStacks = owned ? gameState.getItemPurchases(item.id) : 0;
             if (ownedStacks > 0) {
                 ctx.font = '6px "Press Start 2P", monospace';
                 ctx.textAlign = 'center';
-                ctx.fillStyle = onCooldown ? '#6b5a44' : palette.glyph;
+                ctx.textBaseline = 'alphabetic';
+                ctx.fillStyle = '#ffffff';
                 ctx.fillText(`${ownedStacks}/3`, bx + slotSize / 2, startY + slotSize + 10);
             }
         }
