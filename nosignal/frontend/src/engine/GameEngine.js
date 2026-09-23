@@ -6,7 +6,7 @@
 
 import { Camera } from './Camera.js';
 import { MapRenderer } from './MapRenderer.js';
-import { Player, PlayerState } from '../entities/Player.js';
+import { Player, PlayerState } from '../entities/Player.js?v=dash-3';
 import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
 import { Golem, GOLEM_WAVE_SPAWNS, GOLEM_COLLIDER_HALF_W, GOLEM_COLLIDER_HALF_H, preloadGolemSprites } from '../entities/Golem.js';
 import { AmongUsEasterEgg, preloadAmongUsSprites, AMONG_US_ELIGIBLE_MAPS, AMONG_US_INTERVAL_SECONDS, AMONG_US_TEST_HALF_W, AMONG_US_TEST_HALF_H, AMONG_US_MAX_ATTEMPTS, DEBUG_AMONG_US_EASTER_EGG } from '../entities/AmongUsEasterEgg.js';
@@ -75,7 +75,7 @@ import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionS
 import { DayNightSystem, DAY_NIGHT_PERIOD, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
-import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem } from '../ui/shopScreen.js';
+import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem, getItemIconPath, getItemFramePaths } from '../ui/shopScreen.js';
 import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings, brightnessFilter } from '../state/stateStorage.js';
@@ -221,6 +221,12 @@ export class GameEngine {
         this._dayNightIcons = { cached: new Map(), requested: false };
         this._upgradeIcons = new Map();
         this._upgradeIconsRequested = false;
+        // Sprites dos itens consumíveis (ícone + quadros da animação de quebrar)
+        this._itemFxIcons = new Map();
+        this._itemFxFrames = new Map();
+        this._itemSpritesRequested = false;
+        this._itemFx = []; // animações de item sendo quebrado ao seu lado
+        this._loadItemSprites();
         this._catacombsSkeletonsActive = false;
         this._enemyNpcActor = null;
         this._loadUpgradeIcons();
@@ -1784,6 +1790,92 @@ export class GameEngine {
         }
     }
 
+    // Ícones estáticos e os 8 quadros da animação de quebra de cada item
+    // consumível. Carregamento preguiçoso igual ao dos ícones de upgrade.
+    _loadItemSprites() {
+        if (this._itemSpritesRequested || typeof Image === 'undefined') return;
+        this._itemSpritesRequested = true;
+        const ITEM_IDS = ['cura_alienigena', 'energia_duna', 'cadencia_frenetica'];
+        for (const id of ITEM_IDS) {
+            const iconPath = getItemIconPath(id);
+            if (iconPath) {
+                const icon = new Image();
+                icon.src = iconPath;
+                this._itemFxIcons.set(id, icon);
+            }
+            const framePaths = getItemFramePaths(id);
+            if (framePaths) {
+                this._itemFxFrames.set(id, framePaths.map((p) => {
+                    const img = new Image();
+                    img.src = p;
+                    return img;
+                }));
+            }
+        }
+    }
+
+    // Dispara a animação do frasco "se quebrando" flutuando fixa logo ACIMA da
+    // cabeça do personagem, com um brilho na cor do item (verde/vermelho/amarelo).
+    // A âncora é recalculada a cada frame, então a animação acompanha o jogador.
+    spawnItemBreakFx(itemId) {
+        if (!this._itemFxFrames.get(itemId)) return;
+        this._itemFx.push({
+            itemId,
+            elapsed: 0,
+            duration: 0.55,
+            size: 120
+        });
+    }
+
+    // Prefixo do gradiente radial do brilho, por item consumível.
+    _itemFxGlowColor(itemId) {
+        if (itemId === 'cura_alienigena') return 'rgba(34, 197, 94,';   // verde
+        if (itemId === 'energia_duna') return 'rgba(239, 68, 68,';       // vermelho
+        if (itemId === 'cadencia_frenetica') return 'rgba(234, 179, 8,'; // amarelo
+        return 'rgba(255, 255, 255,';
+    }
+
+    _renderItemFx(ctx) {
+        for (const fx of this._itemFx) {
+            const frames = this._itemFxFrames.get(fx.itemId);
+            if (!frames || !frames.length) continue;
+            const total = frames.length;
+            const idx = Math.min(total - 1, Math.floor((fx.elapsed / fx.duration) * total));
+            const img = frames[idx];
+            if (!img || !img.complete || img.naturalWidth <= 0) continue;
+
+            const ratio = img.naturalWidth / img.naturalHeight;
+            let iw = fx.size;
+            let ih = fx.size;
+            if (ratio > 1) ih = Math.round(fx.size / ratio);
+            else iw = Math.round(fx.size * ratio);
+
+            // Âncora: centro horizontal do personagem, logo acima da cabeça.
+            const screen = this.camera.worldToScreen(this.player.x, this.player.y);
+            const headY = screen.y - (this.player.renderSize || 64) / 2;
+            const cx = Math.round(screen.x);
+            const cy = Math.round(headY - 18 - ih / 2);
+
+            ctx.save();
+
+            // Brilho leve ao redor, na cor do item
+            const glow = this._itemFxGlowColor(fx.itemId);
+            const gg = ctx.createRadialGradient(cx, cy, ih * 0.15, cx, cy, ih * 0.9);
+            gg.addColorStop(0, glow + '0.7)');
+            gg.addColorStop(1, glow + '0)');
+            ctx.fillStyle = gg;
+            ctx.beginPath();
+            ctx.arc(cx, cy, ih * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Frasco quebrando (pixelado, sem suavizar)
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, cx - Math.round(iw / 2), cy - Math.round(ih / 2), iw, ih);
+
+            ctx.restore();
+        }
+    }
+
     unlockUpgrade(upgradeId) {
         if (!gameState.addUpgrade(upgradeId)) return;
 
@@ -2198,6 +2290,14 @@ export class GameEngine {
             return;
         }
 
+        // Dash do personagem ([E] sem interação pendente): custa 25 de energia.
+        if (e.code === 'KeyE' && this.player && !this.player.isDead) {
+            if (this.player.dash(this.input)) {
+                this._spawnDashFx(this.player);
+            }
+            return;
+        }
+
         // Easter egg secreto: Ctrl+Shift+1+F faz o Among Us surgir na frente.
         // (Ctrl+1 puro é roubado pelo navegador, por isso o Shift.)
         const secretAmongUs = e.ctrlKey && e.shiftKey && (
@@ -2234,7 +2334,11 @@ export class GameEngine {
             if (!this.player.isDead) {
                 const result = consumeInventorySlot(itemSlot, this.player);
                 if (result.message) {
-                    if (result.used) playClickButtonSound();
+                    if (result.used) {
+                        playClickButtonSound();
+                        const usedItem = getSlotItem(itemSlot);
+                        if (usedItem) this.spawnItemBreakFx(usedItem.id);
+                    }
                     this.hudMessage = result.message;
                     this.hudMessageTimer = 1.8;
                 }
@@ -2307,6 +2411,26 @@ export class GameEngine {
         }
     }
 
+    // Brilhozinho do dash: explosão de partículas ciano/brancas soltas para
+    // trás do personagem no instante em que começa o impulso.
+    _spawnDashFx(player) {
+        const backX = player.x - player.dashDirX * 20;
+        const backY = player.y - player.dashDirY * 20;
+        for (let i = 0; i < 16; i++) {
+            const angle = Math.atan2(player.dashDirY, player.dashDirX) + (Math.random() - 0.5) * 2.4;
+            const speed = 90 + Math.random() * 170;
+            this.particles.push({
+                x: backX + (Math.random() - 0.5) * 14,
+                y: backY + (Math.random() - 0.5) * 14,
+                vx: Math.cos(angle) * speed - player.dashDirX * 150,
+                vy: Math.sin(angle) * speed - player.dashDirY * 150,
+                life: 0.25 + Math.random() * 0.25,
+                color: Math.random() > 0.45 ? '#7fe7ff' : '#ffffff',
+                size: Math.random() > 0.5 ? 3 : 2
+            });
+        }
+    }
+
     _gameLoop(timestamp) {
         if (!this.isRunning) return;
 
@@ -2355,10 +2479,33 @@ export class GameEngine {
         this.player.update(dt);
         this._handlePlayerDeath(dt);
 
+        // Fagulhas contínuas do dash (rastro ciano atrás do personagem).
+        if (this.player.state === PlayerState.DASHING && this.player.dashTimer > 0) {
+            for (let i = 0; i < 2; i++) {
+                this.particles.push({
+                    x: this.player.x - this.player.dashDirX * 18 + (Math.random() - 0.5) * 16,
+                    y: this.player.y - this.player.dashDirY * 18 + (Math.random() - 0.5) * 16,
+                    vx: -this.player.dashDirX * 45 + (Math.random() - 0.5) * 30,
+                    vy: -this.player.dashDirY * 45 + (Math.random() - 0.5) * 30,
+                    life: 0.12 + Math.random() * 0.16,
+                    color: Math.random() > 0.4 ? '#7fe7ff' : '#ffffff',
+                    size: Math.random() > 0.5 ? 3 : 2
+                });
+            }
+        }
+
         // Timer do feedback de item consumido no HUD
         if (this.hudMessageTimer > 0) {
             this.hudMessageTimer -= dt;
             if (this.hudMessageTimer <= 0) this.hudMessage = '';
+        }
+
+        // Animações de item "se quebrando" ao lado da HUD de upgrades
+        for (let i = this._itemFx.length - 1; i >= 0; i--) {
+            this._itemFx[i].elapsed += dt;
+            if (this._itemFx[i].elapsed >= this._itemFx[i].duration) {
+                this._itemFx.splice(i, 1);
+            }
         }
 
         // Recarga (cooldown de 15s) dos itens consumíveis
@@ -3157,6 +3304,9 @@ export class GameEngine {
         this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
         this._renderUpgradeIndicators(ctx, hudX + 168 + 8, hudY + panelH + 10);
 
+        // Animação de item consumido "se quebrando" ao lado da HUD de upgrades
+        this._renderItemFx(ctx);
+
         // TOP-RIGHT: Coordinates & Moedas (mesma largura da HUD da missão)
         const coordsW = 244;
         const coordsH = 48;
@@ -3445,15 +3595,16 @@ export class GameEngine {
         const startX = 24;
         const startY = barBottomY - slotSize - 16;
         const paletteByItem = {
-            'cura_alienigena': { border: '#22c55e', glyph: '#86efac', label: 'CURA' },
-            'energia_duna': { border: '#38bdf8', glyph: '#7dd3fc', label: 'DUNA' }
+            'cura_alienigena': { border: '#22c55e', glyph: '#86efac' },
+            'energia_duna': { border: '#ef4444', glyph: '#fca5a5' },
+            'cadencia_frenetica': { border: '#eab308', glyph: '#f9a8d4' }
         };
 
         for (let slot = 1; slot <= 3; slot++) {
             const bx = startX + (slot - 1) * (slotSize + slotGap);
             const item = getSlotItem(slot);
             const owned = !!item;
-            const palette = (item && paletteByItem[item.id]) || { border: '#888', glyph: '#999', label: '---' };
+            const palette = (item && paletteByItem[item.id]) || { border: '#888', glyph: '#999' };
             const cooldown = owned ? gameState.getItemCooldown(item.id) : 0;
             const onCooldown = cooldown > 0;
 
@@ -3475,12 +3626,7 @@ export class GameEngine {
             if (owned && item) {
                 // Durante a recarga o item fica apagado e mostra o tempo restante
                 if (onCooldown) ctx.globalAlpha = 0.35;
-                this._drawItemGlyph(ctx, bx, startY, slotSize, item.sprite, palette.glyph);
-
-                ctx.font = '6px "Press Start 2P", monospace';
-                ctx.textAlign = 'center';
-                ctx.fillStyle = palette.glyph;
-                ctx.fillText(palette.label, bx + slotSize / 2, startY + slotSize - 6);
+                this._drawItemGlyph(ctx, bx, startY, slotSize, item, palette.glyph);
 
                 ctx.globalAlpha = 1;
 
@@ -3494,12 +3640,39 @@ export class GameEngine {
             }
 
             ctx.restore();
+
+            // Estoque de doses (compras): X/3 abaixo do socket, centralizado
+            const ownedStacks = owned ? gameState.getItemPurchases(item.id) : 0;
+            if (ownedStacks > 0) {
+                ctx.font = '6px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = onCooldown ? '#6b5a44' : palette.glyph;
+                ctx.fillText(`${ownedStacks}/3`, bx + slotSize / 2, startY + slotSize + 10);
+            }
         }
     }
 
-    // Desenha o ícone do item dentro do socket (shapes vetoriais: nenhum asset
-    // de sprite de item existe ainda — quando existirem, troca-se por imagem).
-    _drawItemGlyph(ctx, bx, by, size, glyph, color) {
+    // Desenha o ícone do item dentro do socket: usa o asset de sprite do item
+    // (ícone estático) e, enquanto ele ainda não carrega, cai no desenho
+    // vetorial/glifo de fallback.
+    _drawItemGlyph(ctx, bx, by, size, item, color) {
+        const icon = item ? this._itemFxIcons?.get(item.id) : null;
+        if (icon && icon.complete && icon.naturalWidth > 0 && icon.naturalHeight > 0) {
+            const pad = 3;
+            const inner = size - pad * 2;
+            const ratio = icon.naturalWidth / icon.naturalHeight;
+            let iw = inner;
+            let ih = inner;
+            if (ratio > 1) ih = Math.round(inner / ratio);
+            else iw = Math.round(inner * ratio);
+            const ix = bx + Math.round((size - iw) / 2);
+            const iy = by + Math.round((size - ih) / 2);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(icon, ix, iy, iw, ih);
+            return;
+        }
+
+        const glyph = (item && item.sprite) || '?';
         const cx = bx + size / 2;
         const cy = by + size / 2 - 2;
         ctx.fillStyle = color;

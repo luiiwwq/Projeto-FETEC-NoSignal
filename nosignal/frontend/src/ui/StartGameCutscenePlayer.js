@@ -150,21 +150,41 @@ export async function playStartGameCutscene(container) {
     stopMenuMusic();
     preloadCutsceneMusic();
 
-    // Carrega imagens e texto em paralelo com um limite de segurança.
-    const texts = await withTimeout(
-        loadScenesText(),
-        TEXT_TIMEOUT_MS,
-        FALLBACK_TEXTS
-    );
-    await withTimeout(preloadAllImages(TOTAL_SCENES), PRELOAD_TIMEOUT_MS + 500, []);
+    // ENTER pula a cutscene a qualquer momento — inclusive durante o
+    // pré-carregamento — e segue direto para a tela de loading. O debounce
+    // impede que o mesmo ENTER que confirmou o tripulante pule no instante.
+    const skip = { triggered: false, now: null };
+    const confirmedAt = Date.now();
+    const onSkipKey = (e) => {
+        if (e.key !== 'Enter' && e.code !== 'Enter') return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (Date.now() - confirmedAt < 350) return;
+        skip.triggered = true;
+        if (skip.now) skip.now();
+    };
+    window.addEventListener('keydown', onSkipKey, true);
 
-    await confirmCutscene(container, texts || FALLBACK_TEXTS);
+    try {
+        // Carrega imagens e texto em paralelo com um limite de segurança.
+        const texts = await withTimeout(
+            loadScenesText(),
+            TEXT_TIMEOUT_MS,
+            FALLBACK_TEXTS
+        );
+        await withTimeout(preloadAllImages(TOTAL_SCENES), PRELOAD_TIMEOUT_MS + 500, []);
 
-    // Ao sair das cutscenes, a tela de loading assume a música do gameplay.
-    stopCutsceneMusic();
+        if (skip.triggered) return;
+
+        await confirmCutscene(container, texts || FALLBACK_TEXTS, skip);
+    } finally {
+        window.removeEventListener('keydown', onSkipKey, true);
+        // Ao sair das cutscenes, a tela de loading assume a música do gameplay.
+        stopCutsceneMusic();
+    }
 }
 
-function confirmCutscene(container, scenesText) {
+function confirmCutscene(container, scenesText, skip) {
     return new Promise((resolve) => {
         /* ── Overlay fullscreen ────────────────────────────── */
         const overlay = document.createElement('div');
@@ -293,10 +313,11 @@ function confirmCutscene(container, scenesText) {
             if (finished) return;
             finished = true;
             stopTimers();
-            window.removeEventListener('keydown', onKeyDown, true);
             if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
             resolve();
         }
+
+        if (skip) skip.now = finish;
 
         /* ── Efeito máquina de escrever ────────────────────── */
         function typeText(el, fullText) {
@@ -321,6 +342,10 @@ function confirmCutscene(container, scenesText) {
         /* ── Reprodução das scenes ─────────────────────────── */
         function showScene(index) {
             if (finished) return;
+            if (skip && skip.triggered) {
+                finish();
+                return;
+            }
             stopTimers();
             currentScene = index;
 
@@ -364,23 +389,9 @@ function confirmCutscene(container, scenesText) {
             }, duration));
         }
 
-        /* ── Tecla ENTER para pular (capture, como nos bosses) */
-        function onKeyDown(e) {
-            if (e.code === 'Enter' || e.key === 'Enter') {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                finish();
-            }
-        }
-
-        // Aguarda um instante antes de capturar o ENTER para que o mesmo
-        // keydown que confirmou o tripulante não pule a cutscene também.
-        const bindTimer = window.setTimeout(() => {
-            if (finished) return;
-            window.addEventListener('keydown', onKeyDown, true);
-        }, 350);
-        timers.push(bindTimer);
-
+        /* ── Tecla ENTER para pular ─────────────────────────── */
+        // O listener de ENTER é global e fica ativo desde o início (skip no
+        // pré-carregamento); aqui só ligamos o clique do botão PULAR.
         skipBtn.addEventListener('click', finish);
 
         // Inicia a trilha da cutscene (chamado dentro de um gesto do usuário,

@@ -27,38 +27,74 @@ export const SHOP_ITEMS = [
     {
         id: 'cura_alienigena',
         name: 'Cura Alienígena',
-        description: 'Poção marciana: restaura 30 de vida instantaneamente. Uso infinito · recarga 15s.',
+        description: 'Poção marciana: restaura 30 de vida, 1 dose por tecla (2 doses = +60). Uso infinito · recarga 15s por dose.',
         price: 20,
         type: 'consumable',
-        effect: 'heal_30',
-        sprite: '✚'
+        effect: 'heal',
+        amountPerUse: 30,
+        cooldownPerUse: 15,
+        sprite: '✚',
+        iconPath: './src/assets/sprites/Itens/health_potion/item_health.png'
     },
     {
         id: 'energia_duna',
         name: 'Energia de Duna',
-        description: 'Poção da tempestade: soma +50 de ENERGIA durante 4.5 segundos. Uso infinito · recarga 15s.',
+        description: 'Poção da tempestade: soma +25 de ENERGIA, 1 dose por tecla (2 doses = +50). Uso infinito · recarga 15s por dose.',
         price: 20,
         type: 'consumable',
-        effect: 'energy_boost',
-        sprite: '⚡'
+        effect: 'energy',
+        amountPerUse: 25,
+        durationPerUse: 4.5,
+        cooldownPerUse: 15,
+        sprite: '⚡',
+        iconPath: './src/assets/sprites/Itens/energy_potion/energy_item.png'
     },
     {
-        id: 'item_slot_3',
-        name: 'Item 3',
-        description: 'Espaço reservado para um futuro item.',
-        price: 10,
-        type: 'placeholder',
-        sprite: '?'
+        id: 'cadencia_frenetica',
+        name: 'Cadência Frenética',
+        description: 'Estimulante de combate: +15% de CADÊNCIA no tiro, 1 dose por tecla (2 doses = +30%). Uso infinito · recarga 15s por dose.',
+        price: 20,
+        type: 'consumable',
+        effect: 'attack_speed',
+        amountPerUse: 0.15,
+        durationPerUse: 4.5,
+        cooldownPerUse: 15,
+        sprite: '»',
+        iconPath: './src/assets/sprites/Itens/attack_speed_potion/attack_speed_potion_item.png'
     },
     {
         id: 'necro_ally_help',
-        name: 'Ajuda no Boss Necromancer',
+        name: 'Ajuda contra o Rei',
         description: 'O aliado surge na Sala do Rei para uma aparição rápida desferindo rajadas devastadoras no Boss.',
         price: 50,
         type: 'boss_assist',
         sprite: '★'
     }
 ];
+
+// Quadros da animação de "quebrando" de cada item (frascos se partindo).
+const ITEM_ASSETS = {
+    cura_alienigena: {
+        framePaths: Array.from({ length: 8 }, (_, i) =>
+            `./src/assets/sprites/Itens/health_potion/health_animation/frame_${String(i + 1).padStart(2, '0')}.png`)
+    },
+    energia_duna: {
+        framePaths: Array.from({ length: 8 }, (_, i) =>
+            `./src/assets/sprites/Itens/energy_potion/energy_animation/frame_${String(i + 1).padStart(2, '0')}.png`)
+    },
+    cadencia_frenetica: {
+        framePaths: Array.from({ length: 8 }, (_, i) =>
+            `./src/assets/sprites/Itens/attack_speed_potion/attack_speed_potion_animation/frame_${String(i + 1).padStart(2, '0')}.png`)
+    }
+};
+
+export function getItemIconPath(itemId) {
+    return SHOP_ITEMS.find((it) => it.id === itemId)?.iconPath || null;
+}
+
+export function getItemFramePaths(itemId) {
+    return ITEM_ASSETS[itemId]?.framePaths || null;
+}
 
 let shopOverlay = null;
 let isOpen = false;
@@ -79,30 +115,45 @@ export function getSlotItem(slot) {
 }
 
 /**
- * Consome o item do slot (teclas 1/2/3). Uso infinito após a compra, mas
- * cada item tem recarga de 15s entre usos.
+ * Consome o item do slot (teclas 1/2/3). Uso infinito após a compra, mas cada
+ * tecla usa 1 dose: apertou N vezes, usou N doses (cada dose soma 15s de
+ * recarga e seu efeito). O total de doses por carga é limitado pelo nº de
+ * compras (1..3); ao fim da recarga, a carga inteira volta.
  * Retorna { used, message } para o engine dar o feedback no HUD.
  */
 export function consumeInventorySlot(slot, player) {
     const item = getSlotItem(slot);
     if (!item || item.type !== 'consumable') return { used: false, message: '' };
-    if (gameState.getItemPurchases(item.id) < 1) return { used: false, message: '' };
+    const stacks = gameState.getItemPurchases(item.id);
+    if (stacks < 1) return { used: false, message: '' };
 
-    // Recarga de 15s por item (uso infinito, mas sem spam)
-    if (gameState.getItemCooldown(item.id) > 0) {
+    // Todas as doses da carga já foram usadas: só volta após a recarga.
+    const dosesUsed = gameState.getItemActivationUses(item.id);
+    if (dosesUsed >= stacks) {
         const secs = Math.ceil(gameState.getItemCooldown(item.id));
         return { used: false, message: `${item.name}: recarregando ${secs}s` };
     }
 
-    gameState.setItemCooldown(item.id, 15);
+    // Cada dose soma 15s à recarga compartilhada do item.
+    const newDoses = dosesUsed + 1;
+    gameState.setItemActivationUses(item.id, newDoses);
+    gameState.setItemCooldown(item.id, (item.cooldownPerUse ?? 15) * newDoses);
 
     let message = '';
-    if (item.effect === 'heal_30') {
-        player.heal(30);
-        message = `${item.name}: +30 VIDA`;
-    } else if (item.effect === 'energy_boost') {
-        player.boostEnergy(50, 4.5);
-        message = `${item.name}: +50 ENERGIA · 4.5s`;
+    if (item.effect === 'heal') {
+        const amount = item.amountPerUse ?? 0;
+        player.heal(amount);
+        message = `${item.name}: +${amount} VIDA`;
+    } else if (item.effect === 'energy') {
+        const amount = item.amountPerUse ?? 0;
+        const duration = item.durationPerUse ?? 0;
+        player.boostEnergy(amount, duration);
+        message = `${item.name}: +${amount} ENERGIA`;
+    } else if (item.effect === 'attack_speed') {
+        const percent = item.amountPerUse ?? 0;
+        const duration = item.durationPerUse ?? 0;
+        player.boostFireRate(percent, duration);
+        message = `${item.name}: +${Math.round(percent * 100)}% CADÊNCIA`;
     }
 
     return { used: true, message };
@@ -191,7 +242,9 @@ function _renderItemCard(item, index) {
     return `
         <div class="shop-card ${isSpecial ? 'shop-card-special' : ''} ${isMaxed || (isSpecial && isPurchased) ? 'is-bought' : ''}" data-item-id="${item.id}">
             <div class="shop-card-sprite" data-item-id="${item.id}">
-                <span>${item.sprite || '?'}</span>
+                ${item.iconPath
+                    ? `<img src="${item.iconPath}" alt="${item.name}" draggable="false" loading="lazy">`
+                    : `<span>${item.sprite || '?'}</span>`}
             </div>
             <div class="shop-card-badge">${badgeText}</div>
             <div class="shop-card-name">${item.name}</div>

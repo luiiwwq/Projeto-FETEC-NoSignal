@@ -42,6 +42,28 @@ function _getWhiteSprite(frameImg) {
     return white;
 }
 
+// Silhueta ciano (asset do personagem recalorizado), usada no brilho e no
+// rastro do dash — mesma técnica do flash branco de dano, mas na cor do dash.
+const _cyanSpriteCache = new WeakMap();
+
+function _getCyanSprite(frameImg) {
+    let cyan = _cyanSpriteCache.get(frameImg);
+    if (cyan) return cyan;
+
+    cyan = document.createElement('canvas');
+    cyan.width = frameImg.width;
+    cyan.height = frameImg.height;
+    const cctx = cyan.getContext('2d');
+    cctx.drawImage(frameImg, 0, 0);
+    cctx.globalCompositeOperation = 'source-in';
+    cctx.fillStyle = '#7fe7ff';
+    cctx.fillRect(0, 0, cyan.width, cyan.height);
+    cctx.globalCompositeOperation = 'source-over';
+
+    _cyanSpriteCache.set(frameImg, cyan);
+    return cyan;
+}
+
 export const PlayerState = {
     IDLE: 'IDLE',
     RUNNING: 'RUNNING',
@@ -51,7 +73,8 @@ export const PlayerState = {
     HURT: 'HURT',
     DEAD: 'DEAD',
     FLOATING: 'FLOATING',
-    PUSH_PULL: 'PUSH_PULL'
+    PUSH_PULL: 'PUSH_PULL',
+    DASHING: 'DASHING'
 };
 
 export class Player {
@@ -110,6 +133,9 @@ export class Player {
         this.energyDelay = 0;  // recarga fica bloqueada logo após cada disparo
         this.energyCost = this.weapon?.energyCost ?? 15;
         this.energyOverdrive = 0; // segundos restantes do boost de energia
+        this._energyBoostAccum = 0; // energia somada pelas doses ativas da Energia de Duna
+        this.fireRateBoost = 0; // fração de redução no cooldown do tiro (Cadência Frenética)
+        this.fireRateBoostTimer = 0; // segundos restantes do boost de cadência
         this.bulletDamage = this.weapon?.damage ?? 14;
         this.damageMultiplier = 1.0;
         this.speedMultiplier = 1.0;
@@ -126,8 +152,18 @@ export class Player {
         // Cooldowns
         this.shootCooldown = 0;
         this.punchCooldown = 0;
+        this.dashCooldown = 0;
         this.recoilX = 0;
         this.recoilY = 0;
+
+        // Dash mechanics ([E], custa energia)
+        this.dashEnergyCost = 25;   // energia gasta por dash
+        this.dashDuration = 0.22;   // segundos do impulso
+        this.dashSpeed = 620;       // px/seg do dash
+        this.dashTimer = 0;
+        this.dashDirX = 0;
+        this.dashDirY = 0;
+        this.dashTrail = [];        // fantasmas do rastro (brilhozinho)
 
         // Jump mechanics
         this.jumpHeight = 0;
@@ -151,7 +187,8 @@ export class Player {
             [PlayerState.HURT]: { name: this._animName(PlayerState.HURT), frames: 7, speed: 0.07, loop: false },
             [PlayerState.DEAD]: { name: this._animName(PlayerState.DEAD), frames: 11, speed: 0.09, loop: false },
             [PlayerState.FLOATING]: { name: this._animName(PlayerState.FLOATING), frames: 11, speed: 0.12, loop: true },
-            [PlayerState.PUSH_PULL]: { name: this._animName(PlayerState.PUSH_PULL), frames: 6, speed: 0.11, loop: true }
+            [PlayerState.PUSH_PULL]: { name: this._animName(PlayerState.PUSH_PULL), frames: 6, speed: 0.11, loop: true },
+            [PlayerState.DASHING]: { name: this._animName(PlayerState.RUNNING), frames: 6, speed: 0.05, loop: true }
         };
     }
 
@@ -189,7 +226,7 @@ export class Player {
         // Priority validation: HURT and one-shot actions shouldn't be overridden by simple move
         if (!force) {
             if (this.state === PlayerState.HURT) return;
-            if ((this.state === PlayerState.SHOOTING || this.state === PlayerState.PUNCHING || this.state === PlayerState.JUMPING)
+            if ((this.state === PlayerState.SHOOTING || this.state === PlayerState.PUNCHING || this.state === PlayerState.JUMPING || this.state === PlayerState.DASHING)
                 && (newState === PlayerState.IDLE || newState === PlayerState.RUNNING)) {
                 return;
             }
@@ -263,17 +300,17 @@ export class Player {
         const aimAngle = Math.atan2(input.mouseY - screenPos.y, input.mouseX - screenPos.x);
 
         // Shoot Action (Left Click)
-        if (input.mouseLeft && this.shootCooldown <= 0 && this.state !== PlayerState.HURT) {
+        if (input.mouseLeft && this.shootCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.shoot(aimAngle, bulletManager);
         }
 
         // Punch Action (Right Click)
-        if (input.mouseRight && this.punchCooldown <= 0 && this.state !== PlayerState.HURT) {
+        if (input.mouseRight && this.punchCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.punch(aimAngle);
         }
 
         // Jump Action (Spacebar)
-        if (input.keys['Space'] && this.state !== PlayerState.JUMPING && this.state !== PlayerState.HURT) {
+        if (input.keys['Space'] && this.state !== PlayerState.JUMPING && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.jump();
         }
 
@@ -304,7 +341,8 @@ export class Player {
             this.state === PlayerState.JUMPING ||
             this.state === PlayerState.HURT ||
             this.state === PlayerState.FLOATING ||
-            this.state === PlayerState.PUSH_PULL);
+            this.state === PlayerState.PUSH_PULL ||
+            this.state === PlayerState.DASHING);
 
         if (!isActionActive) {
             if (moveX !== 0 || moveY !== 0) {
@@ -326,7 +364,8 @@ export class Player {
         this.energyDelay = 0.5;
         }
 
-        this.shootCooldown = weapon.cooldown ?? 0.22; // Cadence
+        // Cadência: a Cadência Frenética reduz o cooldown do tiro.
+        this.shootCooldown = (weapon.cooldown ?? 0.22) * (1 - (this.fireRateBoost || 0));
         this.updateDirectionFromAngle(aimAngle);
         this.setState(PlayerState.SHOOTING, true);
 
@@ -384,6 +423,57 @@ export class Player {
         this.setState(PlayerState.JUMPING, true);
     }
 
+    // Dash para frente ([E]). Direção: teclas WASD/setas se houver input de
+    // movimento; senão, usa a direção que o personagem está virado. Custa
+    // energia e tem um cooldown curto para não virar spam.
+    dash(input) {
+        if (this.state === PlayerState.DEAD || this.isDead) return false;
+        if (this.state === PlayerState.DASHING || this.dashCooldown > 0) return false;
+
+        if (this.team === 'player' && this.role === 'player') {
+            if (this.energy < this.dashEnergyCost) return false;
+            this.energy = Math.max(0, this.energy - this.dashEnergyCost);
+            this.energyDelay = 0.5;
+        }
+
+        let dx = 0;
+        let dy = 0;
+        if (input) {
+            if (input.keys['KeyW'] || input.keys['ArrowUp']) dy -= 1;
+            if (input.keys['KeyS'] || input.keys['ArrowDown']) dy += 1;
+            if (input.keys['KeyA'] || input.keys['ArrowLeft']) dx -= 1;
+            if (input.keys['KeyD'] || input.keys['ArrowRight']) dx += 1;
+        }
+
+        if (dx === 0 && dy === 0) {
+            const facing = {
+                'north': [0, -1],
+                'south': [0, 1],
+                'east': [1, 0],
+                'west': [-1, 0],
+                'north-east': [Math.SQRT1_2, -Math.SQRT1_2],
+                'north-west': [-Math.SQRT1_2, -Math.SQRT1_2],
+                'south-east': [Math.SQRT1_2, Math.SQRT1_2],
+                'south-west': [-Math.SQRT1_2, Math.SQRT1_2]
+            };
+            const f = facing[this.direction] || [0, 0];
+            dx = f[0];
+            dy = f[1];
+        } else if (dx !== 0 && dy !== 0) {
+            dx *= Math.SQRT1_2;
+            dy *= Math.SQRT1_2;
+        }
+
+        this.dashDirX = dx;
+        this.dashDirY = dy;
+        this.dashTimer = this.dashDuration;
+        this.dashCooldown = 0.55;
+        this.vx = 0;
+        this.vy = 0;
+        this.setState(PlayerState.DASHING, true);
+        return true;
+    }
+
     takeDamage(amount = 20, fromX = null, fromY = null) {
         if (this.state === PlayerState.DEAD || this.invulnerableTimer > 0) return;
 
@@ -431,9 +521,13 @@ respawn(x = 0, y = 0) {
         this.invulnerableTimer = 0.5;
         // Remove qualquer boost de energia ativo (energia volta ao padrão)
         this.energyOverdrive = 0;
+        this._energyBoostAccum = 0;
         this.maxEnergy = this.baseMaxEnergy;
         this.energy = this.maxEnergy;
         this.energyDelay = 0;
+        // Remove qualquer boost de cadência ativo
+        this.fireRateBoost = 0;
+        this.fireRateBoostTimer = 0;
         this.setState(PlayerState.IDLE, true);
     }
 
@@ -477,24 +571,42 @@ respawn(x = 0, y = 0) {
         return this.hp - before;
     }
 
-    // Boost de energia (poção Energia de Duna): soma `amount` fixos de energia
-    // ao máximo atual durante `duration` segundos; ao acabar, o máximo volta ao
-    // padrão de base (120 ou 150 com movimento).
+    // Boost de energia (poção Energia de Duna): cada dose soma `amount` fixos
+    // de energia ao máximo atual e soma `duration` ao overdrive; ao acabar, o
+    // máximo volta ao padrão de base (120 ou 150 com movimento).
     boostEnergy(amount, duration) {
         if (this.energyOverdrive <= 0) {
             this.baseMaxEnergy = this.maxEnergy;
+            this._energyBoostAccum = 0;
         }
-        this.maxEnergy = this.baseMaxEnergy + amount;
+        this._energyBoostAccum += amount;
+        this.maxEnergy = this.baseMaxEnergy + this._energyBoostAccum;
         this.energy = this.maxEnergy;
-        this.energyOverdrive = duration;
+        this.energyOverdrive += duration;
+    }
+
+    // Boost de cadência (item Cadência Frenética): cada dose reduz o cooldown
+    // do tiro em `fraction` (0.15) e soma `duration` ao tempo ativo.
+    boostFireRate(fraction, duration) {
+        this.fireRateBoost += fraction;
+        this.fireRateBoostTimer += duration;
     }
 
     update(dt) {
         // Cooldowns
         if (this.shootCooldown > 0) this.shootCooldown -= dt;
         if (this.punchCooldown > 0) this.punchCooldown -= dt;
+        if (this.dashCooldown > 0) this.dashCooldown -= dt;
         if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt;
         if (this.hitFlashTimer > 0) this.hitFlashTimer -= dt;
+
+        // Rastro do dash: cada fantasma esmaece até sumir.
+        if (this.dashTrail.length) {
+            for (let i = this.dashTrail.length - 1; i >= 0; i--) {
+                this.dashTrail[i].t -= dt;
+                if (this.dashTrail[i].t <= 0) this.dashTrail.splice(i, 1);
+            }
+        }
 
         // Energia recarrega rápido, mas SÓ depois que o jogador deixa de atirar
         // (delay bloqueia a recarga durante o fogo contra o spam infinito).
@@ -506,14 +618,24 @@ respawn(x = 0, y = 0) {
             }
         }
 
-        // Energia de Duna: overdrive temporário (+50 de energia). Ao acabar,
+        // Energia de Duna: overdrive temporário (+25 por dose). Ao acabar,
         // o máximo volta ao padrão e a energia é limitada de volta a ele.
         if (this.energyOverdrive > 0) {
             this.energyOverdrive -= dt;
             if (this.energyOverdrive <= 0) {
                 this.energyOverdrive = 0;
+                this._energyBoostAccum = 0;
                 this.maxEnergy = this.baseMaxEnergy;
                 this.energy = Math.min(this.energy, this.maxEnergy);
+            }
+        }
+
+        // Cadência Frenética: quando acaba o tempo, o cooldown volta ao normal.
+        if (this.fireRateBoostTimer > 0) {
+            this.fireRateBoostTimer -= dt;
+            if (this.fireRateBoostTimer <= 0) {
+                this.fireRateBoostTimer = 0;
+                this.fireRateBoost = 0;
             }
         }
 
@@ -539,19 +661,47 @@ respawn(x = 0, y = 0) {
         // Position update with velocity and recoil, resolved through
         // the injected collision resolver (walls + world bounds)
         if (this.state !== PlayerState.DEAD) {
-            const dx = (this.vx + this.recoilX) * dt;
-            const dy = (this.vy + this.recoilY) * dt;
+            if (this.state === PlayerState.DASHING && this.dashTimer > 0) {
+                // Dash: impulso rápido na direção travada, ignorando input.
+                this.dashTimer -= dt;
+                const dashDx = this.dashDirX * this.dashSpeed * dt;
+                const dashDy = this.dashDirY * this.dashSpeed * dt;
 
-            if (this.collisionResolver) {
-                const resolved = this.collisionResolver(this.x, this.y, dx, dy);
-                this.x = resolved.x;
-                this.y = resolved.y;
-            } else if (this.worldBounds) {
-                this.x = Math.max(this.worldBounds.minX + this.colliderHalfW, Math.min(this.worldBounds.maxX - this.colliderHalfW, this.x + dx));
-                this.y = Math.max(this.worldBounds.minY + this.colliderHalfH, Math.min(this.worldBounds.maxY - this.colliderHalfH, this.y + dy));
+                if (this.collisionResolver) {
+                    const resolved = this.collisionResolver(this.x, this.y, dashDx, dashDy);
+                    this.x = resolved.x;
+                    this.y = resolved.y;
+                } else if (this.worldBounds) {
+                    this.x = Math.max(this.worldBounds.minX + this.colliderHalfW, Math.min(this.worldBounds.maxX - this.colliderHalfW, this.x + dashDx));
+                    this.y = Math.max(this.worldBounds.minY + this.colliderHalfH, Math.min(this.worldBounds.maxY - this.colliderHalfH, this.y + dashDy));
+                } else {
+                    this.x += dashDx;
+                    this.y += dashDy;
+                }
+
+                // Guarda um fantasma do rastro nesta posição.
+                this.dashTrail.push({ x: this.x, y: this.y, t: this.dashDuration });
+
+                if (this.dashTimer <= 0) {
+                    this.dashTimer = 0;
+                    const moving = Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1;
+                    this.setState(moving ? PlayerState.RUNNING : PlayerState.IDLE, true);
+                }
             } else {
-                this.x += dx;
-                this.y += dy;
+                const dx = (this.vx + this.recoilX) * dt;
+                const dy = (this.vy + this.recoilY) * dt;
+
+                if (this.collisionResolver) {
+                    const resolved = this.collisionResolver(this.x, this.y, dx, dy);
+                    this.x = resolved.x;
+                    this.y = resolved.y;
+                } else if (this.worldBounds) {
+                    this.x = Math.max(this.worldBounds.minX + this.colliderHalfW, Math.min(this.worldBounds.maxX - this.colliderHalfW, this.x + dx));
+                    this.y = Math.max(this.worldBounds.minY + this.colliderHalfH, Math.min(this.worldBounds.maxY - this.colliderHalfH, this.y + dy));
+                } else {
+                    this.x += dx;
+                    this.y += dy;
+                }
             }
         }
 
@@ -635,12 +785,44 @@ respawn(x = 0, y = 0) {
             ctx.restore();
         }
 
+        // Brilhozinho do dash: aura ciano atrás do personagem.
+        if (this.state === PlayerState.DASHING && this.dashTimer > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const glow = ctx.createRadialGradient(screenPos.x, screenPos.y, 4, screenPos.x, screenPos.y, 42);
+            glow.addColorStop(0, 'rgba(127, 231, 255, 0.55)');
+            glow.addColorStop(1, 'rgba(127, 231, 255, 0)');
+            ctx.fillStyle = glow;
+            ctx.beginPath();
+            ctx.arc(screenPos.x, screenPos.y, 42, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
         // Render player sprite at nativeSize x scale
         // Character is centered horizontally, feet grounded
         const renderW = this.renderSize;
         const renderH = this.renderSize;
         const drawX = Math.round(screenPos.x - renderW / 2);
         const drawY = Math.round(screenPos.y - renderH / 2 - this.jumpHeight);
+        // Rastro do dash: silhuetas ciano do próprio asset esmaecendo para
+        // trás — mesma técnica do flash de dano, mas na cor do dash.
+        if (frameImg && this.dashTrail.length) {
+            for (const g of this.dashTrail) {
+                const ghostAlpha = Math.max(0, Math.min(1, g.t / this.dashDuration));
+                const ghostPos = this.camera.worldToScreen(g.x, g.y);
+                const gx = Math.round(ghostPos.x - renderW / 2);
+                const gy = Math.round(ghostPos.y - renderH / 2 - this.jumpHeight);
+
+                ctx.save();
+                ctx.globalAlpha = ghostAlpha * 0.4;
+                ctx.drawImage(
+                    _getCyanSprite(frameImg),
+                    gx, gy, renderW, renderH
+                );
+                ctx.restore();
+            }
+        }
 
         if (frameImg) {
             ctx.drawImage(frameImg, drawX, drawY, renderW, renderH);

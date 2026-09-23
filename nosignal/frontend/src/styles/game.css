@@ -1199,8 +1199,8 @@
 
 /* ─── Espaço reservado para o sprite asset do item ─── */
 .shop-card-sprite {
-    width: 54px;
-    height: 54px;
+    width: 64px;
+    height: 64px;
     background: #0e0709;
     border: 2px dashed #4d1d15;
     display: flex;
@@ -1213,19 +1213,27 @@
     transition: border-color 0.15s;
 }
 
+.shop-card-sprite img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+    transform: scale(1.2);
+}
+
 .shop-card-sprite[data-item-id="cura_alienigena"] {
     border-color: #22c55e;
     color: #86efac;
 }
 
 .shop-card-sprite[data-item-id="energia_duna"] {
-    border-color: #38bdf8;
-    color: #7dd3fc;
+    border-color: #ef4444;
+    color: #fca5a5;
 }
 
-.shop-card-sprite[data-item-id="item_slot_3"] {
-    border-color: #6b7280;
-    color: #9ca3af;
+.shop-card-sprite[data-item-id="cadencia_frenetica"] {
+    border-color: #eab308;
+    color: #fde047;
 }
 
 .shop-card-sprite[data-item-id="necro_ally_help"] {

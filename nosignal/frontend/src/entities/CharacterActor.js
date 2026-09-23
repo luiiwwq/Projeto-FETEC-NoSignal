@@ -31,11 +31,15 @@ export class CharacterActor extends Player {
         this.isActor = true;
         this.blocksPlayer = false;
 
+        // Combat statistics: enemies are tankier (150 HP) than the default 105.
+        this.maxHp = role === ActorRole.ENEMY ? 150 : this.maxHp;
+        this.hp = this.maxHp;
+
         // NPC combat ranges (only meaningful for enemies). Kept long enough
         // that enemies can shoot from a safer distance without rushing the
         // player from across the map.
-        this.engageRange = role === ActorRole.ENEMY ? 400 : 0;
-        this.attackRange = role === ActorRole.ENEMY ? 340 : 0;
+        this.engageRange = role === ActorRole.ENEMY ? 800 : 0;
+        this.attackRange = role === ActorRole.ENEMY ? 420 : 0;
 
         // Post position: the enemy leashes back here when the player leaves
         // its engage range instead of chasing forever.

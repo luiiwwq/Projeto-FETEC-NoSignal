@@ -46,7 +46,8 @@ export const gameState = {
     inventory: [], // (legado) IDs de itens já comprados
     itemPurchases: {}, // itemId -> nº de compras (máx 3; consumíveis com uso infinito)
     hotbarOrder: [], // ordem de compra dos consumíveis: [0]=slot 1, [1]=slot 2, [2]=slot 3
-    itemCooldowns: {}, // itemId -> segundos restantes da recarga de 15s
+    itemCooldowns: {}, // itemId -> segundos restantes da recarga compartilhada
+    itemActivationUses: {}, // itemId -> doses usadas na carga atual (máx = compras; zera quando a recarga termina)
     allyBossHelpPurchased: (() => { try { return localStorage.getItem('noSignal_allyBossHelpPurchased') === 'true'; } catch { return false; } })(),
 
     // Estado permanente de chefes e áreas da sessão
@@ -121,10 +122,20 @@ export const gameState = {
     setItemCooldown(itemId, seconds) {
         this.itemCooldowns[itemId] = Math.max(0, seconds);
     },
+    getItemActivationUses(itemId) {
+        return this.itemActivationUses[itemId] || 0;
+    },
+    setItemActivationUses(itemId, uses) {
+        this.itemActivationUses[itemId] = Math.max(0, uses);
+    },
     tickItemCooldowns(dt) {
         for (const id in this.itemCooldowns) {
             if (this.itemCooldowns[id] > 0) {
                 this.itemCooldowns[id] = Math.max(0, this.itemCooldowns[id] - dt);
+                // Fim da recarga: as doses da carga voltam a ficar disponíveis.
+                if (this.itemCooldowns[id] <= 0) {
+                    this.itemActivationUses[id] = 0;
+                }
             }
         }
     },
@@ -138,6 +149,7 @@ export const gameState = {
         this.itemPurchases = {};
         this.hotbarOrder = [];
         this.itemCooldowns = {};
+        this.itemActivationUses = {};
         this.upgrades = [];
         this.necromancerDefeated = false;
         this.skeletonAxeBossDefeated = false;
