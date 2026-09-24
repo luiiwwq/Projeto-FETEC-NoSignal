@@ -307,16 +307,9 @@ export class GameEngine {
         this._onMouseUp = this._handleMouseUp.bind(this);
         this._onContextMenu = (e) => e.preventDefault();
         this._onFullscreenChange = () => {
-            if (!this.isRunning) return;
-            if (document.fullscreenElement || document.webkitFullscreenElement) return;
-            if (window.__noSignalKeepFullscreen) {
-                const target = document.documentElement;
-                if (target.requestFullscreen) {
-                    try { target.requestFullscreen(); } catch (err) { /* ignora */ }
-                } else if (target.webkitRequestFullscreen) {
-                    try { target.webkitRequestFullscreen(); } catch (err) { /* ignora */ }
-                }
-            }
+            // A tela cheia é gerenciada pelo módulo optionsView (reentry no
+            // ESC, saída manual e F11). Manter reentrada aqui duplicaria o
+            // requestFullscreen e brigaria com a decisão do usuário de sair.
         };
         this._onResize = this._handleResize.bind(this);
     }
@@ -423,6 +416,11 @@ export class GameEngine {
         const map = MAPS[mapId];
         if (!map) return;
 
+        // Trocou de mapa: nenhum overlay de loja/tela de cavernas pode
+        // sobreviver (o jogo precisa estar despausado e o HUD livre).
+        closeShopScreen();
+        closeCaveChoiceScreen();
+
         this.currentMapId = mapId;
         this.currentMap = map;
         this.mapRenderer.setMap(map);
@@ -527,12 +525,17 @@ export class GameEngine {
         return this.dayNight.dayCount >= OXYGEN_LIFETIME_DAYS;
     }
 
-    // Final 02 (concluir missão sem a nave pronta) bloqueado até 2 min de jogo.
+// Final 02 (concluir missão sem a nave pronta) bloqueado até 2 min de jogo.
     _canConcludeMission() {
         return this.dayNight.elapsedTime >= MIN_CONCLUDE_PLAY_SECONDS;
     }
 
     _updateDayNight(dt) {
+        // Congela o ciclo dia/noite enquanto o jogador está morto (tela
+        // "SINAL PERDIDO" + respawn): assim o Final 1 (oxigênio) sempre chega
+        // no mesmo ponto — cada morte não "consome" oxigênio de forma variada.
+        if (this.player && this.player.isDead) return;
+
         const event = this.dayNight.update(dt);
 
         if (event && event.type === 'night-start') {
@@ -1981,8 +1984,9 @@ export class GameEngine {
                     role: ActorRole.ENEMY
                 });
                 enemy.isEnemyNpc = true;
-                enemy._dialoguePending = true;
+                enemy._dialoguePending = !gameState.enemyNpcDialogueDone;
                 enemy._dialogueStarted = false;
+                enemy._postDialogueDelay = 0;
                 const resolveEnemyCollision = this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH);
                 enemy.setCollisionResolver((x, y, dx, dy) => {
                     const resolved = resolveEnemyCollision(x, y, dx, dy);
@@ -2317,6 +2321,10 @@ export class GameEngine {
             // Impede que o navegador saia da tela cheia ao apertar ESC
             if (document.fullscreenElement || document.webkitFullscreenElement) {
                 window.__noSignalKeepFullscreen = true;
+                // Marca o instante do ESC: o optionsView usa isso para saber
+                // se a tela cheia caiu por ESC (reentrar) ou por saída externa
+                // (F11/gesto: liberar e marcar DESLIGADO).
+                window.__noSignalEscAt = Date.now();
                 e.preventDefault();
             }
             // Cave choice screen intercepts its own ESC while focused, but this
@@ -2346,6 +2354,12 @@ export class GameEngine {
 
         // While paused, gameplay/debug actions must not execute
         if (this.paused) return;
+
+        if (isBound('interact', e.code) && !e.repeat && this._enemyDialogueButtonRect()) {
+            e.preventDefault();
+            this._startEnemyDialogue();
+            return;
+        }
 
         // Dash ([Q]).
         if (isBound('dash', e.code) && !e.repeat && this.player && !this.player.isDead && !this._cutsceneActive) {
@@ -2404,8 +2418,10 @@ export class GameEngine {
             return;
         }
 
-        // Map transition interaction ([E] on a doorway/portal)
-        if (isBound('interact', e.code) && this.interactableExit && this.mapTransitionCooldown <= 0) {
+        // Map transition interaction ([E] on a doorway/portal).
+        // Nunca ativa enquanto a loja ou a tela de cavernas está aberta, senão
+        // um E pressionado junto à loja podia abrir a seleção de cavernas por cima.
+        if (isBound('interact', e.code) && this.interactableExit && this.mapTransitionCooldown <= 0 && !isShopOpen() && !isCaveChoiceOpen()) {
             const exit = this.interactableExit;
             // Som de confirmação: toca SOMENTE quando E realmente ativa a
             // interação (porta/portal) — nunca ao entrar na área do prompt.
@@ -2483,10 +2499,21 @@ export class GameEngine {
 
         this.input.mouseX = (e.clientX - rect.left) * scaleX;
         this.input.mouseY = (e.clientY - rect.top) * scaleY;
+        const button = this._enemyDialogueButtonRect();
+        this.canvas.style.cursor = button && this.input.mouseX >= button.x && this.input.mouseX <= button.x + button.w &&
+            this.input.mouseY >= button.y && this.input.mouseY <= button.y + button.h ? 'pointer' : 'crosshair';
     }
 
     _handleMouseDown(e) {
         if (e.button === 0) {
+            this._handleMouseMove(e);
+            const button = this._enemyDialogueButtonRect();
+            if (button && this.input.mouseX >= button.x && this.input.mouseX <= button.x + button.w &&
+                this.input.mouseY >= button.y && this.input.mouseY <= button.y + button.h) {
+                e.preventDefault();
+                this._startEnemyDialogue();
+                return;
+            }
             this.input.mouseLeft = true;
         } else if (e.button === 1) {
             e.preventDefault();
@@ -2508,6 +2535,37 @@ export class GameEngine {
 
     addBullet(bullet) {
         this.bullets.push(bullet);
+    }
+
+    _enemyDialogueButtonRect() {
+        const actor = this._enemyNpcActor;
+        if (!this.isRunning || this.paused || this._cutsceneActive || !actor || !actor._dialoguePending ||
+            actor._dialogueStarted || actor.isDead || !this.player || this.player.isDead ||
+            this.currentMapId !== MAP_IDS.MARS_SURFACE ||
+            Math.hypot(this.player.x - actor.x, this.player.y - actor.y) > 180) return null;
+
+        const screen = this.camera.worldToScreen(actor.x, actor.y);
+        return { x: Math.round(screen.x - 90), y: Math.round(screen.y - actor.jumpHeight - 12), w: 180, h: 24 };
+    }
+
+    _startEnemyDialogue() {
+        const actor = this._enemyNpcActor;
+        if (!this._enemyDialogueButtonRect()) return;
+        actor._dialogueStarted = true;
+        this._cutsceneActive = true;
+        this.input.keys = {};
+        this.input.mouseLeft = false;
+this.canvas.style.cursor = 'crosshair';
+        const selectedId = CHARACTERS[gameState.selectedCharacter] ? gameState.selectedCharacter : DEFAULT_CHARACTER_ID;
+        playNpcDialogue(this.container, selectedId, actor.characterId)
+            .catch((error) => console.error('[Dialogue] Falha ao exibir diálogo:', error))
+            .finally(() => {
+                gameState.enemyNpcDialogueDone = true;
+                if (actor === this._enemyNpcActor) actor._dialoguePending = false;
+                actor._postDialogueDelay = 0.70;
+                this._cutsceneActive = false;
+                this.input.keys = {};
+            });
     }
 
     _playerHitDamage(target, damage) {
@@ -2721,21 +2779,6 @@ export class GameEngine {
         // Update non-player characters (allies idle, enemies pursue & fire,
         // golems pursue & melee)
         for (const actor of this.actors) {
-            if (actor === this._enemyNpcActor && actor._dialoguePending && !actor._dialogueStarted &&
-                this.player && Math.hypot(this.player.x - actor.x, this.player.y - actor.y) <= 180) {
-                actor._dialogueStarted = true;
-                this._cutsceneActive = true;
-                if (this.input) this.input.keys = {};
-                const selectedId = CHARACTERS[gameState.selectedCharacter] ? gameState.selectedCharacter : DEFAULT_CHARACTER_ID;
-                playNpcDialogue(this.container, selectedId, actor.characterId)
-                    .catch((error) => console.error('[Dialogue] Falha ao exibir diálogo:', error))
-                    .finally(() => {
-                        actor._dialoguePending = false;
-                        this._cutsceneActive = false;
-                        if (this.input) this.input.keys = {};
-                    });
-                return;
-            }
             actor.updateAi(dt, this);
             actor.update(dt);
             if (actor.isDead) {
@@ -3180,6 +3223,21 @@ this.interactableMissionShip = Math.hypot(
         // 10.5. Render Shop Prompt ([E]) when near the Ally NPC on surface
         if (this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
             this._renderShopPrompt(ctx, this.interactableShop);
+        }
+
+        const dialogueButton = this._enemyDialogueButtonRect();
+        if (dialogueButton) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(5, 5, 11, 0.94)';
+            ctx.fillRect(dialogueButton.x, dialogueButton.y, dialogueButton.w, dialogueButton.h);
+            ctx.strokeStyle = '#ff4d4d';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(dialogueButton.x, dialogueButton.y, dialogueButton.w, dialogueButton.h);
+            ctx.font = '8px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#ffd0d0';
+            ctx.fillText(`[${this._interactKey()}] INICIAR DIÁLOGO`, dialogueButton.x + dialogueButton.w / 2, dialogueButton.y + 16);
+            ctx.restore();
         }
 
         // 10.6. Render pop-up de coleta do item de missão ([E] + nome + descrição)

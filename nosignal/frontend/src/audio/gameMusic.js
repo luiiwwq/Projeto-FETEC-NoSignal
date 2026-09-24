@@ -104,11 +104,18 @@ export function preloadGameMusic() {
     // instantânea; o restante continua baixando em segundo plano.
     if (audio.readyState >= 2) return Promise.resolve();
     return new Promise((resolve) => {
+        let settled = false;
         const done = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
             audio.removeEventListener('loadeddata', done);
             audio.removeEventListener('error', done);
             resolve();
         };
+        // Watchdog: se o arquivo demorar (sem loadeddata nem error), não deixa
+        // a tela de loading esperar para sempre.
+        const timer = setTimeout(done, 12000);
         audio.addEventListener('loadeddata', done);
         audio.addEventListener('error', done);
     });

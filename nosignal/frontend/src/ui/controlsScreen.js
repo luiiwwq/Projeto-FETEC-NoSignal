@@ -66,6 +66,10 @@ export function openControlsScreen(container) {
 
 export function closeControlsScreen() {
     if (!overlay) return;
+    // Cancela qualquer remap em andamento ANTES de remover o overlay: senão o
+    // listener global de keydown segue vivo e a próxima tecla troca o bind
+    // ("escutando" após fechar), gerando ainda TypeError em _refreshAll(null).
+    cancelListening();
     overlay.remove();
     overlay = null;
     _unbindGlobalEscape();

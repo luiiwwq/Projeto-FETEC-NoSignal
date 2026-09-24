@@ -75,8 +75,9 @@ export const gameState = {
     // spaceshipRepaired: true depois de instalar as 3 peças na nave.
     missionCollected: [],
     missionDrops: {},
-    spaceshipRepaired: false,
+spaceshipRepaired: false,
     enemyNpcDefeated: false, // o terceiro astronauta não reaparece após ser derrotado
+    enemyNpcDialogueDone: false, // o diálogo com o NPC inimigo só acontece UMA vez por partida
     missionConcluded: false,
 
     hasMissionItem(id) {
@@ -174,6 +175,7 @@ export const gameState = {
         this.missionDrops = {};
         this.spaceshipRepaired = false;
         this.enemyNpcDefeated = false;
+        this.enemyNpcDialogueDone = false;
         this.missionConcluded = false;
         try {
             localStorage.removeItem('noSignal_allyBossHelpPurchased');

@@ -50,7 +50,10 @@ const FALLBACK_TEXTS = [
 ];
 
 function sceneImagePath(index) {
-    // index é 1-based (1..12): scene (1).png, scene (2).png, ...
+    // Cenas 6 e 7 usam imagens atualizadas da queda no cinturão de asteroides.
+    if (index === 6) return `${SCENES_DIR}/scene6_att.png`;
+    if (index === 7) return `${SCENES_DIR}/scene7_att.png`;
+    // demais scenes 1..12: scene (1).png, scene (2).png, ...
     return SCENE_IMAGES_PATH.replace('%i', index);
 }
 

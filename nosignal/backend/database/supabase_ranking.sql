@@ -31,7 +31,22 @@ alter table public.ranking enable row level security;
 
 grant usage on schema public to anon;
 grant select, insert on public.ranking to anon;
-grant usage on sequence public.ranking_id_seq to anon;
+
+-- A sequência só existe se a coluna identity foi criada neste script. Se a
+-- tabela veio de um schema antigo (p. ex. serial), o GRANT falharia e
+-- abortaria o script inteiro antes de criar as funções abaixo — por isso o
+-- concede de forma condicional (permite reexecutar sobre o projeto atual).
+do $$
+begin
+  if exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'ranking_id_seq'
+  ) then
+    grant usage on sequence public.ranking_id_seq to anon;
+  end if;
+end
+$$;
 
 create index if not exists ranking_melhores_idx
 on public.ranking (tempo_segundos asc, mortes asc, moedas desc, id asc)
@@ -150,7 +165,20 @@ on public.controles_jogador ((upper(btrim(nome))));
 
 alter table public.controles_jogador enable row level security;
 grant select on public.controles_jogador to anon;
-grant usage on sequence public.controles_jogador_id_seq to anon;
+
+-- Concede a sequência apenas se ela existir (tabela criada por este script),
+-- senão o GRANT quebraria em projetos recriados com schema antigo.
+do $$
+begin
+  if exists (
+    select 1 from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'controles_jogador_id_seq'
+  ) then
+    grant usage on sequence public.controles_jogador_id_seq to anon;
+  end if;
+end
+$$;
 
 drop policy if exists controles_jogador_select on public.controles_jogador;
 create policy controles_jogador_select

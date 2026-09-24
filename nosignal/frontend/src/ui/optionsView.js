@@ -104,33 +104,68 @@ function exitFullscreen() {
 }
 
 function onFullscreenChange() {
-    refreshFullscreenButtons();
-
     if (document.fullscreenElement) {
         fsTarget = document.fullscreenElement;
         fsKeepRequested = true;
         fsManualExit = false;
         // Adquire o teclado no fullscreen para o ESC chegar ao jogo
         lockEscapeKey();
+        refreshFullscreenButtons();
         return;
     }
 
-    // Tela cheia perdida sem saída manual (ex.: apertou ESC). Reentra
-    // imediatamente — a ativação de usuário do ESC ainda está válida.
-    if (fsKeepRequested && !fsManualExit) {
+    // Tela cheia perdida. Libera a trava de teclado do navegador.
+    unlockEscapeKey();
+    fsManualExit = false;
+
+    // Saída por ESC (navegador sem Keyboard Lock derrubou a tela cheia):
+    // o GameEngine marcou __noSignalEscAt há menos de 1s. Reentra imediatamente
+    // para o ESC continuar bloqueado — a ativação de usuário ainda vale.
+    const escJustPressed =
+        typeof window.__noSignalEscAt === 'number' &&
+        (Date.now() - window.__noSignalEscAt) < 1000;
+
+    if (fsKeepRequested && escJustPressed) {
         const target = (fsTarget && fsTarget.isConnected)
             ? fsTarget
             : document.documentElement;
         enterFullscreen(target);
+        return;
     }
+
+    // Qualquer outra saída (botão das opções, F11, gesto do sistema): libera a
+    // trava e reflete "TELA CHEIA: DESLIGADO" nas configurações. Isso garante
+    // que o F11 funcione como alternativa de escape caso a tela cheia trave.
+    fsKeepRequested = false;
+    window.__noSignalKeepFullscreen = false;
+    const settings = loadSettings();
+    if (settings.fullscreen) saveSettings({ fullscreen: false });
+    refreshFullscreenButtons();
+}
+
+function onFsKeyDown(e) {
+    if (e.key !== 'F11' && e.code !== 'F11') return;
+    // F11 é a alternativa de escape: desliga a travamento e marca a
+    // configuração como DESLIGADO no menu de opções. O navegador segue
+    // lidando com o F11 normalmente (ele não é interceptado).
+    fsKeepRequested = false;
+    fsManualExit = true;
+    window.__noSignalKeepFullscreen = false;
     unlockEscapeKey();
-    fsManualExit = false;
+    if (document.fullscreenElement) {
+        exitFullscreen();
+    } else {
+        const settings = loadSettings();
+        if (settings.fullscreen) saveSettings({ fullscreen: false });
+        refreshFullscreenButtons();
+    }
 }
 
 function bindFsListenerOnce() {
     if (fsListenerBound) return;
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    window.addEventListener('keydown', onFsKeyDown);
     fsListenerBound = true;
 }
 

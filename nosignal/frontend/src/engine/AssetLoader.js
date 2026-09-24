@@ -35,7 +35,9 @@ export class AssetLoader {
         const entry = this._entry(profile.id);
         if (entry.metadata) return entry.metadata;
         if (!this._metadataPromises.has(profile.id)) {
-            const promise = fetch(profile.metadataPath)
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
+            const promise = fetch(profile.metadataPath, { signal: controller ? controller.signal : undefined })
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error(`Failed to load sprite metadata: ${response.statusText}`);
@@ -45,6 +47,9 @@ export class AssetLoader {
                 .then((metadata) => {
                     entry.metadata = metadata;
                     return metadata;
+                })
+                .finally(() => {
+                    if (timer) clearTimeout(timer);
                 });
             this._metadataPromises.set(profile.id, promise);
         }
@@ -130,15 +135,31 @@ export class AssetLoader {
     _loadImage(entry, key, url) {
         return new Promise((resolve) => {
             const img = new Image();
+            let settled = false;
+            const done = (result) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(result);
+            };
+            // Watchdog: um sprite que travar (sem load nem error) não pode
+            // deixar a tela de loading pendurada para sempre.
+            const timer = setTimeout(() => {
+                if (!settled) {
+                    console.warn(`[AssetLoader] Sprite demorou demais para carregar (timeout): ${url}`);
+                    this.loadedAssets++;
+                    done(null);
+                }
+            }, 15000);
             img.onload = () => {
                 entry.images.set(key, img);
                 this.loadedAssets++;
-                resolve(img);
+                done(img);
             };
             img.onerror = () => {
                 console.warn(`[AssetLoader] Could not load sprite: ${url}`);
                 this.loadedAssets++;
-                resolve(null);
+                done(null);
             };
             img.src = url;
         });
