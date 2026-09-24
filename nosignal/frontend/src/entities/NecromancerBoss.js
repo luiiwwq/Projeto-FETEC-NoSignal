@@ -254,14 +254,15 @@ export class NecromancerProjectile extends Bullet {
 
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        if (imgs) {
+        const image = imgs?.[Math.min(this.frame, imgs.length - 1)];
+        if (image?.complete && image.naturalWidth > 0) {
             // A caveira aponta para a direita por padrão: rotaciona o sprite para
             // acompanhar a direção de voo (direita = 0, esquerda = PI, cima =
             // -PI/2, baixo = PI/2...).
             ctx.translate(Math.round(screen.x), Math.round(screen.y));
             ctx.rotate(this.angle);
             ctx.drawImage(
-                imgs[Math.min(this.frame, imgs.length - 1)],
+                image,
                 -Math.round(drawW / 2),
                 -Math.round(drawH / 2),
                 drawW,

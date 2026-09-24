@@ -6,6 +6,7 @@
 
 import { Camera } from './Camera.js';
 import { MapRenderer } from './MapRenderer.js';
+import { RadarRenderer } from './RadarRenderer.js';
 import { Player, PlayerState } from '../entities/Player.js?v=dash-3';
 import { CharacterActor, ActorRole } from '../entities/CharacterActor.js';
 import { Golem, GOLEM_WAVE_SPAWNS, GOLEM_COLLIDER_HALF_W, GOLEM_COLLIDER_HALF_H, preloadGolemSprites } from '../entities/Golem.js';
@@ -196,6 +197,7 @@ export class GameEngine {
         // Subsystems
         this.camera = new Camera(this.width, this.height);
         this.mapRenderer = new MapRenderer();
+        this.radar = new RadarRenderer();
         this.player = null;
         this.bullets = [];
         this.particles = [];
@@ -1689,11 +1691,13 @@ export class GameEngine {
                 const sx = Math.round(e.x + off.x);
                 const sy = Math.round(e.y + off.y);
                 const frame = Math.min(Math.floor(e.t / 0.1), imgs.length - 1);
+                const image = imgs[frame];
+                if (!image?.complete || image.naturalWidth <= 0) continue;
                 const drawW = 64 * 4;
                 const drawH = 55 * 4;
                 ctx.save();
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - Math.round(drawH / 2), drawW, drawH);
+                ctx.drawImage(image, sx - Math.round(drawW / 2), sy - Math.round(drawH / 2), drawW, drawH);
                 ctx.restore();
             } else if (e.kind === 'lightning') {
                 const imgs = getSkillImages('lightning', e.variant);
@@ -1701,11 +1705,13 @@ export class GameEngine {
                 const sx = Math.round(e.x + off.x);
                 const sy = Math.round(e.y + off.y);
                 const frame = Math.min(Math.floor(e.t / (e.strikeDur / imgs.length)), imgs.length - 1);
+                const image = imgs[frame];
+                if (!image?.complete || image.naturalWidth <= 0) continue;
                 const drawW = 100 * 3;
                 const drawH = 208 * 3;
                 ctx.save();
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
+                ctx.drawImage(image, sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
                 ctx.restore();
             } else if (e.kind === 'unholy') {
                 const imgs = getSkillImages('unholy');
@@ -1714,11 +1720,13 @@ export class GameEngine {
                 const drawW = 300 * scale;
                 const drawH = 256 * scale;
                 const frame = Math.floor(e.t / UNHOLY_FRAME_HZ) % imgs.length;
+                const image = imgs[frame];
+                if (!image?.complete || image.naturalWidth <= 0) continue;
                 const sx = Math.round(e.x + off.x);
                 const sy = Math.round(e.y + off.y);
                 ctx.save();
                 ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(imgs[frame], sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
+                ctx.drawImage(image, sx - Math.round(drawW / 2), sy - drawH, drawW, drawH);
                 ctx.restore();
             }
         }
@@ -3605,7 +3613,7 @@ _renderMissionShipPrompt(ctx) {
         // TOP-LEFT: Astronaut Vital Telemetry Panel
         const hudX = 24;
         const hudY = 24;
-        const panelW = 340;
+        const panelW = 316;
         const panelH = 150;
 
         // Frame backing
@@ -3624,7 +3632,7 @@ _renderMissionShipPrompt(ctx) {
         ctx.font = '10px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'left';
-        ctx.fillText(`OPERADOR: ${this.player.name}`, hudX + 16, hudY + 26);
+        ctx.fillText(`OPERADOR: ${this.player.name}`, hudX + 16, hudY + 26, panelW - 32);
 
         // VITALIDADE Label (above the bar)
         ctx.font = '8px "Press Start 2P", monospace';
@@ -3634,7 +3642,7 @@ _renderMissionShipPrompt(ctx) {
         // HP Bar
         const barX = hudX + 16;
         const barY = hudY + 56;
-        const barW = 200;
+        const barW = 184;
         const barH = 18;
 
         ctx.fillStyle = '#1f0d0b';
@@ -3687,27 +3695,32 @@ _renderMissionShipPrompt(ctx) {
         ctx.fillStyle = '#c5975b';
         const areaText = `AREA: ${MAP_LABELS[this.currentMapId] || this.currentMapId.toUpperCase()}`;
         const stateText = `ESTADO: ${this.player.state} | DIR: ${this.player.direction.toUpperCase()}`;
-        ctx.fillText(areaText, hudX + 16, hudY + 122);
-        ctx.fillText(stateText, hudX + 16, hudY + 139);
+        ctx.fillText(areaText, hudX + 16, hudY + 122, panelW - 32);
+        ctx.fillText(stateText, hudX + 16, hudY + 139, panelW - 32);
 
         // DAY / NIGHT INDICATOR — directly below the vitals panel so it never
         // covers the health bar
         this._renderDayNightIndicator(ctx, hudX, hudY + panelH + 10);
-        this._renderUpgradeIndicators(ctx, hudX + 168 + 8, hudY + panelH + 10);
+        this._renderUpgradeIndicators(ctx, hudX + 150 + 8, hudY + panelH + 10);
 
         // Animação de item consumido "se quebrando" ao lado da HUD de upgrades
         this._renderItemFx(ctx);
 
-        // TOP-RIGHT: Coordinates & Moedas (mesma largura da HUD da missão)
+        // TOP-RIGHT: coordenadas e missão reduzidas juntas para manter textos,
+        // cartões e espaçamentos proporcionais ao painel.
+        const missionHudScale = 0.82;
         const coordsW = 244;
         const coordsH = 48;
-        const trX = this.width - 24 - coordsW;
+        const trX = this.width - 24 - coordsW * missionHudScale;
         const trY = 24;
+        ctx.save();
+        ctx.translate(trX, trY);
+        ctx.scale(missionHudScale, missionHudScale);
         ctx.fillStyle = 'rgba(10, 8, 14, 0.85)';
-        ctx.fillRect(trX, trY, coordsW, coordsH);
+        ctx.fillRect(0, 0, coordsW, coordsH);
         ctx.strokeStyle = '#e07228';
         ctx.lineWidth = 2;
-        ctx.strokeRect(trX + 0.5, trY + 0.5, coordsW - 1, coordsH - 1);
+        ctx.strokeRect(0.5, 0.5, coordsW - 1, coordsH - 1);
 
         const posX = Math.round(this.player.x);
         const posY = Math.round(this.player.y);
@@ -3719,17 +3732,18 @@ _renderMissionShipPrompt(ctx) {
         ctx.textAlign = 'left';
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#ffab5e';
-        ctx.fillText(xLabel, trX + 14, trY + 17);
+        ctx.fillText(xLabel, 14, 17);
         ctx.textAlign = 'right';
         ctx.fillStyle = '#7dd3fc';
-        ctx.fillText(yLabel, trX + coordsW - 14, trY + 17);
+        ctx.fillText(yLabel, coordsW - 14, 17);
         ctx.textAlign = 'left';
 
         ctx.fillStyle = '#ffd440';
-        ctx.fillText(`MOEDAS:  🪙 ${gameState.coins ?? 0}`, trX + 14, trY + 38);
+        ctx.fillText(`MOEDAS:  🪙 ${gameState.coins ?? 0}`, 14, 38);
 
         // Indicador da missão principal — logo abaixo da HUD de coordenadas
-        this._renderMissionHUD(ctx, trX, trY + coordsH + 10);
+        this._renderMissionHUD(ctx, 0, coordsH + 10);
+        ctx.restore();
 
         // BOTTOM: Sci-Fi Controls Reference Bar
         const barBottomY = this.height - 38;
@@ -3757,6 +3771,9 @@ _renderMissionShipPrompt(ctx) {
 
         // HOTBAR DE ITENS (Dark Souls) — canto inferior esquerdo
         this._renderItemHotbar(ctx, barBottomY);
+
+        // Mapa compacto sempre visível no canto inferior direito.
+        this.radar.render(ctx, this);
 
         ctx.restore();
     }
@@ -3793,17 +3810,13 @@ _renderMissionShipPrompt(ctx) {
         ctx.fillStyle = '#e07228';
         ctx.fillRect(x, y, 34, 3);
 
-        // Identidade da missão e contador, sem dividir espaço com os cartões.
+        // Objetivo em duas linhas do mesmo tamanho, com contador à direita.
         ctx.textAlign = 'left';
-        ctx.font = '6px "Press Start 2P", monospace';
-        ctx.fillStyle = '#b68d68';
-        ctx.fillText('MISSÃO PRINCIPAL', x + 12, y + 16);
-        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.font = '9px "Press Start 2P", monospace';
         ctx.fillStyle = '#e07228';
-        ctx.fillText('CONSERTE A NAVE', x + 12, y + 29);
-        ctx.font = '6px "Press Start 2P", monospace';
-        ctx.fillStyle = repaired ? '#7fd4a6' : '#a88b80';
-        ctx.fillText('E SAIA DE DUNA', x + 12, y + 41);
+        ctx.fillText('CONSERTE A NAVE', x + 12, y + 19);
+        ctx.fillStyle = repaired ? '#a9f3bc' : '#e2d0bc';
+        ctx.fillText('E SAIA DE DUNA', x + 12, y + 37);
         ctx.textAlign = 'right';
         ctx.font = '9px "Press Start 2P", monospace';
         ctx.fillStyle = hasAll ? '#7fe0a0' : '#ffab5e';
@@ -3908,12 +3921,9 @@ _renderMissionShipPrompt(ctx) {
         ctx.fillRect(x, y, 34, 3);
 
         ctx.textAlign = 'left';
-        ctx.font = '6px "Press Start 2P", monospace';
-        ctx.fillStyle = '#b68d68';
-        ctx.fillText('MISSÃO PRINCIPAL', x + 12, y + 16);
         ctx.font = '9px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
-        ctx.fillText('VOLTE À NAVE', x + 12, y + 34);
+        ctx.fillText('VOLTE À NAVE', x + 12, y + 26);
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = '#ed8733';
         ctx.fillText('DIA 5 // OXIGÊNIO CRÍTICO', x + 12, y + 51, panelW - 24);
@@ -3964,7 +3974,7 @@ _renderMissionShipPrompt(ctx) {
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = collected ? '#a9d6b6' : '#c8b29c';
         const descLines = this._wrapHudText(ctx, summaries[def.id], textW);
-        descLines.slice(0, 3).forEach((line, i) => ctx.fillText(line, textX, py + 40 + i * 10));
+        descLines.slice(0, 3).forEach((line, i) => ctx.fillText(line, textX, py + 42 + i * 12));
 
         ctx.strokeStyle = '#49352e';
         ctx.lineWidth = 1;
@@ -3976,7 +3986,7 @@ _renderMissionShipPrompt(ctx) {
         ctx.fillStyle = collected ? '#7fd4a6' : '#ffab5e';
         const hintLines = this._wrapHudText(ctx, `> ${def.hint.toUpperCase()}`, panelW - 34);
         hintLines.slice(0, 2).forEach((line, i) =>
-            ctx.fillText(line, px + 17, py + (hintLines.length > 1 ? 90 : 101) + i * 11));
+            ctx.fillText(line, px + 17, py + (hintLines.length > 1 ? 89 : 101) + i * 13));
         ctx.restore();
     }
 
@@ -4143,7 +4153,7 @@ _renderMissionShipPrompt(ctx) {
     }
 
     _renderDayNightIndicator(ctx, x, y) {
-        const w = 168;
+        const w = 150;
         const h = 40;
         const isNight = this.dayNight.period === DAY_NIGHT_PERIOD.NIGHT;
 
@@ -4157,8 +4167,8 @@ _renderMissionShipPrompt(ctx) {
 
         // Icon (sun / moon), kept at its natural aspect ratio and pixelated
         const icon = this._dayNightIcons.cached.get(this.dayNight.period);
-        const box = 26;
-        const iconX = x + 12;
+        const box = 24;
+        const iconX = x + 10;
         const iconY = y + (h - box) / 2;
         if (icon && icon.complete && icon.naturalWidth > 0) {
             const ratio = icon.naturalWidth / icon.naturalHeight;
@@ -4176,11 +4186,11 @@ _renderMissionShipPrompt(ctx) {
         ctx.textAlign = 'left';
         ctx.font = '7px "Press Start 2P", monospace';
         ctx.fillStyle = isNight ? '#9fb4ff' : '#e07228';
-        ctx.fillText(isNight ? `NOITE ${this.dayNight.nightCount}` : `DIA ${this.dayNight.dayCount}`, x + 48, y + 16);
+        ctx.fillText(isNight ? `NOITE ${this.dayNight.nightCount}` : `DIA ${this.dayNight.dayCount}`, x + 44, y + 16, w - 50);
 
         ctx.font = '12px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
-        ctx.fillText(formatDayNightTime(this.dayNight.getRemainingSeconds()), x + 48, y + 33);
+        ctx.fillText(formatDayNightTime(this.dayNight.getRemainingSeconds()), x + 44, y + 33, w - 50);
         ctx.restore();
     }
 
