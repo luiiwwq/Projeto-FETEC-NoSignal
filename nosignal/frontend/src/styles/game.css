@@ -190,8 +190,7 @@
     background: rgba(18, 7, 8, .91);
     border-color: #e07228;
     color: var(--text-cream, #f6c885);
-    outline: 1px dashed rgba(237, 135, 51, .75);
-    outline-offset: 3px;
+    outline: none;
     box-shadow: none;
 }
 

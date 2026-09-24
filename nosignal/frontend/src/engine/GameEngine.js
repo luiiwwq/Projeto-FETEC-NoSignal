@@ -69,7 +69,7 @@ import {
 } from '../content/missionItems.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
-import { getMissionEnding, getMissionShipAction } from '../content/endings.js';
+import { MIN_CONCLUDE_PLAY_SECONDS, getMissionEnding, getMissionShipAction } from '../content/endings.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
 import { CHARACTER_ALLY_SHOP_POSITION, CHARACTER_ENEMY_SPAWNS, resolveCharacterRoles } from '../content/characterRoles.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
@@ -522,9 +522,14 @@ export class GameEngine {
         gameState.currentMap = mapId;
     }
 
-    /* ── Day / night cycle ──────────────────────────────── */
+/* ── Day / night cycle ──────────────────────────────── */
     _isFinalDay() {
         return this.dayNight.dayCount >= OXYGEN_LIFETIME_DAYS;
+    }
+
+    // Final 02 (concluir missão sem a nave pronta) bloqueado até 2 min de jogo.
+    _canConcludeMission() {
+        return this.dayNight.elapsedTime >= MIN_CONCLUDE_PLAY_SECONDS;
     }
 
     _updateDayNight(dt) {
@@ -2372,7 +2377,14 @@ export class GameEngine {
                 // A cutscene acompanha o fim do quinto dia e a contagem mostra o oxigênio esgotado.
                 this.dayNight.elapsedTime = OXYGEN_LIFETIME_SECONDS;
                 this._triggerEnding('final1');
-            } else if (action === 'conclude') {
+} else if (action === 'conclude') {
+                // O Final 02 só desbloqueia depois de ~2 minutos de partida.
+                if (!this._canConcludeMission()) {
+                    this.input.keys = {};
+                    this.hudMessage = `CONCLUIR MISSÃO EM ${formatDayNightTime(MIN_CONCLUDE_PLAY_SECONDS - this.dayNight.elapsedTime)}`;
+                    this.hudMessageTimer = 2;
+                    return;
+                }
                 this._cutsceneActive = true;
                 this.input.keys = {};
                 confirmIncompleteMission(this.container).then((confirmed) => {
@@ -2861,10 +2873,10 @@ export class GameEngine {
         if (this.currentMapId === MAP_IDS.MARS_SURFACE && !this.player.isDead) {
             const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
             if (ship) {
-                this.interactableMissionShip = Math.hypot(
-                    this.player.x - (ship.x + ship.w / 2),
-                    this.player.y - (ship.y + ship.h)
-                ) <= 150;
+this.interactableMissionShip = Math.hypot(
+            this.player.x - (ship.x + ship.w / 2),
+            this.player.y - (ship.y + ship.h)
+        ) <= 240;
             }
         }
 
@@ -3195,16 +3207,18 @@ export class GameEngine {
         return codeDisplay(codes[0]);
     }
 
-    _renderMissionShipPrompt(ctx) {
+_renderMissionShipPrompt(ctx) {
         const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
         if (!ship) return;
         // Decisão de concluir sem peças e nave concluída: mesmo botão junto à ARES-1.
         // Nave danificada: aproxima o aviso da inscrição ARES-1 na fuselagem.
         const action = getMissionShipAction(gameState.isMissionComplete(), gameState.spaceshipRepaired, this._isFinalDay());
+        const locked = action === 'conclude' && !this._canConcludeMission();
+        const accent = locked ? '#6b6b6b' : '#e07228';
         const promptX = action !== 'repair' ? ship.x + ship.w / 2 : ship.x + ship.w * 0.63;
         const promptY = action !== 'repair' ? 530 : ship.y + ship.h * 0.55;
         const screen = this.camera.worldToScreen(promptX, promptY);
-const text = action === 'conclude' || action === 'game-over' ? `[${this._interactKey()}] CONCLUIR MISSÃO`
+        const text = action === 'conclude' || action === 'game-over' ? `[${this._interactKey()}] CONCLUIR MISSÃO`
             : action === 'repair' ? `[${this._interactKey()}] CONSERTE A NAVE` : `[${this._interactKey()}] INTERAJA COM A NAVE`;
         ctx.save();
         ctx.font = '8px "Press Start 2P", monospace';
@@ -3212,11 +3226,26 @@ const text = action === 'conclude' || action === 'game-over' ? `[${this._interac
         const textW = ctx.measureText(text).width;
         ctx.fillStyle = 'rgba(5, 5, 11, 0.92)';
         ctx.fillRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
-        ctx.strokeStyle = '#e07228';
+        ctx.strokeStyle = accent;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
-        ctx.fillStyle = ctx.strokeStyle;
+        ctx.fillStyle = locked ? '#9a9a9a' : ctx.strokeStyle;
         ctx.fillText(text, screen.x, screen.y + 3);
+
+        // Final 02 bloqueado: aviso curto abaixo do botão (hudzinha).
+        if (locked) {
+            const wait = Math.max(0, Math.ceil(MIN_CONCLUDE_PLAY_SECONDS - this.dayNight.elapsedTime));
+            const hint = `AGUARDE ${formatDayNightTime(wait)}`;
+            const hintY = screen.y + 29;
+            ctx.font = '6px "Press Start 2P", monospace';
+            const hintW = ctx.measureText(hint).width;
+            ctx.fillStyle = 'rgba(5, 5, 11, 0.92)';
+            ctx.fillRect(screen.x - hintW / 2 - 6, hintY - 8, hintW + 12, 16);
+            ctx.strokeStyle = '#8f8f8f';
+            ctx.strokeRect(screen.x - hintW / 2 - 6, hintY - 8, hintW + 12, 16);
+            ctx.fillStyle = '#d9d9d9';
+            ctx.fillText(hint, screen.x, hintY + 4);
+        }
         ctx.restore();
     }
 

@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
-import { getMissionEnding, getMissionShipAction } from '../src/content/endings.js';
+import { getMissionEnding, getMissionShipAction, MIN_CONCLUDE_PLAY_SECONDS } from '../src/content/endings.js';
 import { MAPS, MAP_IDS } from '../src/content/maps.js';
 import { GameEngine } from '../src/engine/GameEngine.js';
 import { gameState } from '../src/state/gameState.js';
@@ -129,10 +129,63 @@ test('concluir missão sem peças aparece no lugar do botão de partir', () => {
         engine._renderMissionShipPrompt(ctx);
         assert.deepEqual(positions[0], positions[1]);
         const interactKey = codeDisplay(getActionCodes('interact')[0]);
-        assert.deepEqual(labels, [`[${interactKey}] CONCLUIR MISSÃO`, `[${interactKey}] INTERAJA COM A NAVE`]);
+        assert.deepEqual(labels, [
+            `[${interactKey}] CONCLUIR MISSÃO`,
+            'AGUARDE 02:00',
+            `[${interactKey}] INTERAJA COM A NAVE`
+        ]);
     } finally {
         gameState.missionCollected = collected;
         gameState.spaceshipRepaired = repaired;
+    }
+});
+
+test('o final 2 fica bloqueado até ~2 minutos de jogo e é liberado depois', () => {
+    const collected = gameState.missionCollected;
+    const repaired = gameState.spaceshipRepaired;
+    const concluded = gameState.missionConcluded;
+    const originalHTMLElement = globalThis.HTMLElement;
+    const originalDocument = globalThis.document;
+    const originalWindow = globalThis.window;
+    globalThis.HTMLElement = class {};
+    globalThis.document = {
+        createElement: () => ({
+            className: '', id: '', textContent: '', type: 'button',
+            setAttribute() {}, appendChild() {}, append() {},
+            addEventListener() {}, remove() {}, classList: { add() {} }
+        })
+    };
+    globalThis.window = { addEventListener() {} };
+    try {
+        const engine = new GameEngine(null);
+        engine.player = { isDead: false };
+        engine.interactableMissionShip = true;
+        engine.mapTransitionCooldown = 0;
+        engine.container = { appendChild() {} };
+        const triggered = [];
+        engine._triggerEnding = (id) => triggered.push(id);
+
+        gameState.missionCollected = [];
+        gameState.spaceshipRepaired = false;
+        gameState.missionConcluded = false;
+
+        assert.equal(engine._canConcludeMission(), false, 'no início o final 2 está bloqueado');
+        engine.dayNight.update(MIN_CONCLUDE_PLAY_SECONDS - 0.1);
+        engine._handleKeyDown({ code: 'KeyE', target: null, repeat: false });
+        assert.deepEqual(triggered, [], 'E antes de 2 min não abre a conclusão');
+        assert.equal(engine.hudMessage.startsWith('CONCLUIR MISSÃO EM'), true, 'mostra o tempo restante na hud');
+
+        engine.dayNight.update(0.2);
+        assert.equal(engine._canConcludeMission(), true, 'após 2 min o final 2 está liberado');
+        engine._handleKeyDown({ code: 'KeyE', target: null, repeat: false });
+        assert.ok(engine._cutsceneActive, 'após 2 min abre a confirmação do final 2');
+    } finally {
+        globalThis.HTMLElement = originalHTMLElement;
+        globalThis.document = originalDocument;
+        globalThis.window = originalWindow;
+        gameState.missionCollected = collected;
+        gameState.spaceshipRepaired = repaired;
+        gameState.missionConcluded = concluded;
     }
 });
 
