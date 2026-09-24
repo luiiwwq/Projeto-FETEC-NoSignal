@@ -116,9 +116,9 @@ const castleFlankBotRightParts = [
 // Border rocks framing the world edges (visual + collision)
 const surfaceBorderRocks = [
     { x: 0, y: 0, w: 4800, h: 60, kind: 'edge-rock' },
-    { x: 0, y: 3140, w: 4800, h: 60, kind: 'edge-rock' },
-    { x: 0, y: 0, w: 60, h: 3200, kind: 'edge-rock' },
-    { x: 4740, y: 0, w: 60, h: 3200, kind: 'edge-rock' },
+    { x: 0, y: 2679, w: 4800, h: 60, kind: 'edge-rock' },
+    { x: 0, y: 0, w: 60, h: 2739, kind: 'edge-rock' },
+    { x: 4740, y: 0, w: 60, h: 2739, kind: 'edge-rock' },
 ];
 
 // Shop NPC — static merchant facade (Map/shop_npc.png) near (1951, 218).
@@ -229,7 +229,7 @@ export const marsSurfaceMap = {
     id: MAP_IDS.MARS_SURFACE,
     type: 'surface',
     width: 4800,
-    height: 3200,
+    height: 2739,
     tileSize: TILE,
     dust: true,
     spawn: { x: 470, y: 700 },

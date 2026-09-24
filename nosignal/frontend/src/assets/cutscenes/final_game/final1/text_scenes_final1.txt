@@ -1,0 +1,7 @@
+cena1: Com o fim do quinto dia, o astronauta perde suas forças e cai no chão, sem oxigênio.
+
+cena2: Com isso, Kerbin acaba colapsando sem nunca saber o resultado da missão.
+
+cena3: Duna e seus habitantes continuam vivendo em paz.
+
+cena4: FIM.

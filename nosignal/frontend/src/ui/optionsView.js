@@ -10,6 +10,9 @@
 import { loadSettings, saveSettings, brightnessFilter } from '../state/stateStorage.js';
 import { setMenuMusicVolume } from '../audio/menuMusic.js';
 import { setGameMusicVolume } from '../audio/gameMusic.js';
+import { setBossMusicVolume } from '../audio/bossMusic.js';
+import { gameState } from '../state/gameState.js';
+import { openControlsScreen } from './controlsScreen.js';
 
 const RANGES = [
     { setting: 'musicVolume', label: 'VOLUME DA MÚSICA', min: 0, max: 100 },
@@ -186,6 +189,13 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
     fsBtn.textContent = 'TELA CHEIA: DESLIGADO';
     wrap.appendChild(fsBtn);
 
+    const controlsBtn = document.createElement('button');
+    controlsBtn.type = 'button';
+    controlsBtn.className = 'pause-panel__btn';
+    controlsBtn.dataset.action = 'controls';
+    controlsBtn.textContent = 'CONTROLES';
+    wrap.appendChild(controlsBtn);
+
     const backBtn = document.createElement('button');
     backBtn.type = 'button';
     backBtn.className = 'pause-panel__btn';
@@ -206,6 +216,7 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
             if (slider.dataset.setting === 'musicVolume') {
                 setMenuMusicVolume();
                 setGameMusicVolume();
+                setBossMusicVolume();
             }
         };
         slider.addEventListener('input', onSliderChange);
@@ -213,6 +224,8 @@ export function createOptionsContent({ onBack, containerRef } = {}) {
     });
 
     fsBtn.addEventListener('click', () => toggleFullscreen(containerRef));
+
+    controlsBtn.addEventListener('click', () => openControlsScreen(containerRef));
 
     backBtn.addEventListener('click', () => {
         if (onBack) onBack();

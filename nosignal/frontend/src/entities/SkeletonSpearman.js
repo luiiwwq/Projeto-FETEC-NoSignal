@@ -16,7 +16,7 @@
  */
 
 /* ── Combat tuning ───────────────────────────────────────── */
-export const SPEARMAN_MAX_HP = 90;
+export const SPEARMAN_MAX_HP = 60;
 export const SPEARMAN_ATTACK_DAMAGE = 20;
 export const SPEARMAN_ATTACK_COOLDOWN = 1.0;   // seconds between thrusts
 export const SPEARMAN_ATTACK_RANGE = 50;       // spear reach is slightly longer

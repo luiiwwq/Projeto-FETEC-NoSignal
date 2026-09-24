@@ -11,12 +11,13 @@ import { getCharacter } from '../content/characters.js';
 import { gameState } from '../state/gameState.js';
 import { playShootSound } from '../audio/shootSound.js';
 import { playDamageSound, playDieSound, playWalkSound } from '../audio/playerSound.js';
+import { isActionDown } from '../state/controlsStorage.js';
 
 const DIAGONAL_FALLBACK = {
-    'south-east': ['south', 'east'],
-    'south-west': ['south', 'west'],
-    'north-east': ['north', 'east'],
-    'north-west': ['north', 'west']
+    'south-east': ['east', 'south'],
+    'south-west': ['west', 'south'],
+    'north-east': ['east', 'north'],
+    'north-west': ['west', 'north']
 };
 
 // Silhueta branca de cada frame: recaloriza apenas os pixels não-transparentes
@@ -310,7 +311,7 @@ export class Player {
         }
 
         // Jump Action (Spacebar)
-        if (input.keys['Space'] && this.state !== PlayerState.JUMPING && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
+        if (isActionDown('jump', input.keys) && this.state !== PlayerState.JUMPING && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.jump();
         }
 
@@ -318,12 +319,12 @@ export class Player {
         let moveX = 0;
         let moveY = 0;
 
-        if (input.keys['KeyW'] || input.keys['ArrowUp']) moveY -= 1;
-        if (input.keys['KeyS'] || input.keys['ArrowDown']) moveY += 1;
-        if (input.keys['KeyA'] || input.keys['ArrowLeft']) moveX -= 1;
-        if (input.keys['KeyD'] || input.keys['ArrowRight']) moveX += 1;
+        if (isActionDown('moveUp', input.keys)) moveY -= 1;
+        if (isActionDown('moveDown', input.keys)) moveY += 1;
+        if (isActionDown('moveLeft', input.keys)) moveX -= 1;
+        if (isActionDown('moveRight', input.keys)) moveX += 1;
 
-        this.isSprinting = !!input.keys['ShiftLeft'] || !!input.keys['ShiftRight'];
+        this.isSprinting = isActionDown('sprint', input.keys);
 
         // Normalize diagonal speed to avoid moving faster diagonally
         if (moveX !== 0 && moveY !== 0) {
@@ -447,10 +448,10 @@ export class Player {
         let dx = 0;
         let dy = 0;
         if (input && input.keys) {
-            if (input.keys['KeyW'] || input.keys['ArrowUp']) dy -= 1;
-            if (input.keys['KeyS'] || input.keys['ArrowDown']) dy += 1;
-            if (input.keys['KeyA'] || input.keys['ArrowLeft']) dx -= 1;
-            if (input.keys['KeyD'] || input.keys['ArrowRight']) dx += 1;
+            if (isActionDown('moveUp', input.keys)) dy -= 1;
+            if (isActionDown('moveDown', input.keys)) dy += 1;
+            if (isActionDown('moveLeft', input.keys)) dx -= 1;
+            if (isActionDown('moveRight', input.keys)) dx += 1;
         }
 
         if (dx !== 0 || dy !== 0) {

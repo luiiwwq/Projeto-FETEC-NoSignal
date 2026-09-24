@@ -183,8 +183,9 @@ export class SkeletonAxe {
 
         const attackRange = this.attackRange ?? SKELETON_ATTACK_RANGE;
 
-        // In reach: attack on cooldown, otherwise spread to avoid clumping.
-        if (dist <= attackRange) {
+        // Alguns inimigos se aproximam mais antes de iniciar o golpe, sem
+        // reduzir o alcance da hitbox do ataque durante a animação.
+        if (dist <= (this.attackStartRange ?? attackRange)) {
             this._stopAndIdle();
             if (this.attackCooldown <= 0) {
                 this._startAttack(player);

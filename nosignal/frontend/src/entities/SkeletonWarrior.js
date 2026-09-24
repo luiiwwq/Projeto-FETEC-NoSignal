@@ -18,7 +18,7 @@
  */
 
 /* ── Combat tuning (mesmo perfil do antigo Skeleton_Axe) ── */
-export const WARRIOR_MAX_HP = 150;
+export const WARRIOR_MAX_HP = 80;
 export const WARRIOR_ATTACK_DAMAGE = 40;
 export const WARRIOR_ATTACK_COOLDOWN = 1.0;   // seconds between swings
 export const WARRIOR_ATTACK_RANGE = 42;       // centre-to-centre melee reach

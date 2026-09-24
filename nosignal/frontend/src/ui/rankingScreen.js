@@ -1,4 +1,4 @@
-import { getTopRanking } from '../services/ranking.js';
+import { getEndingCounts, getTopRanking } from '../services/ranking.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { CHARACTER_IDS } from '../content/characters.js';
 
@@ -97,18 +97,34 @@ function renderResults(overlay, results) {
 
 async function loadResults(overlay) {
     const content = overlay.querySelector('[data-ranking-content]');
+    const counts = overlay.querySelector('[data-ranking-ending-counts]');
     const refresh = overlay.querySelector('[data-ranking-refresh]');
     content.replaceChildren(makeCell('p', 'CONSULTANDO TELEMETRIA...', 'ranking-loading'));
+    counts.replaceChildren(makeCell('span', 'CONSULTANDO FINAIS...'));
     refresh.disabled = true;
 
     try {
-        const results = await getTopRanking(100);
+        const [rankingResponse, countsResponse] = await Promise.allSettled([getTopRanking(100), getEndingCounts()]);
         if (!overlay.isConnected) return;
-        renderResults(overlay, Array.isArray(results) ? results : []);
-    } catch (error) {
-        console.error('[Ranking] Falha ao carregar os resultados:', error);
-        if (!overlay.isConnected) return;
-        content.replaceChildren(makeCell('p', 'RANKING INDISPONÍVEL. VERIFIQUE A CONEXÃO COM O BANCO DE DADOS.', 'ranking-error'));
+        if (rankingResponse.status === 'fulfilled') {
+            renderResults(overlay, Array.isArray(rankingResponse.value) ? rankingResponse.value : []);
+        } else {
+            console.error('[Ranking] Falha ao carregar os resultados:', rankingResponse.reason);
+            content.replaceChildren(makeCell('p', 'RANKING INDISPONÍVEL. VERIFIQUE A CONEXÃO COM O BANCO DE DADOS.', 'ranking-error'));
+        }
+
+        if (countsResponse.status === 'fulfilled' && Array.isArray(countsResponse.value)) {
+            const totals = new Map(countsResponse.value.map((entry) => [entry.final_id, Number(entry.total) || 0]));
+            counts.replaceChildren(...[1, 2, 3, 4].map((number) => {
+                const item = document.createElement('span');
+                item.className = 'ranking-ending-count';
+                item.append(makeCell('strong', `FINAL ${number}`), makeCell('span', String(totals.get(`final${number}`) || 0)));
+                return item;
+            }));
+        } else {
+            if (countsResponse.status === 'rejected') console.error('[Ranking] Falha ao carregar contagem dos finais:', countsResponse.reason);
+            counts.replaceChildren(makeCell('span', 'CONTAGEM DE FINAIS INDISPONÍVEL'));
+        }
     } finally {
         refresh.disabled = false;
     }
@@ -130,8 +146,9 @@ export function renderRankingScreen(container) {
                     <h2 id="ranking-title">RANKING</h2>
                     <p class="ranking-subtitle">OS MENORES TEMPOS LIDERAM. EMPATES: MENOS MORTES, DEPOIS MAIS MOEDAS.</p>
                 </div>
-                <button type="button" class="ranking-close" data-ranking-back aria-label="Voltar ao menu">×</button>
+                <button type="button" class="ranking-close" data-ranking-back aria-label="Voltar ao menu">X</button>
             </header>
+            <div class="ranking-ending-counts" data-ranking-ending-counts aria-live="polite"></div>
             <div class="ranking-content" data-ranking-content aria-live="polite"></div>
             <footer class="ranking-footer">
                 <span>RESULTADOS REGISTRADOS AO CONCLUIR UM FINAL</span>

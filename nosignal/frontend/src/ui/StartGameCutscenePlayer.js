@@ -219,79 +219,19 @@ function confirmCutscene(container, scenesText, skip) {
         /* ── Caixa de texto (legenda) ──────────────────────── */
         const caption = document.createElement('div');
         caption.id = 'start-cutscene-caption';
-        caption.style.cssText = `
-            position: absolute;
-            left: 50%;
-            bottom: 96px;
-            transform: translateX(-50%);
-            width: min(860px, 92%);
-            background: rgba(5, 6, 12, 0.82);
-            border: 1.5px solid rgba(232, 223, 200, 0.28);
-            border-left: 4px solid rgba(120, 220, 255, 0.75);
-            border-radius: 8px;
-            padding: 16px 22px;
-            color: #e8dfc8;
-            font-family: 'Courier New', 'Lucida Console', monospace;
-            font-size: 16px;
-            line-height: 1.65;
-            letter-spacing: 0.03em;
-            text-shadow: 0 0 8px rgba(120, 220, 255, 0.25);
-            text-align: center;
-            white-space: pre-line;
-            box-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
-            z-index: 9010;
-            pointer-events: none;
-        `;
+        caption.className = 'cutscene-caption';
 
         /* ── Indicador de cena ─────────────────────────────── */
         const counter = document.createElement('div');
         counter.id = 'start-cutscene-counter';
-        counter.style.cssText = `
-            position: absolute;
-            top: 24px;
-            right: 32px;
-            color: rgba(232, 223, 200, 0.55);
-            font-family: 'Courier New', 'Lucida Console', monospace;
-            font-size: 12px;
-            letter-spacing: 0.14em;
-            z-index: 9010;
-        `;
+        counter.className = 'cutscene-counter';
 
         /* ── Botão PULAR (mesmo esquema dos bosses) ────────── */
         const skipBtn = document.createElement('button');
         skipBtn.id = 'cutscene-skip-btn';
+        skipBtn.className = 'ns-pixel-button cutscene-skip';
         skipBtn.type = 'button';
         skipBtn.innerHTML = 'PULAR &nbsp;<span style="opacity:0.75;font-size:0.78em">[ENTER]</span>';
-        skipBtn.style.cssText = `
-            position: absolute;
-            bottom: 28px;
-            right: 32px;
-            background: rgba(10, 8, 16, 0.82);
-            color: #e8dfc8;
-            border: 1.5px solid rgba(232, 223, 200, 0.35);
-            border-radius: 6px;
-            padding: 8px 20px;
-            font-family: 'Courier New', 'Lucida Console', monospace;
-            font-size: 13px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            cursor: pointer;
-            z-index: 9010;
-            transition: background 0.15s, border-color 0.15s, color 0.15s;
-            user-select: none;
-            outline: none;
-        `;
-
-        skipBtn.addEventListener('mouseenter', () => {
-            skipBtn.style.background = 'rgba(40, 30, 60, 0.95)';
-            skipBtn.style.borderColor = 'rgba(232, 223, 200, 0.8)';
-            skipBtn.style.color = '#fff';
-        });
-        skipBtn.addEventListener('mouseleave', () => {
-            skipBtn.style.background = 'rgba(10, 8, 16, 0.82)';
-            skipBtn.style.borderColor = 'rgba(232, 223, 200, 0.35)';
-            skipBtn.style.color = '#e8dfc8';
-        });
 
         overlay.appendChild(img);
         overlay.appendChild(caption);

@@ -6,8 +6,7 @@ const LINES = [
     { speaker: 'player', text: 'E deixar muitas outras vidas morrerem em Kerbin? Não posso fazer isso.' },
     { speaker: 'enemy', text: 'Então você pretende salvar Kerbin matando todos eles?' },
     { speaker: 'player', text: 'Milhões de pessoas estão morrendo. Não temos escolha.' },
-    { speaker: 'enemy', text: 'Eu não posso deixar que você os extermine.' },
-    { speaker: 'enemy', text: 'Os dois entram em confronto.' }
+    { speaker: 'enemy', text: 'Eu não posso deixar que você os extermine.' }
 ];
 
 const PLAYER_PORTRAITS = {

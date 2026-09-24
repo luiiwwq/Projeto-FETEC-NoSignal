@@ -12,6 +12,7 @@ import { gameState } from '../state/gameState.js';
 import { createOptionsContent, syncOptionsUI } from './optionsView.js';
 import { startMenuMusic } from '../audio/menuMusic.js';
 import { startGameMusic, stopGameMusic } from '../audio/gameMusic.js';
+import { pauseBossMusic, resumeBossMusic, stopBossMusic } from '../audio/bossMusic.js';
 
 let menuElement = null;
 let isOpen = false;
@@ -51,6 +52,7 @@ export function openPauseMenu(container, engine) {
 
     // Ao pausar, silencia a música do gameplay.
     stopGameMusic();
+    pauseBossMusic();
 
     const firstBtn = menuElement.querySelector('button[data-action="options"]');
     if (firstBtn) setTimeout(() => firstBtn.focus(), 60);
@@ -66,7 +68,7 @@ export function closePauseMenu() {
     optionsOpen = false;
 
     // Ao retomar o jogo, reinstaura a música ambiente do gameplay.
-    startGameMusic();
+    if (!resumeBossMusic()) startGameMusic();
 }
 
 export function isPauseMenuOpen() {
@@ -227,6 +229,7 @@ function _returnToMainMenu() {
 
     // Deixou o gameplay: a música do jogo não deve continuar no menu.
     stopGameMusic();
+    stopBossMusic();
 
     const container = containerRef || document.getElementById('app');
     const engine = engineRef;

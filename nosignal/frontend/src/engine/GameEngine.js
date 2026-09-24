@@ -69,10 +69,11 @@ import {
 } from '../content/missionItems.js';
 import { gameState } from '../state/gameState.js';
 import { MAPS, MAP_IDS } from '../content/maps.js';
+import { getMissionEnding, getMissionShipAction } from '../content/endings.js';
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
 import { CHARACTER_ALLY_SHOP_POSITION, CHARACTER_ENEMY_SPAWNS, resolveCharacterRoles } from '../content/characterRoles.js';
 import { resolveSlide, pointInCircle, rectsOverlap } from '../systems/collisionSystem.js';
-import { DayNightSystem, DAY_NIGHT_PERIOD, OXYGEN_LIFETIME_SECONDS, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
+import { DayNightSystem, DAY_NIGHT_PERIOD, OXYGEN_LIFETIME_DAYS, OXYGEN_LIFETIME_SECONDS, SPAWN_WAVE_EVERY_SECOND_NIGHT, formatDayNightTime } from '../systems/dayNightSystem.js';
 import { openPauseMenu, closePauseMenu, isPauseMenuOpen, destroyPauseMenu } from '../ui/pauseMenu.js';
 import { openCaveChoiceScreen, closeCaveChoiceScreen, isCaveChoiceOpen } from '../ui/caveChoiceScreen.js';
 import { openShopScreen, closeShopScreen, isShopOpen, consumeInventorySlot, getSlotItem, getItemIconPath, getItemFramePaths } from '../ui/shopScreen.js';
@@ -80,9 +81,13 @@ import { Bullet } from '../entities/Bullet.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { loadSettings, brightnessFilter } from '../state/stateStorage.js';
 import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
+import { startBossMusic, stopBossMusic } from '../audio/bossMusic.js';
+import { startGameMusic, stopGameMusic } from '../audio/gameMusic.js';
 import { playFinalGameCutscene } from '../ui/FinalGameCutscenePlayer.js';
+import { confirmIncompleteMission } from '../ui/missionEndingConfirm.js';
 import { playNpcDialogue } from '../ui/npcDialogue.js';
-import { submitRankingResult } from '../services/ranking.js';
+import { createEndingAttemptId, registerEndingResult, submitRankingResult } from '../services/ranking.js';
+import { isBound, isActionDown, getActionCodes, codeDisplay, loadControls } from '../state/controlsStorage.js';
 
 const DAY_NIGHT_ICON_PATH = {
     [DAY_NIGHT_PERIOD.DAY]: './src/assets/sprites/Night_Day_System/sun_sprite.png',
@@ -398,6 +403,8 @@ export class GameEngine {
     stop() {
         this.isRunning = false;
         this.paused = false;
+        stopBossMusic();
+        stopGameMusic();
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
         }
@@ -513,6 +520,10 @@ export class GameEngine {
     }
 
     /* ── Day / night cycle ──────────────────────────────── */
+    _isFinalDay() {
+        return this.dayNight.dayCount >= OXYGEN_LIFETIME_DAYS;
+    }
+
     _updateDayNight(dt) {
         const event = this.dayNight.update(dt);
 
@@ -557,9 +568,23 @@ export class GameEngine {
         gameState.currentScene = 'ENDING';
         this.stop();
 
+        const partidaId = createEndingAttemptId();
+        const registration = registerEndingResult({ partidaId, finalId }).then(() => true, (error) => {
+            console.error('[Finais] Não foi possível registrar o final. Tentando novamente ao voltar ao menu:', error);
+            return false;
+        });
+
         playFinalGameCutscene(this.container, finalId, async () => {
-            // Registrar apenas depois que a cutscene do final termina (ou é pulada).
-            // Falha de rede não deve impedir o retorno ao menu.
+            // Uma repetição após falha usa o mesmo UUID para não duplicar o total.
+            if (!(await registration)) {
+                try {
+                    await registerEndingResult({ partidaId, finalId });
+                } catch (error) {
+                    console.error('[Finais] Não foi possível registrar o final:', error);
+                }
+            }
+
+            // O ranking por nome é separado do histórico de finais.
             try {
                 await submitRankingResult({
                     nome: gameState.playerName,
@@ -1126,6 +1151,8 @@ export class GameEngine {
     // frame e então some. A derrota é permanente: só volta em novo jogo.
     onNecromancerDefeated(boss) {
         gameState.necromancerDefeated = true;
+        stopBossMusic();
+        startGameMusic();
         this._showSoulsMessage('SINAL REIVINDICADO', '#f5d28a');
         this.necromancerEffects.length = 0;
         if (!boss._coinAwarded) {
@@ -1159,6 +1186,8 @@ export class GameEngine {
     // partículas. A derrota é permanente até iniciar um jogo novo.
     onSkeletonAxeBossDefeated(boss) {
         gameState.skeletonAxeBossDefeated = true;
+        stopBossMusic();
+        startGameMusic();
         this._showSoulsMessage('SINAL REIVINDICADO', '#f6c885');
         if (!boss._coinAwarded) {
             boss._coinAwarded = true;
@@ -1285,7 +1314,7 @@ export class GameEngine {
     }
 
     // (Re)cria no mapa atual todos os itens de missão que devem estar nele:
-    //  - o meio da nave já nasce na superfície nas coordenadas X00942/Y02103;
+    //  - o meio da nave já nasce na superfície nas coordenadas X02138/Y02527;
     //  - as peças soltas pelos chefes aparecem no mapa em que foram dropadas.
     _respawnMissionWorldItems() {
         this.worldItems = [];
@@ -1386,6 +1415,10 @@ export class GameEngine {
 
         if (!this._deathHandled) {
             this._deathHandled = true;
+            if (this.currentMapId === MAP_IDS.CASTLE_KING_ROOM || this.currentMapId === MAP_IDS.MARS_CORE) {
+                stopBossMusic();
+                startGameMusic();
+            }
             gameState.deaths += 1;
             this._deathRespawnTimer = 3.2;
             this._showSoulsMessage('SINAL PERDIDO', '#e62424');
@@ -1843,7 +1876,7 @@ export class GameEngine {
             const screen = this.camera.worldToScreen(this.player.x, this.player.y);
             const headY = screen.y - (this.player.renderSize || 64) / 2;
             const cx = Math.round(screen.x);
-            const cy = Math.round(headY - 18 - ih / 2);
+            const cy = Math.round(headY - 6 - ih / 2);
 
             ctx.save();
 
@@ -1925,7 +1958,7 @@ export class GameEngine {
         }
 
         this._enemyNpcActor = null;
-        if (map.id === MAP_IDS.MARS_SURFACE && roles.enemy) {
+        if (map.id === MAP_IDS.MARS_SURFACE && roles.enemy && !gameState.enemyNpcDefeated) {
             const spawn = CHARACTER_ENEMY_SPAWNS[roles.enemy];
             if (spawn) {
                 const enemy = new CharacterActor({
@@ -1963,7 +1996,7 @@ export class GameEngine {
         // Cutscene do Necromancer (Sala do Rei): toca na primeira entrada da partida
         // (não repete após morte/retry do jogador).
         if (targetMapId === MAP_IDS.CASTLE_KING_ROOM && !gameState.necroIntroDone && !gameState.necromancerDefeated) {
-            cutsceneSrc = './src/assets/cutscenes/necro/cutscene_necro.mp4';
+            cutsceneSrc = './src/assets/cutscenes/necro/cutscene_necro.mp4?v=2';
             isNecroIntro = true;
         } else if (targetMapId === MAP_IDS.MARS_CORE && !gameState.axeBossIntroDone && !gameState.skeletonAxeBossDefeated) {
             // Cutscene do Old Guardian (Núcleo de Marte): toca na primeira entrada da partida
@@ -1971,7 +2004,11 @@ export class GameEngine {
             isAxeIntro = true;
         }
 
+        stopBossMusic();
         this._loadMap(targetMapId, spawnId);
+
+        const bossFight = (targetMapId === MAP_IDS.CASTLE_KING_ROOM && !gameState.necromancerDefeated) ||
+            (targetMapId === MAP_IDS.MARS_CORE && !gameState.skeletonAxeBossDefeated);
 
         if (cutsceneSrc) {
             this._cutsceneActive = true;
@@ -1989,7 +2026,7 @@ export class GameEngine {
             this.allyBossHelpTriggered = false;
 
             try {
-                await playBossCutscene(this.container, cutsceneSrc);
+                await playBossCutscene(this.container, cutsceneSrc, false);
             } catch (err) {
                 console.error('[Cutscene] Erro ao reproduzir vídeo:', err);
             } finally {
@@ -2001,7 +2038,12 @@ export class GameEngine {
                 }
                 this._allyHelpArenaTime = 0;
                 this.mapTransitionCooldown = 0.5;
+                if (this.isRunning && this.currentMapId === targetMapId && bossFight) startBossMusic(targetMapId);
             }
+        } else if (bossFight) {
+            startBossMusic(targetMapId);
+        } else {
+            startGameMusic();
         }
     }
 
@@ -2266,7 +2308,7 @@ export class GameEngine {
         if (this.paused) return;
 
         // Dash ([Q]).
-        if (e.code === 'KeyQ' && !e.repeat && this.player && !this.player.isDead && !this._cutsceneActive) {
+        if (isBound('dash', e.code) && !e.repeat && this.player && !this.player.isDead && !this._cutsceneActive) {
             if (this.player.dash(this.input, this.camera)) {
                 this._spawnDashFx(this.player);
             }
@@ -2274,31 +2316,49 @@ export class GameEngine {
         }
 
         // Interação com a loja do NPC Aliado ([E] perto do aliado)
-        if (e.code === 'KeyE' && this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
+        if (isBound('interact', e.code) && this.interactableShop && !isShopOpen() && this.mapTransitionCooldown <= 0) {
             playClickButtonSound();
             openShopScreen(this.container, this);
             return;
         }
 
         // Coleta de peça da nave ([E] perto de um item da missão principal)
-        if (e.code === 'KeyE' && this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
+        if (isBound('interact', e.code) && this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
             this._collectMissionItem(this.interactableMissionItem);
             return;
         }
 
-        if (e.code === 'KeyE' && this.interactableMissionShip && !this.player.isDead && !this._shipRepairFade) {
+        if (isBound('interact', e.code) && this.interactableMissionShip && !this.player.isDead &&
+            this.mapTransitionCooldown <= 0 && !this._shipRepairFade && !e.repeat) {
             playClickButtonSound();
-            if (!gameState.spaceshipRepaired) {
+            const action = getMissionShipAction(gameState.isMissionComplete(), gameState.spaceshipRepaired, this._isFinalDay());
+            if (action === 'game-over') {
+                gameState.missionConcluded = true;
+                // A cutscene acompanha o fim do quinto dia e a contagem mostra o oxigênio esgotado.
+                this.dayNight.elapsedTime = OXYGEN_LIFETIME_SECONDS;
+                this._triggerEnding('final1');
+            } else if (action === 'conclude') {
+                this._cutsceneActive = true;
+                this.input.keys = {};
+                confirmIncompleteMission(this.container).then((confirmed) => {
+                    this._cutsceneActive = false;
+                    this.input.keys = {};
+                    if (confirmed && this.isRunning && !gameState.missionConcluded) {
+                        gameState.missionConcluded = true;
+                        this._triggerEnding('final2');
+                    }
+                });
+            } else if (action === 'repair') {
                 this._shipRepairFade = { elapsed: 0, duration: 2.4, repaired: false };
             } else if (!gameState.missionConcluded) {
                 gameState.missionConcluded = true;
-                this._triggerEnding('final1');
+                this._triggerEnding(getMissionEnding(gameState.spaceshipRepaired, gameState.enemyNpcDefeated));
             }
             return;
         }
 
         // Map transition interaction ([E] on a doorway/portal)
-        if (e.code === 'KeyE' && this.interactableExit && this.mapTransitionCooldown <= 0) {
+        if (isBound('interact', e.code) && this.interactableExit && this.mapTransitionCooldown <= 0) {
             const exit = this.interactableExit;
             // Som de confirmação: toca SOMENTE quando E realmente ativa a
             // interação (porta/portal) — nunca ao entrar na área do prompt.
@@ -2318,8 +2378,8 @@ export class GameEngine {
         // Easter egg secreto: Ctrl+Shift+1+F faz o Among Us surgir na frente.
         // (Ctrl+1 puro é roubado pelo navegador, por isso o Shift.)
         const secretAmongUs = e.ctrlKey && e.shiftKey && (
-            (e.code === 'Digit1' && this.input.keys['KeyF']) ||
-            (e.code === 'KeyF' && this.input.keys['Digit1'])
+            (isBound('item1', e.code) && this.input.keys['KeyF']) ||
+            (e.code === 'KeyF' && isActionDown('item1', this.input.keys))
         );
         if (secretAmongUs) {
             e.preventDefault();
@@ -2329,13 +2389,15 @@ export class GameEngine {
 
         // State-testing hotkeys
         // (Ctrl+F é 'buscar' do navegador; com Ctrl segurado o F não troca de estado)
-        if (e.code === 'KeyF' && !e.ctrlKey) {
+        if (isBound('float', e.code) && !e.ctrlKey) {
             if (this.player.state === PlayerState.FLOATING) {
                 this.player.setState(PlayerState.IDLE, true);
             } else {
                 this.player.setState(PlayerState.FLOATING, true);
             }
-        } else if (e.code === 'KeyP') {
+        } else if (isBound('emote', e.code) && this.player.characterId !== 'ocstronaut') {
+            // Emote (P): só para personagens com animação própria de Push/Pull.
+            // O Ocstronaut não tem clip de emote, então a tecla fica inativa.
             if (this.player.state === PlayerState.PUSH_PULL) {
                 this.player.setState(PlayerState.IDLE, true);
             } else {
@@ -2345,8 +2407,7 @@ export class GameEngine {
 
         // Itens consumíveis do inventário (estilo Dark Souls): teclas 1/2/3
         // consomem o item do slot correspondente quando está no inventário.
-        const slotMap = { Digit1: 1, Digit2: 2, Digit3: 3 };
-        const itemSlot = slotMap[e.code];
+        const itemSlot = ['item1', 'item2', 'item3'].findIndex((action) => isBound(action, e.code)) + 1;
         if (itemSlot) {
             if (!this.player.isDead) {
                 const result = consumeInventorySlot(itemSlot, this.player);
@@ -2629,6 +2690,7 @@ export class GameEngine {
             actor.updateAi(dt, this);
             actor.update(dt);
             if (actor.isDead) {
+                if (actor === this._enemyNpcActor) gameState.enemyNpcDefeated = true;
                 if (!actor._coinAwarded && actor.team === 'enemy') {
                     actor._coinAwarded = true;
                     const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
@@ -2768,7 +2830,7 @@ export class GameEngine {
         }
 
         this.interactableMissionShip = false;
-        if (this.currentMapId === MAP_IDS.MARS_SURFACE && gameState.isMissionComplete() && !this.player.isDead) {
+        if (this.currentMapId === MAP_IDS.MARS_SURFACE && !this.player.isDead) {
             const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
             if (ship) {
                 this.interactableMissionShip = Math.hypot(
@@ -2833,6 +2895,7 @@ export class GameEngine {
                         if (this._bulletCanDamage(bullet, actor.team, actor)) {
                             actor.takeDamage(bullet.owner === this.player ? this._playerHitDamage(actor, bullet.damage) : bullet.damage, bullet.x, bullet.y);
                             if (actor.isDead) {
+                                if (actor === this._enemyNpcActor) gameState.enemyNpcDefeated = true;
                                 if (!actor._coinAwarded && actor.team === 'enemy') {
                                     actor._coinAwarded = true;
                                     const reward = actor.name === 'GOLEM' ? 5 : (actor.name?.includes('SPEARMAN') ? 4 : 3);
@@ -2856,11 +2919,15 @@ export class GameEngine {
             if (!consumed && this.necromancerBoss) {
                 const b = this.necromancerBoss;
                 if (!b.isDead) {
+                    // A hitbox de acerto é ancorada nos pés e cobre a arte
+                    // visível (hitHeight) — tiro na cabeça não passa por cima.
+                    const bFeetY = b.y + b.colliderHalfH;
+                    const bHitH = b.hitHeight || b.colliderHalfH * 2;
                     const bRectBoss = {
                         x: b.x - b.colliderHalfW,
-                        y: b.y - b.colliderHalfH,
+                        y: bFeetY - bHitH,
                         w: b.colliderHalfW * 2,
-                        h: b.colliderHalfH * 2
+                        h: bHitH
                     };
                     if (rectsOverlap(bRectBoss, bRect)) {
                         if (b !== bullet.owner) {
@@ -2881,14 +2948,18 @@ export class GameEngine {
             if (!consumed && this.skeletonAxeBoss) {
                 const ab = this.skeletonAxeBoss;
                 if (!ab.isDead) {
-                    // Usa a hitHalfW (largura de acerto) quando definida — o
-                    // corpo do guardião é maior que o collider de movimento.
+                    // Igual ao Necromancer: hitbox ancorada nos pés, cobrindo a
+                    // arte visível (hitHeight) — no caso do guardião gigante a
+                    // altura vai até um pouco antes da cabeça, e o collider de
+                    // movimento continua pequeno. Largura usa hitHalfW.
+                    const abFeetY = ab.y + ab.colliderHalfH;
+                    const abHitH = ab.hitHeight || ab.colliderHalfH * 2;
                     const abHalfW = ab.hitHalfW || ab.colliderHalfW;
                     const abRectBoss = {
                         x: ab.x - abHalfW,
-                        y: ab.y - ab.colliderHalfH,
+                        y: abFeetY - abHitH,
                         w: abHalfW * 2,
-                        h: ab.colliderHalfH * 2
+                        h: abHitH
                     };
                     if (rectsOverlap(abRectBoss, bRect)) {
                         if (ab !== bullet.owner) {
@@ -3080,32 +3151,50 @@ export class GameEngine {
         }
     }
 
+    _buildControlsBarText() {
+        const c = loadControls();
+        const primary = (action) => codeDisplay(c[action] && c[action][0]);
+        // Mover mostra os 4 códigos principais (W,S,A,D por padrão).
+        const moveKeys = [primary('moveUp'), primary('moveDown'), primary('moveLeft'), primary('moveRight')].join(' ');
+        const emotes = [primary('float'), primary('emote')].join(' e ');
+        const items = [primary('item1'), primary('item2'), primary('item3')].join('/');
+        return `[${moveKeys}] Mover  [${primary('sprint')}] Correr  [${primary('dash')}] DASH  [${primary('shoot')}] Atirar  [${primary('punch')}] Socar  [${primary('jump')}] Pular  [${emotes}] EMOTES  [${items}] Itens  [ESC] Menu`;
+    }
+
+    // Rótulo da tecla de interação atual (default: E) para os prompts do mundo.
+    _interactKey() {
+        const codes = getActionCodes('interact');
+        return codeDisplay(codes[0]);
+    }
+
     _renderMissionShipPrompt(ctx) {
         const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
         if (!ship) return;
-        // Nave concluída: mantém o X central e fixa o aviso em Y=530.
+        // Decisão de concluir sem peças e nave concluída: mesmo botão junto à ARES-1.
         // Nave danificada: aproxima o aviso da inscrição ARES-1 na fuselagem.
-        const promptX = gameState.spaceshipRepaired ? ship.x + ship.w / 2 : ship.x + ship.w * 0.63;
-        const promptY = gameState.spaceshipRepaired ? 530 : ship.y + ship.h * 0.55;
+        const action = getMissionShipAction(gameState.isMissionComplete(), gameState.spaceshipRepaired, this._isFinalDay());
+        const promptX = action !== 'repair' ? ship.x + ship.w / 2 : ship.x + ship.w * 0.63;
+        const promptY = action !== 'repair' ? 530 : ship.y + ship.h * 0.55;
         const screen = this.camera.worldToScreen(promptX, promptY);
-        const text = gameState.spaceshipRepaired ? '[E] CONCLUA A MISSÃO' : '[E] CONSERTE A NAVE';
+const text = action === 'conclude' || action === 'game-over' ? `[${this._interactKey()}] CONCLUIR MISSÃO`
+            : action === 'repair' ? `[${this._interactKey()}] CONSERTE A NAVE` : `[${this._interactKey()}] INTERAJA COM A NAVE`;
         ctx.save();
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
         const textW = ctx.measureText(text).width;
         ctx.fillStyle = 'rgba(5, 5, 11, 0.92)';
         ctx.fillRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
-        ctx.strokeStyle = '#7fe0a0';
+        ctx.strokeStyle = '#e07228';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(screen.x - textW / 2 - 8, screen.y - 10, textW + 16, 20);
-        ctx.fillStyle = '#7fe0a0';
+        ctx.fillStyle = ctx.strokeStyle;
         ctx.fillText(text, screen.x, screen.y + 3);
         ctx.restore();
     }
 
     _renderShopPrompt(ctx, ally) {
         const screen = this.camera.worldToScreen(ally.x, ally.y - (ally.renderSize || 64) / 2 - 14);
-        const text = '[E] ABRIR LOJA';
+        const text = `[${this._interactKey()}] ABRIR LOJA`;
 
         ctx.save();
         ctx.font = '8px "Press Start 2P", monospace';
@@ -3134,7 +3223,8 @@ export class GameEngine {
         ctx.textAlign = 'center';
 
         ctx.font = '8px "Press Start 2P", monospace';
-        const promptW = ctx.measureText('[E] COLETAR').width;
+        const collectText = `[${this._interactKey()}] COLETAR`;
+        const promptW = ctx.measureText(collectText).width;
 
         ctx.font = '8px "Press Start 2P", monospace';
         const descLines = this._wrapHudText(ctx, def.description.toUpperCase(), 250);
@@ -3156,7 +3246,7 @@ export class GameEngine {
         // Linha 1 — ação
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#ffd440';
-        ctx.fillText('[E] COLETAR', bx + boxW / 2, by + 14);
+        ctx.fillText(`[${this._interactKey()}] COLETAR`, bx + boxW / 2, by + 14);
 
         // Linha 2 — nome
         ctx.font = '8px "Press Start 2P", monospace';
@@ -3185,7 +3275,7 @@ export class GameEngine {
         ctx.save();
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        const text = `[E] ${label}`;
+        const text = `[${this._interactKey()}] ${label}`;
         const textW = ctx.measureText(text).width;
 
         ctx.fillStyle = 'rgba(5, 5, 11, 0.85)';
@@ -3503,11 +3593,7 @@ export class GameEngine {
         ctx.font = '8px "Press Start 2P", monospace';
         ctx.fillStyle = '#f6c885';
         ctx.textAlign = 'center';
-        ctx.fillText(
-            '[WASD] Mover  [SHIFT] Correr  [Q] DASH  [L-CLICK] Atirar  [R-CLICK] Socar  [ESPAÇO] Pular  [F e P] EMOTES  [1/2/3] Itens  [ESC] Menu',
-            this.width / 2,
-            barBottomY + 23
-        );
+        ctx.fillText(this._buildControlsBarText(), this.width / 2, barBottomY + 23);
 
         // Mensagem transitória ao consumir item (estilo Dark Souls)
         if (this.hudMessageTimer > 0 && this.hudMessage) {
@@ -3530,6 +3616,11 @@ export class GameEngine {
      * A confirmação da coleta acontece apenas no indicador da peça; o cartão
      * seguinte entra por baixo sem atravessar o texto ou o sprite anterior. */
     _renderMissionHUD(ctx, x, y) {
+        if (this._isFinalDay() && !gameState.spaceshipRepaired) {
+            this._renderReturnToShipHUD(ctx, x, y);
+            return;
+        }
+
         const collected = Array.isArray(gameState.missionCollected) ? gameState.missionCollected : [];
         const hasAll = gameState.isMissionComplete();
         const flashDef = this._questFlashId ? SPACESHIP_ITEM_DEFS[this._questFlashId] : null;
@@ -3545,12 +3636,12 @@ export class GameEngine {
         const repaired = gameState.spaceshipRepaired;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(10, 8, 14, 0.93)';
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.9)';
         ctx.fillRect(x, y, panelW, headerH + progressH + bodyH);
-        ctx.strokeStyle = repaired ? '#4ade80' : '#a45a2c';
+        ctx.strokeStyle = '#e07228';
         ctx.lineWidth = 2;
         ctx.strokeRect(x + 0.5, y + 0.5, panelW - 1, headerH + progressH + bodyH - 1);
-        ctx.fillStyle = repaired ? '#4ade80' : '#e07228';
+        ctx.fillStyle = '#e07228';
         ctx.fillRect(x, y, 34, 3);
 
         // Identidade da missão e contador, sem dividir espaço com os cartões.
@@ -3649,6 +3740,54 @@ export class GameEngine {
         } else {
             this._renderFinalQuestCard(ctx, x, bodyY, panelW);
         }
+        ctx.restore();
+    }
+
+    _renderReturnToShipHUD(ctx, x, y) {
+        const panelW = 244;
+        const panelH = 195;
+        const hasAllParts = gameState.isMissionComplete();
+        const remaining = formatDayNightTime(OXYGEN_LIFETIME_SECONDS - this.dayNight.elapsedTime);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(5, 5, 11, 0.9)';
+        ctx.fillRect(x, y, panelW, panelH);
+        ctx.strokeStyle = '#e07228';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 0.5, y + 0.5, panelW - 1, panelH - 1);
+        ctx.fillStyle = '#e07228';
+        ctx.fillRect(x, y, 34, 3);
+
+        ctx.textAlign = 'left';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.fillStyle = '#b68d68';
+        ctx.fillText('MISSÃO PRINCIPAL', x + 12, y + 16);
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        ctx.fillText('VOLTE À NAVE', x + 12, y + 34);
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ed8733';
+        ctx.fillText('DIA 5 // OXIGÊNIO CRÍTICO', x + 12, y + 51, panelW - 24);
+
+        ctx.strokeStyle = '#49352e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + 12, y + 62);
+        ctx.lineTo(x + panelW - 12, y + 62);
+        ctx.stroke();
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#c8b29c';
+        ctx.fillText('TEMPO RESTANTE', x + 12, y + 84);
+        ctx.font = '14px "Press Start 2P", monospace';
+        ctx.fillStyle = '#ed8733';
+        ctx.fillText(remaining, x + 12, y + 110);
+
+        const hint = hasAllParts ? '> INSTALE AS PEÇAS NA NAVE' : '> CONCLUA A MISSÃO NA NAVE';
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#f6c885';
+        this._wrapHudText(ctx, hint, panelW - 24).slice(0, 2).forEach((line, index) => {
+            ctx.fillText(line, x + 12, y + 143 + index * 13);
+        });
         ctx.restore();
     }
 
@@ -3769,7 +3908,8 @@ export class GameEngine {
             ctx.font = '7px "Press Start 2P", monospace';
             ctx.textAlign = 'left';
             ctx.fillStyle = owned && !onCooldown ? '#f6c885' : '#6b5a44';
-            ctx.fillText(String(slot), bx + 6, startY + 14);
+            const slotKey = codeDisplay((getActionCodes(`item${slot}`) || [])[0]);
+            ctx.fillText(String(slotKey), bx + 6, startY + 14);
 
             if (owned && item) {
                 // Durante a recarga o item fica apagado e mostra o tempo restante
@@ -3809,7 +3949,7 @@ export class GameEngine {
     _drawItemGlyph(ctx, bx, by, size, item, color) {
         const icon = item ? this._itemFxIcons?.get(item.id) : null;
         if (icon && icon.complete && icon.naturalWidth > 0 && icon.naturalHeight > 0) {
-            const pad = item.id === 'necro_ally_help' ? 10 : 3;
+            const pad = item.id === 'necro_ally_help' ? 8 : 3;
             const inner = size - pad * 2;
             const ratio = icon.naturalWidth / icon.naturalHeight;
             let iw = inner;

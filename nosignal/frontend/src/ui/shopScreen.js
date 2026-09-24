@@ -6,6 +6,7 @@
 
 import { gameState } from '../state/gameState.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
+import { isBound } from '../state/controlsStorage.js';
 
 const ALLY_HELP_STORAGE_KEY = 'noSignal_allyBossHelpPurchased';
 
@@ -218,12 +219,15 @@ function _renderItemCard(item, index) {
     const purchaseCount = isConsumable ? gameState.getItemPurchases(item.id) : 0;
     const isMaxed = isConsumable && purchaseCount >= 3;
 
-    // Campo "compra única permanente" ou "limite 3/3" / contador
-    const badgeText = isSpecial
-        ? '★ ESPECIAL'
-        : isPlaceholder
-            ? 'EM BREVE'
-            : `${purchaseCount}/3`;
+    // Badge text - special item shows 1/1 when purchased, consumables show X/3
+    let badgeText;
+    if (isPlaceholder) {
+        badgeText = 'EM BREVE';
+    } else if (isSpecial) {
+        badgeText = isPurchased ? '★ ADQUIRIDO (1/1)' : '★ ESPECIAL (1/1)';
+    } else {
+        badgeText = `${purchaseCount}/3`;
+    }
 
     let btnText;
     let btnDisabled = false;
@@ -234,11 +238,45 @@ function _renderItemCard(item, index) {
         btnText = '✔ ADQUIRIDO';
         btnDisabled = true;
     } else if (isConsumable && isMaxed) {
-        btnText = `✔ MÁXIMO (${purchaseCount}/3)`;
+        btnText = `✔ MÁXIMO (3/3)`;
         btnDisabled = true;
     } else {
-        btnText = `COMPRAR (${item.price} 🪙)`;
+        btnText = `COMPRAR`;
     }
+
+    // Stats para consumíveis
+    let statsHtml = '';
+    if (isConsumable) {
+        const effects = {
+            cura_alienigena: { label: 'CURA', value: '+30 HP' },
+            energia_duna: { label: 'ENERGIA', value: '+25' },
+            cadencia_frenetica: { label: 'CADÊNCIA', value: '+15%' }
+        };
+        const eff = effects[item.id];
+        if (eff) {
+            statsHtml = `
+                <div class="shop-card-stats">
+                    <span class="shop-stat">${eff.label}: <span class="shop-stat-value">${eff.value}</span></span>
+                    <span class="shop-stat">RECARGA: <span class="shop-stat-value">15s</span></span>
+                </div>
+            `;
+        }
+    } else if (isSpecial) {
+        statsHtml = `
+            <div class="shop-card-stats">
+                <span class="shop-stat">TIPO: <span class="shop-stat-value">APOIO TÁTICO</span></span>
+                <span class="shop-stat">USO: <span class="shop-stat-value">ÚNICO</span></span>
+            </div>
+        `;
+    }
+
+    // Purchase count badge for bottom left - only show when NOT purchased/maxed
+    const showPurchaseBadge = (isConsumable && !isMaxed) || (isSpecial && !isPurchased);
+    const purchaseBadge = showPurchaseBadge
+        ? (isConsumable
+            ? `<div class="shop-card-purchase-badge">${purchaseCount}/3</div>`
+            : `<div class="shop-card-purchase-badge">0/1</div>`)
+        : '';
 
     return `
         <div class="shop-card ${isSpecial ? 'shop-card-special' : ''} ${isMaxed || (isSpecial && isPurchased) ? 'is-bought' : ''}" data-item-id="${item.id}">
@@ -247,16 +285,20 @@ function _renderItemCard(item, index) {
                     ? `<img src="${item.iconPath}" alt="${item.name}" draggable="false" loading="lazy">`
                     : `<span>${item.sprite || '?'}</span>`}
             </div>
-            <div class="shop-card-badge">${badgeText}</div>
-            <div class="shop-card-name">${item.name}</div>
-            <div class="shop-card-desc">${item.description}</div>
-            <div class="shop-card-price">
-                <span class="price-tag">VALOR:</span>
-                <span class="price-val">🪙 ${item.price}</span>
+            <div class="shop-card-info">
+                <div class="shop-card-badge">${badgeText}</div>
+                <div class="shop-card-name">${item.name}</div>
+                <div class="shop-card-desc">${item.description}</div>
+                ${statsHtml}
+                <div class="shop-card-price">
+                    <span class="price-tag">VALOR:</span>
+                    <span class="price-val">🪙 ${item.price}</span>
+                </div>
+                <button class="shop-buy-btn ${btnDisabled ? 'bought' : ''}" data-buy-id="${item.id}" ${btnDisabled ? 'disabled' : ''}>
+                    ${btnText}
+                </button>
             </div>
-            <button class="shop-buy-btn ${btnDisabled ? 'bought' : ''}" data-buy-id="${item.id}" ${btnDisabled ? 'disabled' : ''}>
-                ${btnText}
-            </button>
+            ${purchaseBadge}
         </div>
     `;
 }
@@ -289,7 +331,7 @@ function _bindShopEvents() {
             window.removeEventListener('keydown', keyHandler, true);
             return;
         }
-        if (e.code === 'Escape' || e.code === 'KeyE') {
+        if (e.code === 'Escape' || isBound('interact', e.code)) {
             e.preventDefault();
             e.stopPropagation();
             playClickButtonSound();
@@ -355,22 +397,49 @@ function _updateWallet() {
     }
 }
 
-// Atualiza card + botão na tela após uma compra sem re-renderizar tudo.
+// Atualiza card + botão + badge inferior na tela após uma compra sem re-renderizar tudo.
 function _refreshShopPurchaseState(item, isMaxed) {
     const card = shopOverlay?.querySelector(`[data-item-id="${item.id}"]`);
     if (!card) return;
     const btn = card.querySelector('.shop-buy-btn');
     if (!btn) return;
 
-    card.querySelector('.shop-card-badge').textContent = isMaxed ? '3/3' : `${gameState.getItemPurchases(item.id)}/3`;
+    const isSpecial = item.type === 'boss_assist';
+    const purchaseCount = gameState.getItemPurchases(item.id);
+    const isPurchased = isSpecial ? _isAllyHelpPermanentlyPurchased() : purchaseCount >= 1;
 
-    if (isMaxed) {
+    // Atualiza badge superior
+    let badgeText;
+    if (isSpecial) {
+        badgeText = isPurchased ? '★ ADQUIRIDO (1/1)' : '★ ESPECIAL (1/1)';
+    } else {
+        badgeText = isMaxed ? '3/3' : `${purchaseCount}/3`;
+    }
+    card.querySelector('.shop-card-badge').textContent = badgeText;
+
+    // Atualiza badge inferior (contador de compras)
+    const purchaseBadge = card.querySelector('.shop-card-purchase-badge');
+    if (purchaseBadge) {
+        if (isSpecial) {
+            purchaseBadge.textContent = isPurchased ? '1/1' : '0/1';
+            if (isPurchased) purchaseBadge.style.display = 'none';
+        } else {
+            purchaseBadge.textContent = `${purchaseCount}/3`;
+            if (isMaxed) purchaseBadge.style.display = 'none';
+        }
+    }
+
+    if (isMaxed || (isSpecial && isPurchased)) {
         card.classList.add('is-bought');
         btn.classList.add('bought');
         btn.setAttribute('disabled', 'true');
-        btn.textContent = `✔ MÁXIMO (${gameState.getItemPurchases(item.id)}/3)`;
+        if (isSpecial) {
+            btn.textContent = '✔ ADQUIRIDO';
+        } else {
+            btn.textContent = `✔ MÁXIMO (3/3)`;
+        }
     } else {
-        btn.textContent = `COMPRAR (${item.price} 🪙)`;
+        btn.textContent = `COMPRAR`;
     }
 }
 

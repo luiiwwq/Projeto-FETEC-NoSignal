@@ -21,7 +21,7 @@
  */
 
 /* ── Combat tuning ───────────────────────────────────────── */
-export const ARCHER_MAX_HP = 90;
+export const ARCHER_MAX_HP = 40;
 export const ARCHER_ATTACK_DAMAGE = 18;       // dano de cada flecha
 export const ARCHER_ATTACK_COOLDOWN = 3.5;    // seconds between shots (disparo lento)
 export const ARCHER_ATTACK_RANGE = 620;       // atira dentro deste raio

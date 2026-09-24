@@ -1,7 +1,6 @@
 /**
  * Reprodutor compartilhado das cutscenes de encerramento.
- * Para adicionar um final futuro, configure sua pasta, quantidade de cenas e
- * cartão terminal em FINAL_DEFINITIONS.
+ * Cada final usa suas imagens, textos e cartão terminal em FINAL_DEFINITIONS.
  */
 
 import { preloadCutsceneMusic, startCutsceneMusic, stopCutsceneMusic } from '../audio/cutsceneMusic.js';
@@ -11,9 +10,9 @@ export const FINAL_DEFINITIONS = Object.freeze({
     final1: {
         available: true,
         title: 'GAME OVER',
-        directory: './src/assets/cutscenes/final_game/final_1',
-        textFile: 'final1_texts_scene.txt',
-        sceneCount: 7,
+        directory: './src/assets/cutscenes/final_game/final1',
+        textFile: 'text_scenes_final1.txt',
+        sceneCount: 3,
         imageFile: (index) => `scene${index}_final1.png`,
         terminalLines: [
             'OXIGÊNIO: 0%',
@@ -22,9 +21,35 @@ export const FINAL_DEFINITIONS = Object.freeze({
             'GAME OVER'
         ]
     },
-    final2: { available: false, directory: './src/assets/cutscenes/final_game/final_2' },
-    final3: { available: false, directory: './src/assets/cutscenes/final_game/final_3' },
-    final4: { available: false, directory: './src/assets/cutscenes/final_game/final_4' }
+    final2: {
+        available: true,
+        title: 'TERRAFORMAÇÃO INCOMPLETA',
+        directory: './src/assets/cutscenes/final_game/final2',
+        textFile: 'text_scenes_final2.txt',
+        // Encerra no corpo do astronauta; as outras imagens antecipavam um resultado conhecido.
+        sceneCount: 3,
+        imageFile: (index) => `scene${index}_final2.png`,
+        terminalLines: ['TERRAFORMAÇÃO: EM ANDAMENTO', 'STATUS: DESCONHECIDO', 'ARES-1 — SINAL PERDIDO', 'FIM']
+    },
+    final3: {
+        available: true,
+        title: 'UM NOVO LAR',
+        directory: './src/assets/cutscenes/final_game/final3',
+        textFile: 'text_scenes_final3.txt',
+        sceneCount: 7,
+        imageFile: (index) => `scene${index}_final3.png`,
+        terminalLines: ['TERRAFORMAÇÃO: CONCLUÍDA', 'DUNA: HABITÁVEL', 'MIGRAÇÃO DE KERBIN: INICIADA', 'FIM']
+    },
+    final4: {
+        available: true,
+        title: 'SOBREVIVÊNCIA',
+        directory: './src/assets/cutscenes/final_game/final4',
+        textFile: 'text_scenes_final4.txt',
+        // A cena 6 mostra ataques à civilização nativa, ausentes deste desfecho.
+        sceneCount: 7,
+        imageFile: (index) => `scene${index < 6 ? index : index + 1}_final4.png`,
+        terminalLines: ['TERRAFORMAÇÃO: INDISPONÍVEL', 'DUNA: INADEQUADO PARA KERBIN', 'COLONIZAÇÃO: INICIADA', 'SUPORTE DE VIDA: OBRIGATÓRIO', 'FIM']
+    }
 });
 
 const TYPE_SPEED_MS = 28;
@@ -39,7 +64,7 @@ function parseSceneTexts(raw, sceneCount) {
     let currentIndex = -1;
 
     for (const line of raw.split(/\r?\n/)) {
-        const match = line.match(/^scene\s*(\d+)\s*:\s*(.*)$/i);
+        const match = line.match(/^(?:scene|cena)\s*(\d+)\s*:\s*(.*)$/i);
         if (match) {
             currentIndex = Number(match[1]) - 1;
             if (currentIndex >= 0 && currentIndex < sceneCount) {
@@ -103,6 +128,7 @@ export async function playFinalGameCutscene(container, finalId, onReturnToMenu =
 function showFinal(container, definition, scenes, skip, onReturnToMenu) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
+        overlay.className = 'cutscene-ending-overlay';
         overlay.style.cssText = `
             position:absolute;inset:0;width:100%;height:100%;background:#000;
             display:flex;align-items:center;justify-content:center;z-index:9500;
@@ -118,31 +144,15 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
         `;
 
         const caption = document.createElement('div');
-        caption.style.cssText = `
-            position:absolute;left:50%;bottom:96px;transform:translateX(-50%);
-            width:min(860px,92%);box-sizing:border-box;background:rgba(5,6,12,.86);
-            border:1.5px solid rgba(232,223,200,.3);border-left:4px solid #e07228;
-            border-radius:8px;padding:16px 22px;color:#e8dfc8;font-size:11px;
-            line-height:1.9;letter-spacing:.03em;text-align:center;white-space:pre-line;
-            text-shadow:0 0 8px rgba(224,114,40,.25);box-shadow:0 6px 30px #0009;
-            z-index:2;pointer-events:none;
-        `;
+        caption.className = 'cutscene-caption';
 
         const counter = document.createElement('div');
-        counter.style.cssText = `
-            position:absolute;top:24px;right:32px;color:rgba(232,223,200,.6);
-            font-size:12px;letter-spacing:.14em;z-index:2;
-        `;
+        counter.className = 'cutscene-counter';
 
         const skipButton = document.createElement('button');
+        skipButton.className = 'ns-pixel-button cutscene-skip';
         skipButton.type = 'button';
         skipButton.textContent = 'PULAR [ENTER]';
-        skipButton.style.cssText = `
-            position:absolute;right:32px;bottom:28px;background:rgba(10,8,16,.9);
-            color:#e8dfc8;border:1.5px solid rgba(232,223,200,.4);border-radius:6px;
-            padding:10px 16px;font:700 9px var(--font-pixel,'Press Start 2P',monospace);letter-spacing:.04em;
-            cursor:pointer;z-index:3;
-        `;
 
         overlay.append(image, caption, counter, skipButton);
         container.appendChild(overlay);
@@ -189,37 +199,31 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
             clearTimers();
             image.style.opacity = '0';
             image.removeAttribute('src');
-            counter.textContent = 'SINAL PERDIDO';
+            counter.style.display = 'none';
             caption.textContent = '';
             caption.style.display = 'none';
             skipButton.style.display = 'none';
 
             const card = document.createElement('div');
-            card.style.cssText = `
-                position:relative;z-index:2;display:flex;flex-direction:column;gap:18px;
-                align-items:center;justify-content:center;width:min(760px,90%);padding:40px 24px;
-                color:#e8dfc8;text-align:center;background:rgba(5,6,12,.86);
-                border:1px solid rgba(224,114,40,.6);box-shadow:0 0 48px #000;
-            `;
+            card.className = 'ns-pixel-panel ending-terminal';
+            const heading = document.createElement('h2');
+            heading.className = 'ending-terminal__title';
+            heading.textContent = definition.title;
+            card.appendChild(heading);
             for (const [index, line] of definition.terminalLines.entries()) {
                 const label = document.createElement('div');
                 label.textContent = line;
-                label.style.cssText = `max-width:100%;overflow-wrap:anywhere;font-size:${index === definition.terminalLines.length - 1 ? 15 : 9}px;line-height:1.9;letter-spacing:.04em;`;
+                label.className = 'ending-terminal__line';
                 if (index === definition.terminalLines.length - 1) {
-                    label.style.color = '#e07228';
-                    label.style.fontWeight = 'bold';
+                    label.classList.add('ending-terminal__line--closing');
                 }
                 card.appendChild(label);
             }
 
             const menuButton = document.createElement('button');
+            menuButton.className = 'ns-pixel-button ending-terminal__button';
             menuButton.type = 'button';
             menuButton.textContent = 'VOLTAR AO MENU';
-            menuButton.style.cssText = `
-                margin-top:18px;padding:10px 22px;color:#e8dfc8;background:#15121a;
-                border:1px solid rgba(232,223,200,.45);border-radius:4px;
-                font:700 9px var(--font-pixel,'Press Start 2P',monospace);letter-spacing:.04em;cursor:pointer;
-            `;
             menuButton.addEventListener('click', finish, { once: true });
             card.appendChild(menuButton);
             overlay.appendChild(card);

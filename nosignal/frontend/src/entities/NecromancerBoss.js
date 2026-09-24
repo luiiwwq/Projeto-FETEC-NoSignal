@@ -14,7 +14,7 @@
 export const NECROMANCER_MAX_HP = 1000;
 export const NECROMANCER_PLAYER_DAMAGE_MULTIPLIER = 0.5;
 export const NECROMANCER_PLAYER_DAMAGE_WITH_ALLY_MULTIPLIER = 0.25;
-export const NECROMANCER_ATTACK_DAMAGE = 25;
+export const NECROMANCER_ATTACK_DAMAGE = 20;
 export const NECROMANCER_ATTACK_COOLDOWN = 1.2;
 export const NECROMANCER_MELEE_RANGE = 100;
 export const NECROMANCER_ENGAGE_RANGE = 920;
@@ -36,6 +36,10 @@ export const UNHOLY_FRAME_HZ = 0.09;
 /* ── Hitbox & render ─────────────────────────────────────── */
 export const NECROMANCER_COLLIDER_HALF_W = 28;
 export const NECROMANCER_COLLIDER_HALF_H = 20;
+// Hitbox de acerto das balas: cobre a arte visível (do topo da cabeça aos pés,
+// ~186px). O collider de movimento continua pequeno — as balas não podem passar
+// "por cima" quando o tiro acerta a cabeça do boss.
+export const NECROMANCER_HIT_HEIGHT = 190;
 export const NECROMANCER_RENDER_SCALE = 3;
 export const NECROMANCER_ONESHOT_FPS = 0.055;
 
@@ -300,6 +304,7 @@ export class NecromancerBoss {
 
         this.colliderHalfW = NECROMANCER_COLLIDER_HALF_W;
         this.colliderHalfH = NECROMANCER_COLLIDER_HALF_H;
+        this.hitHeight = NECROMANCER_HIT_HEIGHT;
         this.collisionResolver = null;
         this.worldBounds = null;
 

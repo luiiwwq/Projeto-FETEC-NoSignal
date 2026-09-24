@@ -4,10 +4,22 @@ import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
 
 const SUPABASE_URL = 'https://ymmowxkznmnhflfklcxg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_2WhcoOacjeTPSIf1Ue8HUg_yRBZrkzD';
-const RANKING_ENDPOINT = `${SUPABASE_URL}/rest/v1/ranking`;
+const REST_ENDPOINT = `${SUPABASE_URL}/rest/v1`;
 
-async function requestRanking(path = '', options = {}) {
-    const response = await fetch(`${RANKING_ENDPOINT}${path}`, {
+/** Identificador da partida usado para não contar duas vezes o mesmo final. */
+export function createEndingAttemptId() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+    else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+async function requestRanking(path, options = {}) {
+    const response = await fetch(`${REST_ENDPOINT}${path}`, {
         ...options,
         headers: {
             apikey: SUPABASE_PUBLISHABLE_KEY,
@@ -25,19 +37,31 @@ async function requestRanking(path = '', options = {}) {
     return response.json();
 }
 
+/** Soma uma conclusão por partida; repetir o mesmo partidaId não altera a contagem. */
+export async function registerEndingResult({ partidaId, finalId }) {
+    return requestRanking('/rpc/registrar_final', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ p_partida_id: partidaId, p_final_id: finalId })
+    });
+}
+
+export async function getEndingCounts() {
+    return requestRanking('/rpc/contagem_finais', { method: 'POST', body: '{}' });
+}
+
 /** Registra uma partida quando a cutscene do final for concluída. */
 export async function submitRankingResult({ nome, personagemId, tempoSegundos, mortes = 0, moedas, finalId }) {
     const result = {
-        nome: String(nome || 'ARES-1').trim().slice(0, 20),
-        personagem_id: CHARACTERS[personagemId] ? personagemId : DEFAULT_CHARACTER_ID,
-        tempo_segundos: Math.max(1, Math.floor(tempoSegundos || 1)),
-        mortes: Math.max(0, Math.floor(mortes || 0)),
-        moedas: Math.max(0, Math.floor(moedas || 0)),
-        final_feito: true,
-        final_id: String(finalId || '').slice(0, 32)
+        p_nome: String(nome || 'ARES-1').trim().toUpperCase().slice(0, 20) || 'ARES-1',
+        p_personagem_id: CHARACTERS[personagemId] ? personagemId : DEFAULT_CHARACTER_ID,
+        p_tempo_segundos: Math.max(1, Math.floor(tempoSegundos || 1)),
+        p_mortes: Math.max(0, Math.floor(mortes || 0)),
+        p_moedas: Math.max(0, Math.floor(moedas || 0)),
+        p_final_id: String(finalId || '').slice(0, 32)
     };
 
-    return requestRanking('', {
+    return requestRanking('/rpc/salvar_ranking', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify(result)
@@ -52,5 +76,5 @@ export async function getTopRanking(limit = 100) {
         order: 'tempo_segundos.asc,mortes.asc,moedas.desc,id.asc',
         limit: String(Math.min(100, Math.max(1, Math.floor(limit))))
     });
-    return requestRanking(`?${query.toString()}`);
+    return requestRanking(`/ranking?${query.toString()}`);
 }

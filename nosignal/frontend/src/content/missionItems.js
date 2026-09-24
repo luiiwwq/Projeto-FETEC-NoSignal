@@ -9,7 +9,7 @@
  *  - motor: parte trazeira (a BASE) — solto pelo Old Duna Guardian (Skeleton
  *           Axe Boss) no Núcleo de Duna.
  *  - meio : parte central (todos os componentes) — já está no chão da
- *           superfície nas coordenadas X00942 / Y02103.
+ *           superfície nas coordenadas X02138 / Y02527.
  *  - ponta : parte dianteira (a peça que falta) — solta pelo Necro, King of
  *           Duna (Necromancer) na Sala do Rei.
  */
@@ -35,12 +35,12 @@ export const SPACESHIP_ITEM_DEFS = {
         slot: 2,
         name: 'Combustível',
         description: 'O combustível: a energia que impulsiona a nave pela fuga de Duna.',
-        hint: 'Procure pelas coordenadas X00942 E Y02103',
+        hint: 'Procure pelas coordenadas X02138 E Y02527',
         sprite: './src/assets/sprites/Itens/spaceship_itens/spaceship_item2.png',
         dropFrom: null,
         mapId: 'mars-surface',
-        x: 942,
-        y: 2103,
+        x: 2138,
+        y: 2527,
     },
     ponta: {
         id: 'ponta',

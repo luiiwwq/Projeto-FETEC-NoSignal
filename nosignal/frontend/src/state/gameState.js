@@ -70,10 +70,11 @@ export const gameState = {
     // missionDrops:     itemId -> { mapId, x, y } para os itens dropados pelos
     //                   chefes (persistem ao trocar de mapa; o item do meio da
     //                   nave nasce já na superfície).
-    // spaceshipRepaired: true quando as 3 peças foram coletadas.
+    // spaceshipRepaired: true depois de instalar as 3 peças na nave.
     missionCollected: [],
     missionDrops: {},
     spaceshipRepaired: false,
+    enemyNpcDefeated: false, // o terceiro astronauta não reaparece após ser derrotado
     missionConcluded: false,
 
     hasMissionItem(id) {
@@ -168,6 +169,7 @@ export const gameState = {
         this.missionCollected = [];
         this.missionDrops = {};
         this.spaceshipRepaired = false;
+        this.enemyNpcDefeated = false;
         this.missionConcluded = false;
         try {
             localStorage.removeItem('noSignal_allyBossHelpPurchased');

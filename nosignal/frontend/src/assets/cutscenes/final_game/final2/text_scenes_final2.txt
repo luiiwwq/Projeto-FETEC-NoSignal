@@ -1,0 +1,5 @@
+cena1: Sem conseguir consertar a ARES-1, o astronauta decide ativar o equipamento de terraformação.
+
+cena2: O processo começa, mas levará tempo demais para ser concluído. Não há como voltar para Kerbin.
+
+cena3: Seu oxigênio se esgota. O corpo permanece ao lado do equipamento, que continua funcionando. Ninguém saberá o resultado.

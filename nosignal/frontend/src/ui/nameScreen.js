@@ -8,6 +8,8 @@ import { renderCharacterSelectScreen } from './characterSelectScreen.js';
 import { renderTitleScreen } from './titleScreen.js';
 import { initMainMenu } from './screens.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
+import { applyControls } from '../state/controlsStorage.js';
+import { fetchControlsByPlayer } from '../services/controlsRemote.js';
 
 export function renderNameScreen(container) {
     container.innerHTML = `
@@ -75,11 +77,21 @@ export function renderNameScreen(container) {
         gameState.playerName = enteredName;
         console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
 
-        // O backend PHP/MySQL local foi descontinuado: o projeto roda como site
-        // estático (Cloudflare Pages). O nome fica salvo apenas na sessão local.
-
-        // Transition to Crew Selection (character select) screen
-        renderCharacterSelectScreen(container);
+        // Ao reconhecer o nome, carrega os controles personalizados salvos
+        // para aquele astronauta (mesmo nome -> mesma config de botões).
+        const loadRemote = async () => {
+            try {
+                const raw = await fetchControlsByPlayer(enteredName);
+                if (raw) {
+                    applyControls(raw);
+                    console.log('[No Signal] Controles carregados para', enteredName);
+                }
+            } catch (err) {
+                console.warn('[No Signal] Falha ao buscar controles remotos:', err);
+            }
+            renderCharacterSelectScreen(container);
+        };
+        loadRemote();
     };
 
     btnConfirm?.addEventListener('click', handleConfirm);
