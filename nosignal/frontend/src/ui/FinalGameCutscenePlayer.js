@@ -172,6 +172,9 @@ function showFinal(container, definition, scenes, skip, onContinue) {
             finished = true;
             clearTimers();
             overlay.remove();
+            // A música do menu pode começar em onContinue; encerra a trilha da
+            // cutscene antes de trocar de tela para não tocar as duas juntas.
+            stopCutsceneMusic();
             resolve(true);
             onContinue();
         };
