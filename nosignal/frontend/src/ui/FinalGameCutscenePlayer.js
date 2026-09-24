@@ -5,6 +5,7 @@
 
 import { preloadCutsceneMusic, startCutsceneMusic, stopCutsceneMusic } from '../audio/cutsceneMusic.js';
 import { stopMenuMusic } from '../audio/menuMusic.js';
+import { withNetworkTimeout } from '../services/networkTimeout.js';
 
 export const FINAL_DEFINITIONS = Object.freeze({
     final1: {
@@ -23,13 +24,12 @@ export const FINAL_DEFINITIONS = Object.freeze({
     },
     final2: {
         available: true,
-        title: 'TERRAFORMAÇÃO INCOMPLETA',
+        title: 'DUNA TERRAFORMADA',
         directory: './src/assets/cutscenes/final_game/final2',
         textFile: 'text_scenes_final2.txt',
-        // Encerra no corpo do astronauta; as outras imagens antecipavam um resultado conhecido.
-        sceneCount: 3,
+        sceneCount: 6,
         imageFile: (index) => `scene${index}_final2.png`,
-        terminalLines: ['TERRAFORMAÇÃO: EM ANDAMENTO', 'STATUS: DESCONHECIDO', 'ARES-1 — SINAL PERDIDO', 'FIM']
+        terminalLines: ['TERRAFORMAÇÃO: CONCLUÍDA', 'ASTRONAUTA: SEM OXIGÊNIO', 'KERBIN: SEM NOTÍCIAS', 'DUNA: NÃO COLONIZADA POR KERBIN']
     },
     final3: {
         available: true,
@@ -45,9 +45,8 @@ export const FINAL_DEFINITIONS = Object.freeze({
         title: 'SOBREVIVÊNCIA',
         directory: './src/assets/cutscenes/final_game/final4',
         textFile: 'text_scenes_final4.txt',
-        // A cena 6 mostra ataques à civilização nativa, ausentes deste desfecho.
-        sceneCount: 7,
-        imageFile: (index) => `scene${index < 6 ? index : index + 1}_final4.png`,
+        sceneCount: 8,
+        imageFile: (index) => `scene${index}_final4.png`,
         terminalLines: ['TERRAFORMAÇÃO: INDISPONÍVEL', 'DUNA: INADEQUADO PARA KERBIN', 'COLONIZAÇÃO: INICIADA', 'SUPORTE DE VIDA: OBRIGATÓRIO', 'FIM']
     }
 });
@@ -59,7 +58,7 @@ const MIN_DURATION_MS = 4200;
 const MAX_DURATION_MS = 10000;
 const FADE_MS = 600;
 
-function parseSceneTexts(raw, sceneCount) {
+export function parseSceneTexts(raw, sceneCount) {
     const scenes = Array.from({ length: sceneCount }, () => '');
     let currentIndex = -1;
 
@@ -79,16 +78,18 @@ function parseSceneTexts(raw, sceneCount) {
 }
 
 async function loadScenes(definition) {
-    const response = await fetch(`${definition.directory}/${definition.textFile}`, { cache: 'no-cache' });
-    if (!response.ok) throw new Error(`Falha ao carregar o texto do final: HTTP ${response.status}`);
-    return parseSceneTexts(await response.text(), definition.sceneCount);
+    return withNetworkTimeout(async (signal) => {
+        const response = await fetch(`${definition.directory}/${definition.textFile}`, { cache: 'no-cache', signal });
+        if (!response.ok) throw new Error(`Falha ao carregar o texto do final: HTTP ${response.status}`);
+        return parseSceneTexts(await response.text(), definition.sceneCount);
+    });
 }
 
 function sceneImagePath(definition, index) {
     return `${definition.directory}/${definition.imageFile(index)}`;
 }
 
-export async function playFinalGameCutscene(container, finalId, onReturnToMenu = () => {}) {
+export async function playFinalGameCutscene(container, finalId, onContinue = () => {}) {
     const definition = FINAL_DEFINITIONS[finalId];
     if (!container || !definition || !definition.available) {
         console.warn(`[FinalCutscene] Final indisponível: ${finalId}`);
@@ -118,14 +119,14 @@ export async function playFinalGameCutscene(container, finalId, onReturnToMenu =
             scenes = Array.from({ length: definition.sceneCount }, () => '');
         }
 
-        return await showFinal(container, definition, scenes, skip, onReturnToMenu);
+        return await showFinal(container, definition, scenes, skip, onContinue);
     } finally {
         window.removeEventListener('keydown', onSkipKey, true);
         stopCutsceneMusic();
     }
 }
 
-function showFinal(container, definition, scenes, skip, onReturnToMenu) {
+function showFinal(container, definition, scenes, skip, onContinue) {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.className = 'cutscene-ending-overlay';
@@ -172,7 +173,7 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
             clearTimers();
             overlay.remove();
             resolve(true);
-            onReturnToMenu();
+            onContinue();
         };
 
         skip.now = () => {
@@ -220,14 +221,14 @@ function showFinal(container, definition, scenes, skip, onReturnToMenu) {
                 card.appendChild(label);
             }
 
-            const menuButton = document.createElement('button');
-            menuButton.className = 'ns-pixel-button ending-terminal__button';
-            menuButton.type = 'button';
-            menuButton.textContent = 'VOLTAR AO MENU';
-            menuButton.addEventListener('click', finish, { once: true });
-            card.appendChild(menuButton);
+            const continueButton = document.createElement('button');
+            continueButton.className = 'ns-pixel-button ending-terminal__button';
+            continueButton.type = 'button';
+            continueButton.textContent = 'CONTINUAR';
+            continueButton.addEventListener('click', finish, { once: true });
+            card.appendChild(continueButton);
             overlay.appendChild(card);
-            menuButton.focus();
+            continueButton.focus();
         };
 
         const showScene = (index) => {

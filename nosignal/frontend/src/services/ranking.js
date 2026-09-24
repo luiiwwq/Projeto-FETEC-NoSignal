@@ -1,6 +1,7 @@
 /** Integração pública com o ranking do Supabase (Cloudflare Pages). */
 
 import { CHARACTERS, DEFAULT_CHARACTER_ID } from '../content/characters.js';
+import { withNetworkTimeout } from './networkTimeout.js';
 
 const SUPABASE_URL = 'https://ymmowxkznmnhflfklcxg.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_2WhcoOacjeTPSIf1Ue8HUg_yRBZrkzD';
@@ -19,22 +20,25 @@ export function createEndingAttemptId() {
 }
 
 async function requestRanking(path, options = {}) {
-    const response = await fetch(`${REST_ENDPOINT}${path}`, {
-        ...options,
-        headers: {
-            apikey: SUPABASE_PUBLISHABLE_KEY,
-            'Content-Type': 'application/json',
-            ...options.headers
+    return withNetworkTimeout(async (signal) => {
+        const response = await fetch(`${REST_ENDPOINT}${path}`, {
+            ...options,
+            signal,
+            headers: {
+                apikey: SUPABASE_PUBLISHABLE_KEY,
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        });
+
+        if (!response.ok) {
+            const details = await response.text();
+            throw new Error(`Supabase ranking error (${response.status}): ${details}`);
         }
+
+        if (response.status === 204) return null;
+        return response.json();
     });
-
-    if (!response.ok) {
-        const details = await response.text();
-        throw new Error(`Supabase ranking error (${response.status}): ${details}`);
-    }
-
-    if (response.status === 204) return null;
-    return response.json();
 }
 
 /** Soma uma conclusão por partida; repetir o mesmo partidaId não altera a contagem. */

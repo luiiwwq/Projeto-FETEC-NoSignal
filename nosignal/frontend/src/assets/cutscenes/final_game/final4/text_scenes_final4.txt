@@ -1,13 +1,15 @@
-cena1: A ARES-1 está consertada. O astronauta e o terceiro tripulante podem voltar para Kerbin.
+cena1: Com o foguete consertado, a volta para Kerbin era possível. Mas havia um problema.
 
-cena2: Antes da partida, o terceiro astronauta destrói o equipamento de terraformação para proteger a vida nativa de Duna.
+cena2: O equipamento de terraformação estava destruído. E, olhando os buracos de bala na nave, era provável que o outro astronauta tivesse feito isso.
 
-cena3: Os dois deixam Duna juntos, sem terraformar o planeta.
+cena3: Mesmo assim, os astronautas sobreviventes partem de volta para seu planeta natal.
 
-cena4: Meses depois, chegam a Kerbin e revelam que a terraformação não acontecerá.
+cena4: Depois de meses, eles finalmente chegam em Kerbin e relatam o fracasso da missão.
 
-cena5: Com Kerbin morrendo, a população decide migrar para Duna mesmo assim.
+cena5: Mesmo com Duna não terraformada, o povo de Kerbin constrói enormes naves para levar a população ao novo planeta.
 
-cena6: Os habitantes de Kerbin sobrevivem em domos, trajes e sistemas de suporte de vida permanentes.
+cena6: Como os habitantes de Duna ainda estavam vivos, o povo de Kerbin promoveu ataques às cidades das criaturas.
 
-cena7: A vida em Duna é difícil. Mas a civilização nativa continua existindo ao lado dos novos colonos.
+cena7: Como Duna não teve sua terraformação concluída, os habitantes de Kerbin foram obrigados a viver em domos pelo resto de suas vidas.
+
+cena8: Assim, eles viveram em péssimas condições, pagando o preço por seus próprios erros.

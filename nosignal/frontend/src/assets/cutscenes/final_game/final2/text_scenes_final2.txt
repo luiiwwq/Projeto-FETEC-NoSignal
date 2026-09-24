@@ -1,5 +1,11 @@
-cena1: Sem conseguir consertar a ARES-1, o astronauta decide ativar o equipamento de terraformação.
+cena1: Decidido a cumprir sua missão, o astronauta escolhe terraformar Duna, mesmo sabendo que com isso não poderá voltar para Kerbin.
 
-cena2: O processo começa, mas levará tempo demais para ser concluído. Não há como voltar para Kerbin.
+cena2: Ele monta o equipamento e dá início ao processo de terraformação.
 
-cena3: Seu oxigênio se esgota. O corpo permanece ao lado do equipamento, que continua funcionando. Ninguém saberá o resultado.
+cena3: Os primeiros resultados da terraformação começam a aparecer, mas o astronauta não resiste e acaba morrendo por falta de oxigênio.
+
+cena4: Enquanto isso, Kerbin continua em colapso, sem saber o que aconteceu com a missão ou se a terraformação foi concluída.
+
+cena5: Com a terraformação, a sociedade que vivia abaixo do solo é extinta, incapaz de sobreviver às novas condições atmosféricas.
+
+cena6: Assim, Duna é terraformada, mas permanece intocada pela população de Kerbin.

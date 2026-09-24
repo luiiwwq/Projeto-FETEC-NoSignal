@@ -13,10 +13,14 @@ import { preloadShootSounds } from '../audio/shootSound.js';
 import { preloadPlayerSounds } from '../audio/playerSound.js';
 
 export function renderLoadingScreen(container) {
-    // Qualquer fluxo que chegue ao gameplay começa UMA PARTIDA NOVA: garante a
-    // limpeza da sessão anterior (inclusive a compra única da Ajuda no Boss,
-    // persistida em localStorage) para o item poder ser comprado de novo.
-    gameState.reset();
+    // Só a cutscene inicial pode abrir este loading. Uma continuação assíncrona
+    // antiga nunca deve apagar um gameplay já em andamento e reiniciar a partida.
+    if (gameState.currentScene === 'LOADING') return;
+    if (gameState.currentScene !== 'OPENING_CUTSCENE') {
+        console.warn('[Loading] Transição ignorada fora do fluxo inicial:', gameState.currentScene);
+        return;
+    }
+    gameState.currentScene = 'LOADING';
 
     // O jogador deixou o menu: interrompe a música do menu antes do gameplay.
     stopMenuMusic();
@@ -52,6 +56,7 @@ export function renderLoadingScreen(container) {
             </div>
         </div>
     `;
+    const loadingScreen = container.querySelector('.loading-screen-wrapper');
 
     const fillElement = document.getElementById('loading-bar-fill');
     const statusElement = document.getElementById('loading-status-text');
@@ -87,34 +92,41 @@ export function renderLoadingScreen(container) {
     // imediatamente quando o primeiro acontecer em gameplay.
     preloadPlayerSounds();
 
-    // Run preload
-    assetLoader.preloadAll((progress, loaded, total) => {
+    // Um servidor lento não pode manter a tela de loading aberta para sempre.
+    const preloadDeadline = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Tempo limite global do preload excedido.')), 20000);
+    });
+    const preloadAssets = assetLoader.preloadAll((progress, loaded, total) => {
         const pct = Math.floor(progress * 100);
         if (fillElement) fillElement.style.width = `${pct}%`;
         if (counterElement) counterElement.innerText = `${loaded} / ${total} MÓDULOS`;
         if (percentElement) percentElement.innerText = `${pct}%`;
-    }, gameState.selectedCharacter).then(() => musicReady).then(() => {
+    }, gameState.selectedCharacter);
+
+    let launchScheduled = false;
+    const launchGame = (delay) => {
+        if (launchScheduled) return;
+        launchScheduled = true;
+        setTimeout(() => {
+            if (!loadingScreen?.isConnected || gameState.currentScene !== 'LOADING') return;
+            startGameMusic();
+            const engine = new GameEngine(container);
+            engine.init();
+        }, delay);
+    };
+
+    Promise.race([preloadAssets, preloadDeadline]).then(() => musicReady).then(() => {
         clearInterval(phraseInterval);
         if (statusElement) statusElement.innerText = 'POUSO AUTORIZADO! INICIANDO SIMULAÇÃO...';
         if (fillElement) fillElement.style.width = '100%';
         if (percentElement) percentElement.innerText = '100%';
-
-        setTimeout(() => {
-            // O jogador deixou o menu: a música ambiente do gameplay assume.
-            startGameMusic();
-            const engine = new GameEngine(container);
-            engine.init();
-        }, 500);
+        launchGame(500);
     }).catch((err) => {
         clearInterval(phraseInterval);
         console.error('[AssetLoader] Error preloading:', err);
         if (statusElement) {
             statusElement.innerText = 'AVISO: FALHA PARCIAL NO CARREGAMENTO. INICIANDO...';
         }
-        setTimeout(() => {
-            startGameMusic();
-            const engine = new GameEngine(container);
-            engine.init();
-        }, 800);
+        launchGame(800);
     });
 }

@@ -12,6 +12,7 @@ import { applyControls } from '../state/controlsStorage.js';
 import { fetchControlsByPlayer } from '../services/controlsRemote.js';
 
 export function renderNameScreen(container) {
+    gameState.currentScene = 'NAME_ENTRY';
     container.innerHTML = `
         <div class="name-screen-wrapper">
             <div class="mars-grid-overlay"></div>
@@ -62,9 +63,11 @@ export function renderNameScreen(container) {
         </div>
     `;
 
-    const input = document.getElementById('astronaut-name-input');
-    const btnConfirm = document.getElementById('btn-confirm-mission');
-    const btnBack = document.getElementById('btn-back-menu');
+    const screen = container.querySelector('.name-screen-wrapper');
+    const input = screen?.querySelector('#astronaut-name-input');
+    const btnConfirm = screen?.querySelector('#btn-confirm-mission');
+    const btnBack = screen?.querySelector('#btn-back-menu');
+    let submitting = false;
 
     // Auto focus & select text
     if (input) {
@@ -72,26 +75,33 @@ export function renderNameScreen(container) {
         input.select();
     }
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
+        if (submitting || !screen?.isConnected) return;
+        submitting = true;
+        input.disabled = true;
+        if (btnConfirm) btnConfirm.disabled = true;
+        if (btnBack) btnBack.disabled = true;
+
         const enteredName = input.value.trim().toUpperCase() || 'ARES-1';
         gameState.playerName = enteredName;
         console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
 
         // Ao reconhecer o nome, carrega os controles personalizados salvos
         // para aquele astronauta (mesmo nome -> mesma config de botões).
-        const loadRemote = async () => {
-            try {
-                const raw = await fetchControlsByPlayer(enteredName);
-                if (raw) {
-                    applyControls(raw);
-                    console.log('[No Signal] Controles carregados para', enteredName);
-                }
-            } catch (err) {
-                console.warn('[No Signal] Falha ao buscar controles remotos:', err);
+        try {
+            const raw = await fetchControlsByPlayer(enteredName);
+            if (raw) {
+                applyControls(raw);
+                console.log('[No Signal] Controles carregados para', enteredName);
             }
+        } catch (err) {
+            console.warn('[No Signal] Falha ao buscar controles remotos:', err);
+        }
+
+        // Uma resposta atrasada não pode sobrescrever uma tela mais nova.
+        if (screen.isConnected && gameState.currentScene === 'NAME_ENTRY') {
             renderCharacterSelectScreen(container);
-        };
-        loadRemote();
+        }
     };
 
     btnConfirm?.addEventListener('click', handleConfirm);
@@ -106,6 +116,7 @@ export function renderNameScreen(container) {
     });
 
     btnBack?.addEventListener('click', () => {
+        if (submitting) return;
         renderTitleScreen(container);
         initMainMenu();
     });

@@ -9,7 +9,7 @@ import { MAPS, MAP_IDS } from '../src/content/maps.js';
 import { GameEngine } from '../src/engine/GameEngine.js';
 import { gameState } from '../src/state/gameState.js';
 import { OXYGEN_LIFETIME_DAYS, OXYGEN_LIFETIME_SECONDS } from '../src/systems/dayNightSystem.js';
-import { FINAL_DEFINITIONS } from '../src/ui/FinalGameCutscenePlayer.js';
+import { FINAL_DEFINITIONS, parseSceneTexts } from '../src/ui/FinalGameCutscenePlayer.js';
 import { createEndingAttemptId, registerEndingResult } from '../src/services/ranking.js';
 import { getActionCodes } from '../src/state/controlsStorage.js';
 import { codeDisplay } from '../src/state/controlsStorage.js';
@@ -197,7 +197,19 @@ test('cada final configurado tem texto para todas as imagens que exibe', () => {
         const textPath = resolve(directory, definition.textFile);
         assert.ok(existsSync(textPath), textPath);
         const text = readFileSync(textPath, 'utf8');
+        const labeledScenes = [...text.matchAll(/^(?:scene|cena)\s*(\d+)\s*:[ \t]*(.+)$/gim)];
+        assert.deepEqual(
+            labeledScenes.map((match) => Number(match[1])),
+            Array.from({ length: definition.sceneCount }, (_, i) => i + 1),
+            `${id}: cada cena escrita precisa ser exibida, na ordem correta`
+        );
+        assert.deepEqual(
+            parseSceneTexts(text, definition.sceneCount),
+            labeledScenes.map((match) => match[2].trim()),
+            `${id}: o reprodutor deve usar os textos originais das cenas`
+        );
         for (let index = 1; index <= definition.sceneCount; index++) {
+            assert.equal(definition.imageFile(index), `scene${index}_${id}.png`, `${id}: imagem alinhada ao texto da cena ${index}`);
             assert.ok(existsSync(resolve(directory, definition.imageFile(index))), `${id} imagem ${index}`);
             assert.match(text, new RegExp(`^cena${index}:\\s*\\S`, 'im'), `${id} texto ${index}`);
         }

@@ -2,8 +2,11 @@
  * Módulo de Renderização e Controle da Tela Inicial (Title Screen) - No Signal
  */
 
+import { gameState } from '../state/gameState.js';
+
 export function renderTitleScreen(container) {
     if (!container) return;
+    gameState.currentScene = 'TITLE';
 
     container.innerHTML = `
         <div class="title-screen-wrapper">

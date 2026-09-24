@@ -12,6 +12,7 @@ import { playStartGameCutscene } from './StartGameCutscenePlayer.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 
 export function renderCharacterSelectScreen(container) {
+    gameState.currentScene = 'CHARACTER_SELECT';
     container.innerHTML = `
         <div class="name-screen-wrapper">
             <div class="mars-grid-overlay"></div>
@@ -68,9 +69,10 @@ export function renderCharacterSelectScreen(container) {
         </div>
     `;
 
-    const grid = document.getElementById('char-select-grid');
-    const btnConfirm = document.getElementById('btn-confirm-char');
-    const btnBack = document.getElementById('btn-back-name');
+    const screen = container.querySelector('.name-screen-wrapper');
+    const grid = screen?.querySelector('#char-select-grid');
+    const btnConfirm = screen?.querySelector('#btn-confirm-char');
+    const btnBack = screen?.querySelector('#btn-back-name');
 
     let selectedId = gameState.selectedCharacter || DEFAULT_CHARACTER_ID;
     if (!CHARACTERS[selectedId]) selectedId = DEFAULT_CHARACTER_ID;
@@ -86,6 +88,9 @@ export function renderCharacterSelectScreen(container) {
     };
 
     const spinners = new Map();
+    let active = true;
+    let confirming = false;
+    let keyListenerTimer = null;
 
     const stopSpin = (card) => {
         const timer = spinners.get(card);
@@ -123,15 +128,32 @@ export function renderCharacterSelectScreen(container) {
         });
     });
 
-    const handleConfirm = () => {
+    const handleConfirm = async () => {
+        if (confirming || !active || !screen?.isConnected) return;
+        confirming = true;
         gameState.selectedCharacter = selectedId;
+        gameState.currentScene = 'OPENING_CUTSCENE';
+        cleanup();
+        cards.forEach((card) => { card.disabled = true; });
+        if (btnConfirm) btnConfirm.disabled = true;
+        if (btnBack) btnBack.disabled = true;
         console.log(`[No Signal] Tripulante selecionado: ${selectedId}`);
-        playStartGameCutscene(container).then(() => {
+
+        try {
+            await playStartGameCutscene(container);
+        } catch (error) {
+            console.error('[StartGameCutscene] Falha inesperada; seguindo para o jogo.', error);
+        }
+
+        // Ignora continuações de uma seleção que já foi substituída.
+        if (screen.isConnected && gameState.currentScene === 'OPENING_CUTSCENE') {
             renderLoadingScreen(container);
-        });
+        }
     };
 
     const handleBack = () => {
+        if (confirming) return;
+        cleanup();
         renderNameScreen(container);
     };
 
@@ -139,19 +161,24 @@ export function renderCharacterSelectScreen(container) {
     btnBack?.addEventListener('click', handleBack);
 
     const cleanup = () => {
+        active = false;
+        if (keyListenerTimer !== null) {
+            clearTimeout(keyListenerTimer);
+            keyListenerTimer = null;
+        }
         document.removeEventListener('keydown', onKeyDown);
+        for (const timer of spinners.values()) clearInterval(timer);
+        spinners.clear();
     };
 
     const onKeyDown = (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            cleanup();
             // Enter confirma a seleção (nenhum `click` nativo é gerado aqui,
             // pois o keydown é interceptado com preventDefault).
             playClickButtonSound();
             handleConfirm();
         } else if (e.key === 'Escape') {
-            cleanup();
             playClickButtonSound();
             handleBack();
         }
@@ -159,12 +186,10 @@ export function renderCharacterSelectScreen(container) {
 
     // Fires after the current synchronous dispatch so the name screen's leftover
     // Enter/click keydown no longer reaches this new document listener.
-    setTimeout(() => {
-        document.addEventListener('keydown', onKeyDown);
+    keyListenerTimer = setTimeout(() => {
+        keyListenerTimer = null;
+        if (active && screen?.isConnected) document.addEventListener('keydown', onKeyDown);
     }, 0);
-
-    btnConfirm?.addEventListener('click', cleanup);
-    btnBack?.addEventListener('click', cleanup);
 
     applySelection();
 }

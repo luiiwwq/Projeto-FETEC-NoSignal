@@ -7,7 +7,7 @@ import { DAY_NIGHT_DURATION, DAY_NIGHT_PERIOD } from '../systems/dayNightSystem.
 
 export const gameState = {
     playerName: 'ARES-1',
-    currentScene: 'TITLE', // 'TITLE', 'NAME_ENTRY', 'LOADING', 'GAMEPLAY'
+    currentScene: 'TITLE', // 'TITLE', 'NAME_ENTRY', 'CHARACTER_SELECT', 'OPENING_CUTSCENE', 'LOADING', 'GAMEPLAY', 'ENDING', 'CREDITS'
     selectedCharacter: null, // 'astronaut' | 'space-lizard' | 'ocstronaut' — escolhido no characterSelectScreen
     playerHp: 105,
     maxPlayerHp: 105,

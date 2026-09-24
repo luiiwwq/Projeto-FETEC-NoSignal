@@ -41,12 +41,17 @@ function applyBrightness() {
     root.style.filter = brightnessFilter(settings.brightness);
 }
 
-function refreshFullscreenButtons() {
-    document.querySelectorAll('button[data-action="fullscreen"]').forEach((btn) => {
-        btn.textContent = document.fullscreenElement ? 'TELA CHEIA: LIGADO' : 'TELA CHEIA: DESLIGADO';
+function refreshFullscreenButtons(wrap = null) {
+    const fullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    // createOptionsContent sincroniza antes de inserir o painel no DOM. Inclui
+    // o painel recém-criado para não reabrir opções exibindo "DESLIGADO".
+    const buttons = new Set(document.querySelectorAll('button[data-action="fullscreen"]'));
+    wrap?.querySelectorAll('button[data-action="fullscreen"]').forEach((btn) => buttons.add(btn));
+    buttons.forEach((btn) => {
+        btn.textContent = fullscreen ? 'TELA CHEIA: LIGADO' : 'TELA CHEIA: DESLIGADO';
     });
     const settings = loadSettings();
-    settings.fullscreen = !!document.fullscreenElement || fsKeepRequested;
+    settings.fullscreen = fullscreen || fsKeepRequested;
     saveSettings(settings);
 }
 
@@ -282,6 +287,6 @@ export function syncOptionsUI(wrap, containerRef) {
         const label = wrap.querySelector(`[data-value-for="${slider.dataset.setting}"]`);
         if (label) label.textContent = value + '%';
     });
-    refreshFullscreenButtons();
+    refreshFullscreenButtons(wrap);
     applyBrightness();
 }

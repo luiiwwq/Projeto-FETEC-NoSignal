@@ -11,7 +11,7 @@ import { getCharacter } from '../content/characters.js';
 import { gameState } from '../state/gameState.js';
 import { playShootSound } from '../audio/shootSound.js';
 import { playDamageSound, playDieSound, playWalkSound } from '../audio/playerSound.js';
-import { isActionDown } from '../state/controlsStorage.js';
+import { isActionDown, isCombatActionDown } from '../state/controlsStorage.js';
 
 const DIAGONAL_FALLBACK = {
     'south-east': ['east', 'south'],
@@ -300,13 +300,12 @@ export class Player {
         const screenPos = camera.worldToScreen(this.x, this.y);
         const aimAngle = Math.atan2(input.mouseY - screenPos.y, input.mouseX - screenPos.x);
 
-        // Shoot Action (Left Click)
-        if (input.mouseLeft && this.shootCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
+        // Tiro e soco respeitam tanto o mouse padrão quanto teclas remapeadas.
+        if (isCombatActionDown('shoot', input) && this.shootCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.shoot(aimAngle, bulletManager);
         }
 
-        // Punch Action (Right Click)
-        if (input.mouseRight && this.punchCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
+        if (isCombatActionDown('punch', input) && this.punchCooldown <= 0 && this.state !== PlayerState.HURT && this.state !== PlayerState.DASHING) {
             this.punch(aimAngle, bulletManager);
         }
 

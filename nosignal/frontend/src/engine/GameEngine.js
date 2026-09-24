@@ -84,6 +84,9 @@ import { playBossCutscene } from '../ui/BossCutscenePlayer.js';
 import { startBossMusic, stopBossMusic } from '../audio/bossMusic.js';
 import { startGameMusic, stopGameMusic } from '../audio/gameMusic.js';
 import { playFinalGameCutscene } from '../ui/FinalGameCutscenePlayer.js';
+import { renderTitleScreen } from '../ui/titleScreen.js';
+import { renderCreditsScreen } from '../ui/creditsScreen.js';
+import { startMenuMusic } from '../audio/menuMusic.js';
 import { confirmIncompleteMission } from '../ui/missionEndingConfirm.js';
 import { playNpcDialogue } from '../ui/npcDialogue.js';
 import { createEndingAttemptId, registerEndingResult, submitRankingResult } from '../services/ranking.js';
@@ -302,6 +305,10 @@ export class GameEngine {
         // Bound listeners for cleanup
         this._onKeyDown = this._handleKeyDown.bind(this);
         this._onKeyUp = this._handleKeyUp.bind(this);
+        this._onBlur = this._clearInput.bind(this);
+        this._onVisibilityChange = () => {
+            if (document.hidden) this._clearInput();
+        };
         this._onMouseMove = this._handleMouseMove.bind(this);
         this._onMouseDown = this._handleMouseDown.bind(this);
         this._onMouseUp = this._handleMouseUp.bind(this);
@@ -373,6 +380,8 @@ export class GameEngine {
         // Bind events
         window.addEventListener('keydown', this._onKeyDown);
         window.addEventListener('keyup', this._onKeyUp);
+        window.addEventListener('blur', this._onBlur);
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
         window.addEventListener('resize', this._onResize);
         this.canvas.addEventListener('mousemove', this._onMouseMove);
         this.canvas.addEventListener('mousedown', this._onMouseDown);
@@ -406,6 +415,9 @@ export class GameEngine {
         closeShopScreen();
         window.removeEventListener('keydown', this._onKeyDown);
         window.removeEventListener('keyup', this._onKeyUp);
+        window.removeEventListener('blur', this._onBlur);
+        document.removeEventListener('visibilitychange', this._onVisibilityChange);
+        this._clearInput();
         window.removeEventListener('resize', this._onResize);
         window.removeEventListener('mouseup', this._onMouseUp);
         document.removeEventListener('fullscreenchange', this._onFullscreenChange);
@@ -583,47 +595,61 @@ export class GameEngine {
         this.stop();
 
         const partidaId = createEndingAttemptId();
+        // Captura o placar desta partida antes de liberar o menu para uma nova.
+        const result = {
+            nome: gameState.playerName,
+            personagemId: gameState.selectedCharacter || DEFAULT_CHARACTER_ID,
+            tempoSegundos: this.dayNight.elapsedTime,
+            mortes: gameState.deaths,
+            moedas: gameState.totalCoinsEarned,
+            finalId
+        };
         const registration = registerEndingResult({ partidaId, finalId }).then(() => true, (error) => {
-            console.error('[Finais] Não foi possível registrar o final. Tentando novamente ao voltar ao menu:', error);
+            console.error('[Finais] Não foi possível registrar o final. Tentando novamente em segundo plano:', error);
             return false;
         });
 
-        playFinalGameCutscene(this.container, finalId, async () => {
-            // Uma repetição após falha usa o mesmo UUID para não duplicar o total.
-            if (!(await registration)) {
-                try {
-                    await registerEndingResult({ partidaId, finalId });
-                } catch (error) {
-                    console.error('[Finais] Não foi possível registrar o final:', error);
+        playFinalGameCutscene(this.container, finalId, () => {
+            // Persistência independente da navegação: Supabase lento ou offline
+            // não pode deixar o jogador diante de uma tela vazia.
+            void (async () => {
+                // Uma repetição após falha usa o mesmo UUID para não duplicar o total.
+                if (!(await registration)) {
+                    try {
+                        await registerEndingResult({ partidaId, finalId });
+                    } catch (error) {
+                        console.error('[Finais] Não foi possível registrar o final:', error);
+                    }
                 }
-            }
 
-            // O ranking por nome é separado do histórico de finais.
-            try {
-                await submitRankingResult({
-                    nome: gameState.playerName,
-                    personagemId: gameState.selectedCharacter || DEFAULT_CHARACTER_ID,
-                    tempoSegundos: this.dayNight.elapsedTime,
-                    mortes: gameState.deaths,
-                    moedas: gameState.totalCoinsEarned,
-                    finalId
-                });
-            } catch (error) {
-                console.error('[Ranking] Não foi possível salvar o resultado:', error);
-            }
+                try {
+                    await submitRankingResult(result);
+                } catch (error) {
+                    console.error('[Ranking] Não foi possível salvar o resultado:', error);
+                }
+            })();
 
             this.container.innerHTML = '';
             gameState.activeEngine = null;
             gameState.activeEnding = null;
-            gameState.currentScene = 'TITLE';
 
-            const [{ renderTitleScreen }, { initMainMenu }, { startMenuMusic }] = await Promise.all([
-                import('../ui/titleScreen.js'),
-                import('../ui/screens.js'),
-                import('../audio/menuMusic.js')
-            ]);
+            // Mesma cena do botão CRÉDITOS da tela inicial, mas o menu só fica
+            // visível e clicável após a rolagem e o botão VOLTAR AO MENU.
             renderTitleScreen(this.container);
-            initMainMenu();
+            const title = this.container.querySelector('.title-screen-wrapper');
+            title.classList.add('title-screen-wrapper--credits');
+            gameState.currentScene = 'CREDITS';
+            renderCreditsScreen(this.container, {
+                afterEnding: true,
+                onBack: () => {
+                    title.classList.remove('title-screen-wrapper--credits');
+                    gameState.currentScene = 'TITLE';
+                    import('../ui/screens.js').then(({ initMainMenu }) => {
+                        initMainMenu();
+                        title.querySelector('#btn-start')?.focus();
+                    });
+                }
+            });
             startMenuMusic();
         });
     }
@@ -2490,6 +2516,14 @@ export class GameEngine {
 
     _handleKeyUp(e) {
         this.input.keys[e.code] = false;
+    }
+
+    _clearInput() {
+        // Um keyup/mouseup liberado fora da aba nunca chega ao jogo.
+        this.input.keys = {};
+        this.input.mouseLeft = false;
+        this.input.mouseMiddle = false;
+        this.input.mouseRight = false;
     }
 
     _handleMouseMove(e) {

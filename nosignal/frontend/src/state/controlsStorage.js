@@ -154,6 +154,16 @@ export function isActionDown(action, keys) {
     return codes.some((code) => keys[code] === true);
 }
 
+/** Consulta o binding de combate configurado, seja ele mouse ou teclado. */
+export function isCombatActionDown(action, input) {
+    return getActionCodes(action).some((code) => {
+        if (code === 'MouseLeft') return !!input.mouseLeft;
+        if (code === 'MouseRight') return !!input.mouseRight;
+        if (code === 'MouseMiddle') return !!input.mouseMiddle;
+        return input.keys?.[code] === true;
+    });
+}
+
 /** Vários binds simultâneos da mesma ação compartilham a mesma tecla? Não. */
 export function findActionByCode(controls, code) {
     for (const action in controls) {

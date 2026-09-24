@@ -51,6 +51,13 @@ export class AssetLoader {
                 .finally(() => {
                     if (timer) clearTimeout(timer);
                 });
+            promise.catch(() => {
+                // Uma falha temporária não pode deixar uma Promise rejeitada
+                // permanentemente no cache e bloquear todas as novas partidas.
+                if (this._metadataPromises.get(profile.id) === promise) {
+                    this._metadataPromises.delete(profile.id);
+                }
+            });
             this._metadataPromises.set(profile.id, promise);
         }
         return this._metadataPromises.get(profile.id);

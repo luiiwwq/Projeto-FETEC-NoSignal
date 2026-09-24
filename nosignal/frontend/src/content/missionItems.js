@@ -2,8 +2,8 @@
  * missionItems.js
  * Missão principal: "Conserte a nave e saia de Duna".
  *
- * Define os 3 itens que consertam a nave, onde cada um aparece e o ícone de
- * missão do HUD. Os itens NÃO são apanhados automaticamente — caem no chão
+ * Define os 3 itens que consertam a nave e onde cada um aparece. Os itens NÃO
+ * são apanhados automaticamente — caem no chão
  * saltitando e só são coletados quando o jogador chega perto e aperta E.
  *
  *  - motor: parte trazeira (a BASE) — solto pelo Old Duna Guardian (Skeleton
@@ -17,7 +17,6 @@
 export const PRINCIPAL_MISSION = {
     id: 'principal',
     title: 'Conserte a nave e saia de Duna',
-    icon: './src/assets/sprites/Mission/principal_mission/spaceship_misson_hud.png',
 };
 
 export const SPACESHIP_ITEM_DEFS = {
@@ -59,15 +58,9 @@ export const MISSION_ITEM_ORDER = ['motor', 'meio', 'ponta'];
 /* ── Sprites (id -> HTMLImageElement) ────────────────────── */
 const imageCache = new Map();
 
-/** Pré-carrega os sprites dos 3 itens + o ícone da missão. */
+/** Pré-carrega os sprites dos 3 itens. */
 export function preloadMissionItemSprites() {
     if (typeof Image === 'undefined') return;
-
-    if (!imageCache.has('mission-icon')) {
-        const icon = new Image();
-        icon.src = PRINCIPAL_MISSION.icon;
-        imageCache.set('mission-icon', icon);
-    }
 
     for (const id of Object.keys(SPACESHIP_ITEM_DEFS)) {
         if (imageCache.has(id)) continue;
@@ -79,10 +72,5 @@ export function preloadMissionItemSprites() {
 
 export function getMissionItemImage(id) {
     const img = imageCache.get(id);
-    return img && img.complete && img.naturalWidth > 0 ? img : null;
-}
-
-export function getMissionIconImage() {
-    const img = imageCache.get('mission-icon');
     return img && img.complete && img.naturalWidth > 0 ? img : null;
 }

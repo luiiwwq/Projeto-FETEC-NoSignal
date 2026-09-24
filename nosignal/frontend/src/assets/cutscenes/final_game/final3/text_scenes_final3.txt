@@ -1,13 +1,13 @@
-cena1: Após derrotar o terceiro astronauta, ele consegue consertar a ARES-1.
+cena1: Com o foguete consertado, a volta para Kerbin era possível.
 
-cena2: O equipamento é ativado. A terraformação começa enquanto ele se prepara para fugir de Duna.
+cena2: Para cumprir a missão, o astronauta monta o equipamento e dá início ao processo de terraformação.
 
-cena3: A ARES-1 parte em direção a Kerbin. O processo continua mesmo sem ninguém para acompanhá-lo.
+cena3: Com o processo de terraformação iniciado, os astronautas sobreviventes partem de volta para seu planeta natal.
 
-cena4: Meses depois, o astronauta chega a Kerbin e relata o sucesso da missão.
+cena4: Depois de meses, eles finalmente chegam em Kerbin e relatam o sucesso da missão.
 
-cena5: Com Duna habitável, a população de Kerbin constrói naves e inicia a migração.
+cena5: O povo de Kerbin constrói enormes naves para levar a população ao novo planeta.
 
-cena6: Novas colônias são erguidas no planeta transformado.
+cena6: Assim, Duna é terraformada, e o povo de Kerbin constrói diversas colônias por todo o planeta.
 
-cena7: Mas o novo lar tem um custo: a terraformação destruiu o ecossistema e a civilização que já existiam em Duna.
+cena7: Mas isso teve um custo, a extinção dos habitantes de Duna.

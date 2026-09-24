@@ -329,7 +329,8 @@ export class SkeletonAxe {
                 const dy = target.y - this.y;
                 const hitHalfWidth = this.attackHitHalfWidth;
                 const inAttackArea = hitHalfWidth !== undefined
-                    ? dx * this._facing >= 0 && Math.abs(dx) <= reach && Math.abs(dy) <= hitHalfWidth
+                    ? dx * this._facing >= -(this.attackHitBackReach ?? 0) &&
+                      dx * this._facing <= reach && Math.abs(dy) <= hitHalfWidth
                     : Math.hypot(dx, dy) <= reach;
                 if (inAttackArea) {
                     target.takeDamage(this.attackDamage, this.x, this.y);
@@ -360,13 +361,13 @@ export class SkeletonAxe {
         const cfg = ANIM_CONFIG[this.state];
         if (!cfg) return;
 
-        // Multiplicador de velocidade por instância (boss ataca bem mais
-        // rápido); esqueletos comuns ficam em 1x (FRAME_DURATION base).
-        // O ataque tem multiplicador próprio (attackAnimSpeedMul) para o boss
-        // poder ter giro rápido com golpe pesado/mais lento, independente.
+        // Multiplicadores por estado: caminhar e atacar podem ter ritmos
+        // próprios, independentes da velocidade real de deslocamento.
         const stateMul = this.state === SKELETON_STATES.ATTACK
             ? (this.attackAnimSpeedMul ?? this.animSpeedMul ?? 1)
-            : (this.animSpeedMul ?? 1);
+            : this.state === SKELETON_STATES.WALK
+                ? (this.walkAnimSpeedMul ?? this.animSpeedMul ?? 1)
+                : (this.animSpeedMul ?? 1);
 
         this.animTime += dt * stateMul;
         while (this.animTime >= FRAME_DURATION) {

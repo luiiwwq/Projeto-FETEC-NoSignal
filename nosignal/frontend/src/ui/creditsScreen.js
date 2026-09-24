@@ -36,8 +36,9 @@ const CREDITS_HTML = `
 `;
 
 let overlay = null;
+let revealTimer = null;
 
-export function renderCreditsScreen(container) {
+export function renderCreditsScreen(container, { afterEnding = false, onBack = null } = {}) {
     if (overlay) return overlay;
 
     const mount = container && container.querySelector('.title-screen-wrapper')
@@ -55,37 +56,67 @@ export function renderCreditsScreen(container) {
     `;
 
     mount.appendChild(overlay);
+    const backButton = overlay.querySelector('[data-action="credits-back"]');
+    if (afterEnding) backButton.hidden = true;
 
     // Mede a distância a percorrer e centraliza o bloco ao final da subida
     const scroller = overlay.querySelector('.credits-scroller');
     const viewportH = overlay.offsetHeight;
     const contentH = scroller.scrollHeight;
     const rise = (viewportH + contentH) / 2;
+    const duration = Math.max(8, Math.round(rise / 70));
     scroller.style.setProperty('--rise', `${rise}px`);
-    scroller.style.animationDuration = `${Math.max(8, Math.round(rise / 70))}s`;
+    scroller.style.animationDuration = `${duration}s`;
 
-    overlay.querySelector('[data-action="credits-back"]').addEventListener('click', closeCreditsScreen);
+    const showReturnButton = () => {
+        if (!overlay || !backButton.isConnected || !backButton.hidden) return;
+        backButton.hidden = false;
+        backButton.focus();
+    };
+    if (afterEnding) {
+        scroller.addEventListener('animationend', (event) => {
+            if (event.animationName === 'creditsRise') showReturnButton();
+        });
+        // Fallback se o navegador não disparar animationend.
+        revealTimer = setTimeout(showReturnButton, duration * 1000 + 250);
+        overlay.tabIndex = -1;
+        overlay.focus();
+    }
+
+    const goBack = () => {
+        if (afterEnding && backButton.hidden) return;
+        closeCreditsScreen();
+        if (onBack) onBack();
+    };
+    backButton.addEventListener('click', goBack);
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeCreditsScreen();
+        if (e.target === overlay && !afterEnding) goBack();
     });
     overlay.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            // ESC volta ao menu, equivalente ao botão VOLTAR (toca o som).
             playClickButtonSound();
-            closeCreditsScreen();
+            if (afterEnding && backButton.hidden) {
+                // ESC adianta os créditos, mas ainda exige VOLTAR AO MENU.
+                scroller.style.animation = 'none';
+                scroller.style.transform = `translateY(-${rise}px)`;
+                showReturnButton();
+            } else {
+                goBack();
+            }
         }
     });
 
-    const skipBtn = overlay.querySelector('.credits-skip');
-    if (skipBtn) setTimeout(() => skipBtn.focus(), 80);
+    if (!afterEnding) setTimeout(() => { if (backButton.isConnected) backButton.focus(); }, 80);
 
     return overlay;
 }
 
 export function closeCreditsScreen() {
     if (!overlay) return;
+    clearTimeout(revealTimer);
+    revealTimer = null;
     overlay.remove();
     overlay = null;
 }
