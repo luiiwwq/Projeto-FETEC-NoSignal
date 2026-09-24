@@ -8,7 +8,7 @@ import { getMissionEnding, getMissionShipAction } from '../src/content/endings.j
 import { MAPS, MAP_IDS } from '../src/content/maps.js';
 import { GameEngine } from '../src/engine/GameEngine.js';
 import { gameState } from '../src/state/gameState.js';
-import { GAME_DAY_DURATION, OXYGEN_LIFETIME_DAYS, OXYGEN_LIFETIME_SECONDS } from '../src/systems/dayNightSystem.js';
+import { OXYGEN_LIFETIME_DAYS, OXYGEN_LIFETIME_SECONDS } from '../src/systems/dayNightSystem.js';
 import { FINAL_DEFINITIONS } from '../src/ui/FinalGameCutscenePlayer.js';
 import { createEndingAttemptId, registerEndingResult } from '../src/services/ranking.js';
 import { getActionCodes } from '../src/state/controlsStorage.js';
@@ -66,73 +66,39 @@ test('a interação na nave reparada aciona o final correto e o NPC derrotado n�
     }
 });
 
-test('o fim do quinto dia continua causando game over antes do conserto', () => {
-    const repaired = gameState.spaceshipRepaired;
-    const dayNight = gameState.dayNight;
-    try {
-        const engine = new GameEngine(null);
-        const triggered = [];
-        engine._triggerEnding = (id) => triggered.push(id);
-        engine.dayNight.elapsedTime = OXYGEN_LIFETIME_SECONDS - 0.05;
-        gameState.spaceshipRepaired = false;
-        engine._updateDayNight(0.1);
-        assert.deepEqual(triggered, ['final1']);
-
-        engine.dayNight.elapsedTime = OXYGEN_LIFETIME_SECONDS - 0.05;
-        gameState.spaceshipRepaired = true;
-        engine._updateDayNight(0.1);
-        assert.deepEqual(triggered, ['final1']);
-    } finally {
-        gameState.spaceshipRepaired = repaired;
-        gameState.dayNight = dayNight;
-    }
-});
-
-test('no início do quinto dia a HUD manda voltar à nave e o botão leva ao final 1', () => {
-    const originalHTMLElement = globalThis.HTMLElement;
-    const collected = gameState.missionCollected;
+test('a virada para o quinto dia aciona o final 1 automaticamente, inclusive fora da superfície', () => {
     const repaired = gameState.spaceshipRepaired;
     const concluded = gameState.missionConcluded;
     const dayNight = gameState.dayNight;
-    globalThis.HTMLElement = class {};
     try {
         const engine = new GameEngine(null);
-        engine.player = { isDead: false };
-        engine.interactableMissionShip = true;
-        engine.mapTransitionCooldown = 0;
+        engine.currentMapId = MAP_IDS.MARS_CATACOMBS;
         const triggered = [];
-        engine._triggerEnding = (id) => triggered.push(id);
-
-        gameState.missionCollected = [];
+        engine._triggerEnding = (id) => {
+            triggered.push(id);
+            engine._endingTriggered = true;
+        };
+        engine.dayNight.update(OXYGEN_LIFETIME_SECONDS - 0.05);
+        assert.equal(engine.dayNight.dayCount, OXYGEN_LIFETIME_DAYS - 1);
         gameState.spaceshipRepaired = false;
         gameState.missionConcluded = false;
-        engine.dayNight.update((OXYGEN_LIFETIME_DAYS - 1) * GAME_DAY_DURATION);
+        engine._updateDayNight(0.02);
+        assert.deepEqual(triggered, [], 'o final não começa antes da virada de dia');
+        engine._updateDayNight(0.1);
         assert.equal(engine.dayNight.dayCount, OXYGEN_LIFETIME_DAYS);
-        assert.deepEqual(triggered, [], 'o quinto dia não encerra a partida automaticamente');
-
-        const labels = [];
-        const ctx = {
-            save() {}, restore() {}, fillRect() {}, strokeRect() {}, beginPath() {},
-            moveTo() {}, lineTo() {}, stroke() {},
-            fillText: (text) => labels.push(text), measureText: (text) => ({ width: text.length * 7 })
-        };
-        engine._renderMissionHUD(ctx, 10, 10);
-        assert.ok(labels.includes('VOLTE À NAVE'));
-        assert.ok(!labels.includes('CONSERTE A NAVE'));
-
-        engine._handleKeyDown({ code: 'KeyE', target: null, repeat: false });
         assert.deepEqual(triggered, ['final1']);
-        assert.equal(engine.dayNight.elapsedTime, OXYGEN_LIFETIME_SECONDS);
+        assert.equal(gameState.missionConcluded, true);
+        engine._updateDayNight(0.1);
+        assert.deepEqual(triggered, ['final1'], 'a cutscene não pode ser disparada duas vezes');
 
-        gameState.missionCollected = ['motor', 'meio', 'ponta'];
-        gameState.missionConcluded = false;
-        engine.dayNight.elapsedTime = (OXYGEN_LIFETIME_DAYS - 1) * GAME_DAY_DURATION;
-        engine._handleKeyDown({ code: 'KeyE', target: null, repeat: false });
-        assert.ok(engine._shipRepairFade, 'com todas as peças ainda é possível consertar a nave');
-        assert.deepEqual(triggered, ['final1']);
+        const repairedEngine = new GameEngine(null);
+        repairedEngine.dayNight.update(OXYGEN_LIFETIME_SECONDS - 0.05);
+        const otherEndings = [];
+        repairedEngine._triggerEnding = (id) => otherEndings.push(id);
+        gameState.spaceshipRepaired = true;
+        repairedEngine._updateDayNight(0.1);
+        assert.deepEqual(otherEndings, [], 'a nave reparada preserva os outros finais');
     } finally {
-        globalThis.HTMLElement = originalHTMLElement;
-        gameState.missionCollected = collected;
         gameState.spaceshipRepaired = repaired;
         gameState.missionConcluded = concluded;
         gameState.dayNight = dayNight;

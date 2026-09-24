@@ -21,7 +21,8 @@ export const NIGHT_DURATION = 60;
 export const DAY_NIGHT_DURATION = DAY_DURATION;
 export const GAME_DAY_DURATION = DAY_DURATION + NIGHT_DURATION;
 export const OXYGEN_LIFETIME_DAYS = 5;
-export const OXYGEN_LIFETIME_SECONDS = GAME_DAY_DURATION * OXYGEN_LIFETIME_DAYS;
+// O oxigênio acaba na virada para o dia 5, após quatro ciclos completos.
+export const OXYGEN_LIFETIME_SECONDS = GAME_DAY_DURATION * (OXYGEN_LIFETIME_DAYS - 1);
 
 export const DAY_NIGHT_PERIOD = {
     DAY: 'day',

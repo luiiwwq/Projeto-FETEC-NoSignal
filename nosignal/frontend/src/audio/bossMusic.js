@@ -3,7 +3,8 @@ import { stopGameMusic } from './gameMusic.js';
 
 const BOSS_THEMES = {
     'castle-king-room': './src/assets/sounds/music enemies/necro/necro_theme.mp3',
-    'mars-core': './src/assets/sounds/music enemies/old duna guardian/old_duna_guardian_theme.mp3'
+    'mars-core': './src/assets/sounds/music enemies/old duna guardian/old_duna_guardian_theme.mp3',
+    'mars-catacombs': './src/assets/sounds/music enemies/skeleton catacombs/audio_combat.mp3'
 };
 
 let audio = null;
@@ -13,7 +14,8 @@ let unbindInteraction = null;
 
 function volume() {
     const value = loadSettings().musicVolume;
-    return Number.isFinite(value) ? Math.max(0, Math.min(1, value / 100)) : 1;
+    const level = Number.isFinite(value) ? Math.max(0, Math.min(1, value / 100)) : 1;
+    return activeMap === 'mars-catacombs' ? level * 0.6 : level;
 }
 
 function clearInteraction() {

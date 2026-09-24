@@ -58,6 +58,8 @@ export const gameState = {
     necromancerDefeated: false,
     skeletonAxeBossDefeated: false,
     catacombsCleared: false,
+    catacombsRespawnRemaining: null, // inicia em 40s apenas após limpar a sala e sair
+    catacombsWaveActive: false, // permite retomar uma horda abandonada antes de eliminá-la
 
     // Flags de sessão: cutscene de introdução já exibida (não persiste nem
     // reseta em retry — só em nova partida). Impede que a cutscene toque de
@@ -164,6 +166,8 @@ export const gameState = {
         this.necromancerDefeated = false;
         this.skeletonAxeBossDefeated = false;
         this.catacombsCleared = false;
+        this.catacombsRespawnRemaining = null;
+        this.catacombsWaveActive = false;
         this.necroIntroDone = false;
         this.axeBossIntroDone = false;
         this.missionCollected = [];

@@ -478,13 +478,16 @@ export class GameEngine {
         // standing beside them) in LOCAL map coordinates. They are recreated on
         // every load of the map and wiped together with `actors` the moment the
         // player leaves (see above), so they never leak to the surface/castle
-        // and never duplicate. Depois de limpas, ficam limpas até iniciar um
-        // jogo novo (gameState.catacombsCleared).
-        if (mapId === MAP_IDS.MARS_CATACOMBS && !gameState.catacombsCleared) {
+        // and never duplicate. Após a primeira limpeza, só renascem em uma
+        // nova entrada, depois de 40 segundos passados fora das catacumbas.
+        if (mapId === MAP_IDS.MARS_CATACOMBS &&
+            (!gameState.catacombsCleared || gameState.catacombsWaveActive || gameState.catacombsRespawnRemaining === 0)) {
             this._spawnCatacombsWarriors(map);
             this._spawnCatacombsArchers(map);
             this._spawnCatacombsSpearmen(map);
             this._catacombsSkeletonsActive = true;
+            gameState.catacombsWaveActive = true;
+            gameState.catacombsRespawnRemaining = null;
         } else {
             this._catacombsSkeletonsActive = false;
         }
@@ -555,7 +558,10 @@ export class GameEngine {
         gameState.dayNight = this.dayNight.getHudState();
         gameState.dayNight.waveCount = this._golemWaveCount;
 
-        if (this.dayNight.elapsedTime >= OXYGEN_LIFETIME_SECONDS && !gameState.spaceshipRepaired) {
+        // O Final 01 começa sozinho ao amanhecer do dia 5, em qualquer mapa;
+        // a nave já reparada preserva o caminho dos outros finais.
+        if (this._isFinalDay() && !gameState.spaceshipRepaired && !this._endingTriggered) {
+            gameState.missionConcluded = true;
             this._triggerEnding('final1');
         }
     }
@@ -787,6 +793,7 @@ export class GameEngine {
             this._spawnCatacombsArchers(this.currentMap);
             this._spawnCatacombsSpearmen(this.currentMap);
             this._catacombsSkeletonsActive = true;
+            gameState.catacombsWaveActive = true;
         }
     }
 
@@ -1988,6 +1995,27 @@ export class GameEngine {
         }
     }
 
+    // Ao eliminar o último esqueleto, encerra a trilha de combate ainda dentro
+    // das catacumbas. A limpeza continua permanente durante esta partida.
+    _checkCatacombsCleared() {
+        if (this.currentMapId !== MAP_IDS.MARS_CATACOMBS || !this._catacombsSkeletonsActive) return;
+        if (this.skeletons.some((s) => !s.isDead && !s.shouldRemove)) return;
+
+        this._catacombsSkeletonsActive = false;
+        gameState.catacombsWaveActive = false;
+        const firstClear = !gameState.catacombsCleared;
+        gameState.catacombsCleared = true;
+        stopBossMusic();
+        startGameMusic();
+        if (firstClear && !gameState.hasUpgrade('damage_up')) this.unlockUpgrade('damage_up');
+    }
+
+    _advanceCatacombsRespawn(dt) {
+        if (this.currentMapId !== MAP_IDS.MARS_CATACOMBS && gameState.catacombsRespawnRemaining > 0) {
+            gameState.catacombsRespawnRemaining = Math.max(0, gameState.catacombsRespawnRemaining - dt);
+        }
+    }
+
     async changeMap(targetMapId, spawnId) {
         let cutsceneSrc = null;
         let isNecroIntro = false;
@@ -2004,6 +2032,13 @@ export class GameEngine {
             isAxeIntro = true;
         }
 
+        // Só inicia a contagem depois de eliminar todos os esqueletos E sair.
+        // Voltar antes do prazo não reinicia a contagem nem cria outra horda.
+        if (this.currentMapId === MAP_IDS.MARS_CATACOMBS && targetMapId !== MAP_IDS.MARS_CATACOMBS &&
+            gameState.catacombsCleared && !this._catacombsSkeletonsActive &&
+            gameState.catacombsRespawnRemaining === null) {
+            gameState.catacombsRespawnRemaining = 40;
+        }
         stopBossMusic();
         this._loadMap(targetMapId, spawnId);
 
@@ -2040,7 +2075,7 @@ export class GameEngine {
                 this.mapTransitionCooldown = 0.5;
                 if (this.isRunning && this.currentMapId === targetMapId && bossFight) startBossMusic(targetMapId);
             }
-        } else if (bossFight) {
+        } else if (bossFight || (targetMapId === MAP_IDS.MARS_CATACOMBS && this._catacombsSkeletonsActive)) {
             startBossMusic(targetMapId);
         } else {
             startGameMusic();
@@ -2596,6 +2631,8 @@ export class GameEngine {
         // Durante a exibição da cutscene, congela o mundo, IA e entidades
         if (this._cutsceneActive) return;
 
+        this._advanceCatacombsRespawn(dt);
+
         // Advance the day/night clock first so a wave spawned on a night
         // transition is simulated in the same frame.
         this._updateDayNight(dt);
@@ -2726,16 +2763,7 @@ export class GameEngine {
             }
         }
 
-        // Upgrade: damage_up (ao derrotar todos os esqueletos nas Catacumbas)
-        // — a limpeza é permanente até iniciar um jogo novo.
-        if (this.currentMapId === MAP_IDS.MARS_CATACOMBS && this._catacombsSkeletonsActive && !gameState.hasUpgrade('damage_up')) {
-            const aliveSkeletons = this.skeletons.filter((s) => !s.isDead && !s.shouldRemove);
-            if (aliveSkeletons.length === 0) {
-                this._catacombsSkeletonsActive = false;
-                gameState.catacombsCleared = true;
-                this.unlockUpgrade('damage_up');
-            }
-        }
+        this._checkCatacombsCleared();
 
         // Upgrade: movespeed_up (verificação direta do NPC inimigo)
         if (!gameState.hasUpgrade('movespeed_up') && this._enemyNpcActor && (this._enemyNpcActor.isDead || this._enemyNpcActor.hp <= 0)) {
