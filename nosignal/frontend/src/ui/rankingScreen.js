@@ -1,7 +1,18 @@
 import { getTopRanking } from '../services/ranking.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
+import { CHARACTER_IDS } from '../content/characters.js';
 
 let activeOverlay = null;
+
+const CHARACTER_LABELS = {
+    [CHARACTER_IDS.ASTRONAUT]: 'ASTRONAUT',
+    [CHARACTER_IDS.SPACE_LIZARD]: 'SPACE LIZARD',
+    [CHARACTER_IDS.OCSTRONAUT]: 'OCSTRONAUT'
+};
+
+function formatCharacter(characterId) {
+    return CHARACTER_LABELS[characterId] || '—';
+}
 
 function formatTime(totalSeconds) {
     const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
@@ -11,6 +22,11 @@ function formatTime(totalSeconds) {
     return hours > 0
         ? `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
         : `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+function formatEnding(finalId) {
+    const match = /^final(\d+)$/i.exec(String(finalId || ''));
+    return match ? `FINAL ${match[1].padStart(2, '0')}` : (finalId || '—');
 }
 
 function makeCell(tag, text, className = '') {
@@ -37,12 +53,16 @@ function renderResults(overlay, results) {
         card.append(
             makeCell('span', `#${index + 1}`, 'ranking-podium__place'),
             makeCell('strong', result.nome || 'ASTRONAUTA', 'ranking-podium__name'),
+            makeCell('span', formatCharacter(result.personagem_id), 'ranking-podium__character'),
             makeCell('span', formatTime(result.tempo_segundos), 'ranking-podium__time'),
-            makeCell('span', `${Number(result.mortes) || 0} MORTES · ${Number(result.moedas) || 0} MOEDAS`, 'ranking-podium__stats')
+            makeCell('span', `${Number(result.mortes) || 0} MORTES · ${Number(result.moedas) || 0} MOEDAS`, 'ranking-podium__stats'),
+            makeCell('span', formatEnding(result.final_id), 'ranking-podium__stats')
         );
         podium.appendChild(card);
     });
     content.appendChild(podium);
+
+    if (results.length <= 3) return;
 
     const tableWrap = document.createElement('div');
     tableWrap.className = 'ranking-table-wrap';
@@ -50,7 +70,7 @@ function renderResults(overlay, results) {
     table.className = 'ranking-table';
     const header = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['POS.', 'ASTRONAUTA', 'TEMPO', 'MORTES', 'MOEDAS', 'FINAL'].forEach((label) => {
+    ['POS.', 'ASTRONAUTA', 'PERSONAGEM', 'TEMPO', 'MORTES', 'MOEDAS', 'FINAL'].forEach((label) => {
         headerRow.appendChild(makeCell('th', label));
     });
     header.appendChild(headerRow);
@@ -61,10 +81,11 @@ function renderResults(overlay, results) {
         [
             String(index + 4),
             result.nome || 'ASTRONAUTA',
+            formatCharacter(result.personagem_id),
             formatTime(result.tempo_segundos),
             String(Number(result.mortes) || 0),
             String(Number(result.moedas) || 0),
-            result.final_id || '—'
+            formatEnding(result.final_id)
         ].forEach((value) => row.appendChild(makeCell('td', value)));
         body.appendChild(row);
     });

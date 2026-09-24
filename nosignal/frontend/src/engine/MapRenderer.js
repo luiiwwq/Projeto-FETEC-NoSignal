@@ -578,7 +578,7 @@ export class MapRenderer {
                 this._drawEdgeRiff(ctx, sx, sy, o, seed);
             } else if (o.kind === 'npc') {
                 if (o.id === 'mission-spaceship' && gameState.spaceshipRepaired) {
-                    this._drawUndeadSprite(ctx, { ...o, sprite: 'Map/spaceship_mission_completed.png' }, offset);
+                    this._drawUndeadSprite(ctx, o.repaired, offset);
                 } else {
                     this._drawUndeadSprite(ctx, o, offset);
                 }

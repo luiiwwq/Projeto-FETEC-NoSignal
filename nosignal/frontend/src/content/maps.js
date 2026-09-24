@@ -200,6 +200,28 @@ const missionSpaceship = {
         { dx: 121, dy: 303, w: 141, h: 20 },
     ],
     sprite: 'Map/spaceship_mission.png',
+    // PNG concluído: 1024×1536 na mesma escala 0.36 da nave danificada.
+    // A base e o centro permanecem no mesmo lugar; cada faixa bloqueia só o
+    // corpo visível do foguete, sem incluir as margens transparentes do PNG.
+    repaired: {
+        x: 285,
+        y: 107,
+        w: 369,
+        h: 553,
+        collisionBoxes: [
+            { dx: 164, dy: 0, w: 41, h: 35 },
+            { dx: 155, dy: 35, w: 59, h: 35 },
+            { dx: 137, dy: 70, w: 94, h: 50 },
+            { dx: 120, dy: 120, w: 129, h: 45 },
+            { dx: 103, dy: 165, w: 162, h: 255 },
+            { dx: 110, dy: 420, w: 149, h: 45 },
+            { dx: 112, dy: 465, w: 69, h: 45 },
+            { dx: 188, dy: 465, w: 69, h: 45 },
+            { dx: 103, dy: 510, w: 81, h: 35 },
+            { dx: 187, dy: 510, w: 79, h: 35 },
+        ],
+        sprite: 'Map/spaceship_mission_completed.png',
+    },
 };
 
 

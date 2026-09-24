@@ -45,6 +45,8 @@ export const gameState = {
 
     // Economia e loja
     coins: 50, // Saldo inicial generoso para permitir testes imediatos
+    totalCoinsEarned: 0, // Apenas moedas coletadas durante a partida (não inclui saldo inicial)
+    deaths: 0,
     inventory: [], // (legado) IDs de itens já comprados
     itemPurchases: {}, // itemId -> nº de compras (máx 3; consumíveis com uso infinito)
     hotbarOrder: [], // ordem de compra dos consumíveis: [0]=slot 1, [1]=slot 2, [2]=slot 3
@@ -93,6 +95,7 @@ export const gameState = {
     },
 
     addCoins(amount) {
+        if (amount > 0) this.totalCoinsEarned += amount;
         this.coins = Math.max(0, (this.coins || 0) + amount);
         return this.coins;
     },
@@ -149,6 +152,8 @@ export const gameState = {
         this.currentScene = 'TITLE';
         this.activeEnding = null;
         this.coins = 50;
+        this.totalCoinsEarned = 0;
+        this.deaths = 0;
         this.inventory = [];
         this.itemPurchases = {};
         this.hotbarOrder = [];

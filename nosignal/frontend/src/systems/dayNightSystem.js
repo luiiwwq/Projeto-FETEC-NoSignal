@@ -8,15 +8,15 @@
  * while the player is inside a cave. Only `reset()` (a new game session)
  * restarts it on day 1.
  *
- *   day  (80s) ──► night (80s) ──► day ──► night ...
+ *   day  (60s) ──► night (60s) ──► day ──► night ...
  *
  * Every full period is a "cycle". Every transition into night increments
  * `nightCount`. The golem wave is scheduled on every second night (2, 4, 6 …),
  * and the wave spawned on every 4th night (4, 8, 12 …) comes back buffed.
  */
 
-export const DAY_DURATION = 30;
-export const NIGHT_DURATION = 40;
+export const DAY_DURATION = 60;
+export const NIGHT_DURATION = 60;
 // Compatibilidade para consumidores antigos que inicializam a HUD no dia.
 export const DAY_NIGHT_DURATION = DAY_DURATION;
 export const GAME_DAY_DURATION = DAY_DURATION + NIGHT_DURATION;

@@ -43,3 +43,9 @@ Projeto-FETEC-NoSignal/
    ```
    http://localhost/Projeto-Feira-NOSIGNAL/nosignal/frontend/index.html
    ```
+
+## 🏆 Ranking global (Supabase)
+
+Execute `nosignal/backend/database/supabase_ranking.sql` no **SQL Editor** do projeto Supabase configurado em `nosignal/frontend/src/services/ranking.js`. O script cria a tabela `public.ranking`, o índice de ordenação e as permissões de leitura e envio para visitantes anônimos. Se usar outro projeto, atualize a URL e a chave **publishable** nesse arquivo (nunca use uma chave `service_role` no frontend).
+
+Ao voltar ao menu depois da cutscene de um final, a partida é enviada com nome, personagem escolhido, tempo de jogo, mortes, total de moedas ganhas durante a partida (sem incluir as 50 iniciais e sem descontar compras) e ID do final. O menu **Ranking** apresenta os três primeiros no pódio e os próximos na tabela; a ordem é menor tempo, menos mortes e mais moedas. Por enquanto, o jogo disponibiliza apenas `final1` (GAME OVER); os outros finais estão marcados como indisponíveis em `FinalGameCutscenePlayer.js`.

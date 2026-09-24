@@ -45,11 +45,10 @@ export const CHARACTER_ALLY_SHOP_POSITION = {
     y: 410
 };
 
-// Enemy spawn — just east of the parked enemy spaceship (surface). The hull
-// obstacle spans x3111..3411 / y1927..2173 (center ≈ 3261, 2050), so the enemy
-// stands at the ship's right flank, centered vertically on the hull.
+// Enemy spawn — east of the parked spaceship, outside its rightmost collision
+// box (x3476) with room for the NPC's 20px half-width collider.
 export const CHARACTER_ENEMY_SHIP_POSITION = {
-    x: 3480,
+    x: 3510,
     y: 2050
 };
 

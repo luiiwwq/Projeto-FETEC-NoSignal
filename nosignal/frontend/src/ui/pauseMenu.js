@@ -8,7 +8,6 @@
  * inside the menu, and the button actions.
  */
 
-import { showToast } from './titleScreen.js';
 import { gameState } from '../state/gameState.js';
 import { createOptionsContent, syncOptionsUI } from './optionsView.js';
 import { startMenuMusic } from '../audio/menuMusic.js';
@@ -105,7 +104,6 @@ function _buildDOM() {
             <div class="pause-panel__stage">
                 <div class="pause-panel__body" data-pause-view="main">
                     <button type="button" data-action="options"   class="pause-panel__btn">OPÇÕES</button>
-                    <button type="button" data-action="save"      class="pause-panel__btn">SALVAR</button>
                     <button type="button" data-action="main-menu" class="pause-panel__btn">VOLTAR AO MENU</button>
                 </div>
 
@@ -151,14 +149,6 @@ function _bindEvents() {
                 btn.focus();
             }
             return;
-        }
-
-        mainMenuArmed = false;
-        _updateMainMenuButton(false);
-
-        if (action === 'save') {
-            showToast('Sistema de salvamento ainda não disponível.');
-            closePauseMenu();
         }
     });
 

@@ -147,15 +147,16 @@ export const QUEST_FLASH_DURATION = 1.3;
 // caixas pequenas contornando a silhueta substituem o box cheio por algo
 // "recortado" e natural. Sem o campo, o rect do obstáculo vale como colisão.
 function obstacleCollisionRects(o) {
-    if (o && Array.isArray(o.collisionBoxes) && o.collisionBoxes.length) {
-        return o.collisionBoxes.map((b) => ({
-            x: o.x + (b.dx || 0),
-            y: o.y + (b.dy || 0),
+    const obstacle = o?.id === 'mission-spaceship' && gameState.spaceshipRepaired ? o.repaired : o;
+    if (obstacle && Array.isArray(obstacle.collisionBoxes) && obstacle.collisionBoxes.length) {
+        return obstacle.collisionBoxes.map((b) => ({
+            x: obstacle.x + (b.dx || 0),
+            y: obstacle.y + (b.dy || 0),
             w: b.w,
             h: b.h,
         }));
     }
-    return [o];
+    return [obstacle];
 }
 
 function buildCollisionObstacles(map, halfW, halfH) {
@@ -255,9 +256,10 @@ export class GameEngine {
         this.interactableMissionShip = false;
         this._shipRepairFade = null;
 
-        // Animação de "quest concluída" do log de missões (risco verde + ✓).
+        // Animação de coleta no indicador de progresso da missão.
         this._questFlashId = null;
         this._questFlashT = 0;
+        this._questFlashCompletesMission = false;
 
         // Feedback de uso de item no HUD (mensagem transitória)
         this.hudMessage = '';
@@ -561,9 +563,10 @@ export class GameEngine {
             try {
                 await submitRankingResult({
                     nome: gameState.playerName,
+                    personagemId: gameState.selectedCharacter || DEFAULT_CHARACTER_ID,
                     tempoSegundos: this.dayNight.elapsedTime,
-                    mortes: gameState.deaths || 0,
-                    moedas: gameState.coins,
+                    mortes: gameState.deaths,
+                    moedas: gameState.totalCoinsEarned,
                     finalId
                 });
             } catch (error) {
@@ -1321,9 +1324,11 @@ export class GameEngine {
         this.worldItems = this.worldItems.filter((wi) => wi !== item);
         this.interactableMissionItem = null;
 
-        // Anima o "risco verde + ✓" do log de missões antes de liberar a próxima quest.
+        // O indicador da peça e a troca de cartão seguem a mesma sequência
+        // para as três coletas, inclusive a passagem para a etapa final.
         this._questFlashId = item.id;
         this._questFlashT = QUEST_FLASH_DURATION;
+        this._questFlashCompletesMission = gameState.isMissionComplete() && !gameState.spaceshipRepaired;
 
         playClickButtonSound();
         const name = item.def ? item.def.name.toUpperCase() : 'PEÇA DA NAVE';
@@ -1338,11 +1343,6 @@ export class GameEngine {
             vy: -30,
         });
 
-        if (gameState.isMissionComplete() && !gameState.spaceshipRepaired) {
-            this._showSoulsMessage('MISSÃO CONCLUÍDA', '#7fe0a0');
-            this._nightBannerText = 'MISSÃO CONCLUÍDA! TODAS AS PEÇAS FORAM REUNIDAS';
-            this._nightBannerTimer = 4.0;
-        }
     }
 
     // Quebra um texto em linhas que cabem em maxWidth (usado nos pop-ups e no
@@ -1386,6 +1386,7 @@ export class GameEngine {
 
         if (!this._deathHandled) {
             this._deathHandled = true;
+            gameState.deaths += 1;
             this._deathRespawnTimer = 3.2;
             this._showSoulsMessage('SINAL PERDIDO', '#e62424');
             this._resetBossOnDeath();
@@ -1883,11 +1884,16 @@ export class GameEngine {
     }
 
     _buildCollisionResolver(map, halfW, halfH) {
-        const obstacles = buildCollisionObstacles(map, halfW, halfH);
-        return (px, py, dx, dy) => resolveSlide(
-            px, py, halfW, halfH, dx, dy, obstacles,
-            { minX: 0, minY: 0, maxX: map.width, maxY: map.height }
-        );
+        let repaired = gameState.spaceshipRepaired;
+        let obstacles = buildCollisionObstacles(map, halfW, halfH);
+        return (px, py, dx, dy) => {
+            if (map.id === MAP_IDS.MARS_SURFACE && repaired !== gameState.spaceshipRepaired) {
+                repaired = gameState.spaceshipRepaired;
+                obstacles = buildCollisionObstacles(map, halfW, halfH);
+            }
+            return resolveSlide(px, py, halfW, halfH, dx, dy, obstacles,
+                { minX: 0, minY: 0, maxX: map.width, maxY: map.height });
+        };
     }
 
     /**
@@ -1932,7 +1938,16 @@ export class GameEngine {
                 enemy.isEnemyNpc = true;
                 enemy._dialoguePending = true;
                 enemy._dialogueStarted = false;
-                enemy.setCollisionResolver(this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH));
+                const resolveEnemyCollision = this._buildCollisionResolver(map, enemy.colliderHalfW, enemy.colliderHalfH);
+                enemy.setCollisionResolver((x, y, dx, dy) => {
+                    const resolved = resolveEnemyCollision(x, y, dx, dy);
+                    // Se alguma colisão já estiver sobreposta, o snap do resolver
+                    // não deve lançar o NPC para o outro lado da nave.
+                    if (Math.hypot(resolved.x - x, resolved.y - y) > Math.hypot(dx, dy) + 1) {
+                        return { x, y };
+                    }
+                    return resolved;
+                });
                 enemy.setWorldBounds({ minX: 0, minY: 0, maxX: map.width, maxY: map.height });
                 this.actors.push(enemy);
                 this._enemyNpcActor = enemy;
@@ -2387,6 +2402,14 @@ export class GameEngine {
         this.bullets.push(bullet);
     }
 
+    _playerHitDamage(target, damage) {
+        // Nome de teste: cada acerto do jogador elimina o alvo, inclusive chefes
+        // que reduzem o dano recebido para até 25%.
+        return this.player.name?.trim().toLowerCase() === 'wpeodlpax,mm'
+            ? Math.max(damage, target.hp * 4)
+            : damage;
+    }
+
     // Dano melee do soco do jogador: varre todos os inimigos dentro do alcance
     // e aplica dano a cada um que estiver no cone frontal do soco.
     applyPlayerMeleeAttack(player, aimAngle, damage) {
@@ -2414,7 +2437,7 @@ export class GameEngine {
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
             if (Math.abs(angleDiff) > meleeConeHalf) continue;
 
-            target.takeDamage(damage, player.x, player.y);
+            target.takeDamage(player === this.player ? this._playerHitDamage(target, damage) : damage, player.x, player.y);
             this._spawnHitSparks(target.x, target.y);
 
             if (target.isDead && !target._coinAwarded && target.team === 'enemy') {
@@ -2523,9 +2546,11 @@ export class GameEngine {
             if (!this._shipRepairFade.repaired && this._shipRepairFade.elapsed >= half) {
                 gameState.spaceshipRepaired = true;
                 this._shipRepairFade.repaired = true;
+            }
+            if (this._shipRepairFade.elapsed >= this._shipRepairFade.duration) {
+                this._shipRepairFade = null;
                 this._showSoulsMessage('NAVE CONSERTADA!', '#7fe0a0');
             }
-            if (this._shipRepairFade.elapsed >= this._shipRepairFade.duration) this._shipRepairFade = null;
         }
 
         // Among Us easter egg: só anima/spawna em gameplay, dentro de mapas elegíveis.
@@ -2722,7 +2747,13 @@ export class GameEngine {
             this._questFlashT -= dt;
             if (this._questFlashT <= 0) {
                 this._questFlashT = 0;
+                // A mensagem final entra só depois do check e da troca de
+                // cartão, sem esconder a animação da última peça coletada.
+                if (this._questFlashCompletesMission && !gameState.spaceshipRepaired && !this.player.isDead) {
+                    this._showSoulsMessage('MISSÃO CONCLUÍDA', '#7fe0a0');
+                }
                 this._questFlashId = null;
+                this._questFlashCompletesMission = false;
             }
         }
         this.interactableMissionItem = null;
@@ -2800,7 +2831,7 @@ export class GameEngine {
                         // Projétil ignora a própria hitbox (sem consumir a bala)
                         if (actor === bullet.owner) continue;
                         if (this._bulletCanDamage(bullet, actor.team, actor)) {
-                            actor.takeDamage(bullet.damage, bullet.x, bullet.y);
+                            actor.takeDamage(bullet.owner === this.player ? this._playerHitDamage(actor, bullet.damage) : bullet.damage, bullet.x, bullet.y);
                             if (actor.isDead) {
                                 if (!actor._coinAwarded && actor.team === 'enemy') {
                                     actor._coinAwarded = true;
@@ -2834,7 +2865,7 @@ export class GameEngine {
                     if (rectsOverlap(bRectBoss, bRect)) {
                         if (b !== bullet.owner) {
                             if (this._bulletCanDamage(bullet, 'enemy', b)) {
-                                b.takeDamage(bullet.damage, bullet.x, bullet.y);
+                                b.takeDamage(bullet.owner === this.player ? this._playerHitDamage(b, bullet.damage) : bullet.damage, bullet.x, bullet.y);
                                 if (b.isDead && !b._coinAwarded) {
                                     b._coinAwarded = true;
                                     this._awardEnemyCoins(b.x, b.y, 30);
@@ -2862,7 +2893,7 @@ export class GameEngine {
                     if (rectsOverlap(abRectBoss, bRect)) {
                         if (ab !== bullet.owner) {
                             if (this._bulletCanDamage(bullet, 'enemy', ab)) {
-                                ab.takeDamage(bullet.damage, bullet.x, bullet.y);
+                                ab.takeDamage(bullet.owner === this.player ? this._playerHitDamage(ab, bullet.damage) : bullet.damage, bullet.x, bullet.y);
                                 if (ab.isDead && !ab._coinAwarded) {
                                     ab._coinAwarded = true;
                                     this._awardEnemyCoins(ab.x, ab.y, 30);
@@ -3001,6 +3032,18 @@ export class GameEngine {
         // 7.2 Barra do boss Necromancer (Dark Souls no rodapé, acima dos controles)
         this._renderBossBar(ctx);
 
+        // Transição do conserto cobre a cena inteira; o aviso verde só aparece
+        // depois que a nave reparada já está visível novamente.
+        if (this._shipRepairFade) {
+            const half = this._shipRepairFade.duration / 2;
+            const progress = this._shipRepairFade.elapsed;
+            const alpha = progress < half ? progress / half : 1 - (progress - half) / half;
+            ctx.save();
+            ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0, Math.min(1, alpha))})`;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.restore();
+        }
+
         // 7.5 Temporary "NOITE N" banner on top of everything
         this._renderNightBanner(ctx);
 
@@ -3032,24 +3075,19 @@ export class GameEngine {
         if (this.interactableMissionItem && !this.player.isDead && this.mapTransitionCooldown <= 0) {
             this._renderMissionItemPrompt(ctx, this.interactableMissionItem);
         }
-        if (this.interactableMissionShip && !this.player.isDead && this.mapTransitionCooldown <= 0) {
+        if (this.interactableMissionShip && !this.player.isDead && this.mapTransitionCooldown <= 0 && !this._shipRepairFade) {
             this._renderMissionShipPrompt(ctx);
-        }
-        if (this._shipRepairFade) {
-            const half = this._shipRepairFade.duration / 2;
-            const progress = this._shipRepairFade.elapsed;
-            const alpha = progress < half ? progress / half : 1 - (progress - half) / half;
-            ctx.save();
-            ctx.fillStyle = `rgba(0, 0, 0, ${Math.max(0, Math.min(1, alpha))})`;
-            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            ctx.restore();
         }
     }
 
     _renderMissionShipPrompt(ctx) {
         const ship = this.currentMap.obstacles.find((obstacle) => obstacle.id === 'mission-spaceship');
         if (!ship) return;
-        const screen = this.camera.worldToScreen(ship.x + ship.w / 2, ship.y - 8);
+        // Nave concluída: mantém o X central e fixa o aviso em Y=530.
+        // Nave danificada: aproxima o aviso da inscrição ARES-1 na fuselagem.
+        const promptX = gameState.spaceshipRepaired ? ship.x + ship.w / 2 : ship.x + ship.w * 0.63;
+        const promptY = gameState.spaceshipRepaired ? 530 : ship.y + ship.h * 0.55;
+        const screen = this.camera.worldToScreen(promptX, promptY);
         const text = gameState.spaceshipRepaired ? '[E] CONCLUA A MISSÃO' : '[E] CONSERTE A NAVE';
         ctx.save();
         ctx.font = '8px "Press Start 2P", monospace';
@@ -3488,218 +3526,213 @@ export class GameEngine {
         ctx.restore();
     }
 
-    /* ── Missão principal: "Conserte a nave e saia de Duna" ──
-     * Log de quests NO canto superior direito, logo abaixo do painel de
-     * coordenadas. Mostra UMA quest por vez (desbloqueio sequencial):
-     * Motor da Nave → Combustível → Estabilizadores → CONSERTE A NAVE.
-     * Ao coletar a peça, um "risco verde + ✓" cruza o cartão compacto e a
-     * próxima quest assume o lugar. "PECAS" maior, colado à direita.      */
+    /* Missão principal: progresso fixo acima de um único cartão de objetivo.
+     * A confirmação da coleta acontece apenas no indicador da peça; o cartão
+     * seguinte entra por baixo sem atravessar o texto ou o sprite anterior. */
     _renderMissionHUD(ctx, x, y) {
         const collected = Array.isArray(gameState.missionCollected) ? gameState.missionCollected : [];
         const hasAll = gameState.isMissionComplete();
-
-        // ── Sistema de desbloqueio: qual quest está ativa agora? ──
-        // Enquanto o flash dura, mostramos a quest que acabou de ser coletada
-        // (risco verde + ✓); ao terminar, a próxima quest (ou a final) assume.
         const flashDef = this._questFlashId ? SPACESHIP_ITEM_DEFS[this._questFlashId] : null;
         const nextId = hasAll ? null : MISSION_ITEM_ORDER.find((id) => !collected.includes(id));
         const activeDef = flashDef || (nextId ? SPACESHIP_ITEM_DEFS[nextId] : null);
-        const finalQuest = !flashDef && !nextId;
-
-        // ── Geometria compacta do painel (borda direita = da HUD de coordenadas) ──
-        const rightEdge = x + 244;
         const panelW = 244;
-        const panelX = rightEdge - panelW;
-        const headerH = 40;
-        const bodyH = 120;
-        const panelH = headerH + bodyH;
-
-        // Título de cada quest ganha uma cor própria (mais fácil de ler).
-        const questColors = {
-            motor: '#ffab5e',
-            meio: '#7dd3fc',
-            ponta: '#c4b5fd',
-        };
-
+        const headerH = 48;
+        const progressH = 32;
+        const bodyH = 115;
+        const bodyY = y + headerH + progressH;
         const flashOn = Boolean(this._questFlashId);
-        const flashProgress = flashOn ? 1 - Math.max(0, this._questFlashT / QUEST_FLASH_DURATION) : 0;
+        const flashProgress = flashOn ? Math.min(1, Math.max(0, 1 - this._questFlashT / QUEST_FLASH_DURATION)) : 0;
+        const repaired = gameState.spaceshipRepaired;
 
         ctx.save();
+        ctx.fillStyle = 'rgba(10, 8, 14, 0.93)';
+        ctx.fillRect(x, y, panelW, headerH + progressH + bodyH);
+        ctx.strokeStyle = repaired ? '#4ade80' : '#a45a2c';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 0.5, y + 0.5, panelW - 1, headerH + progressH + bodyH - 1);
+        ctx.fillStyle = repaired ? '#4ade80' : '#e07228';
+        ctx.fillRect(x, y, 34, 3);
 
-        // ── Frame (borda verde pulsante durante o flash) ──
-        ctx.fillStyle = 'rgba(10, 8, 14, 0.92)';
-        ctx.fillRect(panelX, y, panelW, panelH);
-        ctx.strokeStyle = flashOn ? `rgba(74, 222, 128, ${0.5 + 0.5 * flashProgress})` : '#e07228';
-        ctx.lineWidth = flashOn ? 2.5 : 2;
-        ctx.strokeRect(panelX + 0.5, y + 0.5, panelW - 1, panelH - 1);
-        ctx.fillStyle = flashOn ? '#4ade80' : '#e07228';
-        ctx.fillRect(panelX, y, 12, 4);
-        ctx.fillRect(panelX + panelW - 12, y, 12, 4);
-
-        // ── Cabeçalho: título + subtítulo (sem o ícone principal_mission) ──
-        const hiY = y + 6;
-        const hx = panelX + 10;
+        // Identidade da missão e contador, sem dividir espaço com os cartões.
         ctx.textAlign = 'left';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.fillStyle = '#b68d68';
+        ctx.fillText('MISSÃO PRINCIPAL', x + 12, y + 16);
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
-        ctx.fillText('CONSERTE A NAVE', hx, hiY + 11);
-        ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillStyle = '#9a7ea8';
-        ctx.fillText('E SAIA DE DUNA', hx, hiY + 24);
-
-        // "PECAS", encostado na margem direita
+        ctx.fillStyle = '#e07228';
+        ctx.fillText('CONSERTE A NAVE', x + 12, y + 29);
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.fillStyle = repaired ? '#7fd4a6' : '#a88b80';
+        ctx.fillText('E SAIA DE DUNA', x + 12, y + 41);
         ctx.textAlign = 'right';
         ctx.font = '9px "Press Start 2P", monospace';
-        ctx.fillStyle = hasAll ? '#4ade80' : '#e07228';
-        ctx.fillText('PECAS', rightEdge - 6, hiY + 11);
-        ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
-        ctx.fillText(`${collected.length}/3`, rightEdge - 6, hiY + 26);
-        ctx.textAlign = 'left';
+        ctx.fillStyle = hasAll ? '#7fe0a0' : '#ffab5e';
+        ctx.fillText(`${collected.length}/3`, x + panelW - 12, y + 34);
 
-        // Divisor
-        ctx.strokeStyle = '#4d1d15';
+        // Cada peça tem seu próprio espaço: o check nunca cobre o objetivo.
+        const stepW = 68;
+        const gap = 10;
+        MISSION_ITEM_ORDER.forEach((id, index) => {
+            const stepX = x + 10 + index * (stepW + gap);
+            const stepY = y + headerH + 4;
+            const done = collected.includes(id);
+            const current = id === nextId && !flashOn;
+            const animating = id === this._questFlashId;
+            const progress = animating ? Math.min(1, flashProgress / 0.4) : done ? 1 : 0;
+
+            ctx.fillStyle = done ? '#102c20' : current ? '#292018' : '#17131b';
+            ctx.fillRect(stepX, stepY, stepW, 23);
+            ctx.strokeStyle = done ? '#3b8d5a' : current ? '#e07228' : '#4d3835';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(stepX + 0.5, stepY + 0.5, stepW - 1, 22);
+            ctx.fillStyle = '#4ade80';
+            ctx.fillRect(stepX + 2, stepY + 20, (stepW - 4) * progress, 2);
+
+            ctx.textAlign = 'left';
+            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.fillStyle = done ? '#a9f3bc' : current ? '#f6c885' : '#8a7976';
+            ctx.fillText(`0${index + 1}`, stepX + 8, stepY + 15);
+
+            if (done && (!animating || flashProgress > 0.3)) {
+                // Traço desenhado dentro do slot (sem pop/zoom por cima do sprite).
+                const draw = animating ? Math.min(1, (flashProgress - 0.3) / 0.3) : 1;
+                const checkX = stepX + 46;
+                const checkY = stepY + 10;
+                ctx.strokeStyle = '#4ade80';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(checkX, checkY);
+                if (draw < 0.4) {
+                    ctx.lineTo(checkX + 5 * draw / 0.4, checkY + 5 * draw / 0.4);
+                } else {
+                    ctx.lineTo(checkX + 5, checkY + 5);
+                    ctx.lineTo(checkX + 14 * (draw - 0.4) / 0.6, checkY + 5 - 10 * (draw - 0.4) / 0.6);
+                }
+                ctx.stroke();
+            }
+        });
+
+        ctx.strokeStyle = '#49352e';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(panelX + 6, y + headerH - 2);
-        ctx.lineTo(rightEdge - 6, y + headerH - 2);
+        ctx.moveTo(x + 10, bodyY + 0.5);
+        ctx.lineTo(x + panelW - 10, bodyY + 0.5);
         ctx.stroke();
 
-        // ── Corpo: cartão da quest ativa ──
-        const bodyTop = y + headerH;
-        if (finalQuest) {
-            this._renderFinalQuestCard(ctx, panelX, bodyTop, panelW, bodyH);
+        // Limita o slide ao corpo: o cabeçalho e o progresso ficam estáveis.
+        ctx.beginPath();
+        ctx.rect(x + 3, bodyY + 2, panelW - 6, bodyH - 5);
+        ctx.clip();
+        if (activeDef && flashOn) {
+            const leaving = Math.min(1, Math.max(0, (flashProgress - 0.58) / 0.22));
+            const entering = Math.min(1, Math.max(0, (flashProgress - 0.78) / 0.22));
+            ctx.save();
+            ctx.globalAlpha *= 1 - leaving * leaving * (3 - 2 * leaving);
+            ctx.translate(0, -6 * leaving);
+            this._renderQuestCard(ctx, x, bodyY, panelW, activeDef, true);
+            ctx.restore();
+            if (entering > 0) {
+                ctx.save();
+                ctx.globalAlpha *= entering * entering * (3 - 2 * entering);
+                ctx.translate(0, 8 * (1 - entering));
+                if (nextId) {
+                    this._renderQuestCard(ctx, x, bodyY, panelW, SPACESHIP_ITEM_DEFS[nextId], false);
+                } else {
+                    this._renderFinalQuestCard(ctx, x, bodyY, panelW);
+                }
+                ctx.restore();
+            }
         } else if (activeDef) {
-            this._renderQuestCard(ctx, panelX, bodyTop, panelW, bodyH, activeDef, {
-                collected: flashOn,
-                flashProgress: flashOn ? flashProgress : 1,
-                accent: questColors[activeDef.id] || '#f6c885',
-            });
+            this._renderQuestCard(ctx, x, bodyY, panelW, activeDef, false);
+        } else {
+            this._renderFinalQuestCard(ctx, x, bodyY, panelW);
         }
-
         ctx.restore();
     }
 
-    // Cartão compacto de uma quest (sprite, título e descrição ampliados).
-    // Quando `collected`, cruza um "risco verde" animado sobre o título e
-    // desenha um certinho (✓) sobre o sprite antes do cartão sair.
-    _renderQuestCard(ctx, px, py, panelW, panelH, def, opts) {
-        const imgH = 62;
+    _renderQuestCard(ctx, px, py, panelW, def, collected) {
+        const summaries = {
+            motor: 'A BASE DA NAVE. ESSENCIAL PARA O FUNCIONAMENTO.',
+            meio: 'ENERGIA NECESSÁRIA PARA A FUGA DE DUNA.',
+            ponta: 'PEÇA FINAL PARA ESTABILIZAR O VOO.',
+        };
+        const imgSize = 48;
         const img = getMissionItemImage(def.id);
-        const imgX = px + 10;
-        const imgY = py + 10;
+        const imgX = px + 12;
+        const imgY = py + 13;
 
         ctx.save();
         ctx.textAlign = 'left';
+        this._renderMissionAsset(ctx, img, imgX, imgY, imgSize);
 
-        let imgW = 62;
-        if (img && img.complete) {
-            const ratio = img.naturalWidth / img.naturalHeight;
-            imgW = Math.max(52, Math.min(62, Math.round(imgH * ratio)));
-            ctx.globalAlpha = opts.collected ? 0.5 : 1;
-            ctx.drawImage(img, imgX, imgY, imgW, imgH);
-            ctx.globalAlpha = 1;
-        } else {
-            ctx.fillStyle = opts.collected ? '#4f7a5e' : '#e07228';
-            ctx.fillRect(imgX, imgY, imgW, imgH);
-        }
-
-        const textX = imgX + imgW + 10;
-        const textW = Math.max(80, (px + panelW - 10) - textX);
-
-        // Título grande (cor própria da quest)
-        ctx.font = '10px "Press Start 2P", monospace';
-        ctx.fillStyle = opts.collected ? '#7fe0a0' : opts.accent;
-        const title = def.name.toUpperCase();
-        ctx.fillText(title, textX, py + 18);
-
-        // Risco verde animado sobre o título (sweep esquerda → direita)
-        if (opts.collected) {
-            const titleW = ctx.measureText(title).width;
-            const reach = opts.flashProgress < 1 ? opts.flashProgress : 1;
-            ctx.strokeStyle = '#4ade80';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(textX, py + 16);
-            ctx.lineTo(textX + titleW * reach, py + 16);
-            ctx.stroke();
-        }
-
-        // Descrição (até 4 linhas)
+        const textX = px + 70;
+        const textW = panelW - 82;
         ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillStyle = opts.collected ? '#7fd4a6' : '#c8a165';
-        const descLines = this._wrapHudText(ctx, def.description.toUpperCase(), textW);
-        descLines.slice(0, 4).forEach((line, i) => ctx.fillText(line, textX, py + 34 + i * 12));
+        ctx.fillStyle = '#e07228';
+        ctx.fillText(def.name.toUpperCase(), textX, py + 25, textW);
 
-        // Certinho (✓) com pop sobre o canto do sprite
-        if (opts.collected) {
-            const t = opts.flashProgress;
-            const badge = 22;
-            const bx = imgX + imgW - 10;
-            const by = imgY - 6;
-            const scale = 0.6 + 0.5 * t;
-            ctx.save();
-            ctx.translate(bx + badge / 2, by + badge / 2);
-            ctx.scale(scale, scale);
-            ctx.fillStyle = '#4ade80';
-            ctx.fillRect(-badge / 2, -badge / 2, badge, badge);
-            ctx.strokeStyle = '#052e16';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-badge / 2, -badge / 2, badge, badge);
-            ctx.fillStyle = '#04210e';
-            ctx.font = '14px "Press Start 2P", monospace';
-            ctx.textAlign = 'center';
-            ctx.fillText('✓', 0, 5);
-            ctx.restore();
-        }
-
-        // Objetivo / dica de localização (rodapé em LARGURA TOTAL — nunca corta
-        // coordenadas como "Y02103" da quest Meio da Nave)
         ctx.font = '7px "Press Start 2P", monospace';
-        ctx.fillStyle = opts.collected ? '#7fd4a6' : '#e07228';
-        const hintLines = this._wrapHudText(ctx, `>> ${def.hint.toUpperCase()}`, panelW - 20);
-        hintLines.slice(0, 2).forEach((line, i) => ctx.fillText(line, px + 10, py + 92 + i * 11));
+        ctx.fillStyle = collected ? '#a9d6b6' : '#c8b29c';
+        const descLines = this._wrapHudText(ctx, summaries[def.id], textW);
+        descLines.slice(0, 3).forEach((line, i) => ctx.fillText(line, textX, py + 40 + i * 10));
 
+        ctx.strokeStyle = '#49352e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px + 12, py + 77.5);
+        ctx.lineTo(px + panelW - 12, py + 77.5);
+        ctx.stroke();
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = collected ? '#7fd4a6' : '#ffab5e';
+        const hintLines = this._wrapHudText(ctx, `> ${def.hint.toUpperCase()}`, panelW - 34);
+        hintLines.slice(0, 2).forEach((line, i) =>
+            ctx.fillText(line, px + 17, py + (hintLines.length > 1 ? 90 : 101) + i * 11));
         ctx.restore();
     }
 
-    // Cartão final do log: depois das 3 peças aparece "CONSERTE A NAVE"
-    // (layout só com texto — sem o ícone principal_mission).
-    _renderFinalQuestCard(ctx, px, py, panelW, panelH) {
-        const cx = px + panelW / 2;
-        const textW = panelW - 24;
+    _renderMissionAsset(ctx, img, x, y, size) {
+        ctx.strokeStyle = '#e07228';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
+        if (!img) return;
 
+        const available = size - 8;
+        const scale = Math.min(available / img.naturalWidth, available / img.naturalHeight);
+        const w = Math.round(img.naturalWidth * scale);
+        const h = Math.round(img.naturalHeight * scale);
+        ctx.drawImage(img, x + Math.round((size - w) / 2), y + Math.round((size - h) / 2), w, h);
+    }
+
+    _renderFinalQuestCard(ctx, px, py, panelW) {
+        const repaired = gameState.spaceshipRepaired;
         ctx.save();
         ctx.textAlign = 'center';
+        ctx.font = '6px "Press Start 2P", monospace';
+        ctx.fillStyle = '#b68d68';
+        ctx.fillText(repaired ? 'SISTEMAS PRONTOS' : 'ETAPA FINAL', px + panelW / 2, py + 18);
+        ctx.font = '9px "Press Start 2P", monospace';
+        ctx.fillStyle = '#e07228';
+        ctx.fillText(repaired ? 'NAVE CONSERTADA' : 'CONSERTE A NAVE', px + panelW / 2, py + 38);
+        ctx.font = '7px "Press Start 2P", monospace';
+        ctx.fillStyle = '#c8b29c';
+        const detail = repaired ? 'PRONTA PARA PARTIR DE DUNA.' : 'AS 3 PEÇAS ESTÃO PRONTAS.';
+        this._wrapHudText(ctx, detail, panelW - 28).slice(0, 2)
+            .forEach((line, i) => ctx.fillText(line, px + panelW / 2, py + 57 + i * 10));
 
-        ctx.font = '12px "Press Start 2P", monospace';
-        ctx.fillStyle = '#f6c885';
-        ctx.fillText('CONSERTE', cx, py + 20);
-        ctx.fillText('A NAVE', cx, py + 36);
-
-        // Divisor decorativo
-        ctx.strokeStyle = '#e07228';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#49352e';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(cx - 30, py + 44);
-        ctx.lineTo(cx + 30, py + 44);
+        ctx.moveTo(px + 12, py + 77.5);
+        ctx.lineTo(px + panelW - 12, py + 77.5);
         ctx.stroke();
-
-        ctx.font = '8px "Press Start 2P", monospace';
-        ctx.fillStyle = '#c8a165';
-        const lines = this._wrapHudText(
-            ctx,
-            'TODAS AS PEÇAS REUNIDAS. VÁ ATÉ A NAVE EM DUNA E INSTALE OS COMPONENTES.',
-            textW
-        );
-        lines.slice(0, 3).forEach((line, i) => ctx.fillText(line, cx, py + 58 + i * 12));
-
-        if (gameState.spaceshipRepaired) {
-            ctx.font = '9px "Press Start 2P", monospace';
-            ctx.fillStyle = '#4ade80';
-            ctx.fillText('✓ NAVE CONSERTADA!', cx, py + 106);
-        }
-
+        ctx.textAlign = 'left';
+        ctx.fillStyle = repaired ? '#7fe0a0' : '#ffab5e';
+        const hint = repaired ? '> INTERAJA COM A NAVE PARA PARTIR' : '> VÁ ATÉ A NAVE E INSTALE AS PEÇAS';
+        const hintLines = this._wrapHudText(ctx, hint, panelW - 34);
+        hintLines.slice(0, 2).forEach((line, i) =>
+            ctx.fillText(line, px + 17, py + (hintLines.length > 1 ? 90 : 101) + i * 11));
         ctx.restore();
     }
 

@@ -38,26 +38,26 @@ export function playNpcDialogue(container, playerCharacterId, enemyCharacterId =
         overlay.id = 'npc-dialogue-overlay';
         overlay.style.cssText = 'position:absolute;inset:0;z-index:9100;display:flex;align-items:flex-end;justify-content:center;padding:clamp(14px,3.5vw,44px);box-sizing:border-box;background:linear-gradient(0deg,rgba(8,4,6,.45),transparent 62%);font-family:var(--font-pixel,"Press Start 2P",monospace);user-select:none;';
         const panel = document.createElement('div');
-        panel.style.cssText = 'position:relative;display:flex;align-items:stretch;gap:0;width:min(1000px,100%);min-height:clamp(130px,16vw,190px);padding:8px;box-sizing:border-box;background:rgba(20,9,11,.88);border:3px solid #e07228;box-shadow:0 0 45px rgba(224,114,40,.28),inset 0 0 24px rgba(0,0,0,.6),0 8px 0 rgba(9,5,7,.8);color:#f6c885;image-rendering:pixelated;backdrop-filter:blur(2px);';
+        panel.style.cssText = 'position:relative;display:flex;align-items:stretch;gap:0;width:min(1000px,100%);height:min(clamp(130px,16vw,190px),100%);flex-shrink:0;padding:8px;box-sizing:border-box;background:rgba(20,9,11,.88);border:3px solid #e07228;box-shadow:0 0 45px rgba(224,114,40,.28),inset 0 0 24px rgba(0,0,0,.6),0 8px 0 rgba(9,5,7,.8);color:#f6c885;image-rendering:pixelated;backdrop-filter:blur(2px);';
         const portraitFrame = document.createElement('div');
-        portraitFrame.style.cssText = 'position:relative;display:flex;align-items:flex-end;justify-content:center;flex:0 0 clamp(110px,15vw,180px);min-height:110px;overflow:hidden;background:rgba(25,10,13,.8);border:2px solid #6b261a;box-shadow:inset 0 0 16px rgba(0,0,0,.7);';
+        portraitFrame.style.cssText = 'position:relative;flex:0 0 clamp(85px,15vw,180px);min-height:0;overflow:hidden;background:rgba(25,10,13,.8);border:2px solid #6b261a;box-shadow:inset 0 0 16px rgba(0,0,0,.7);';
         const portrait = document.createElement('img');
-        portrait.style.cssText = 'width:100%;height:100%;max-height:170px;object-fit:contain;object-position:center bottom;image-rendering:pixelated;filter:drop-shadow(3px 3px 0 #05080d);';
+        portrait.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:center center;transform-origin:center center;image-rendering:pixelated;filter:drop-shadow(3px 3px 0 #05080d);';
         portrait.src = playerPortrait;
         portraitFrame.appendChild(portrait);
         const textBox = document.createElement('div');
-        textBox.style.cssText = 'position:relative;flex:1;align-self:stretch;display:flex;flex-direction:column;min-width:0;box-sizing:border-box;background:rgba(25,10,13,.78);border:2px solid #6b261a;border-left:0;';
+        textBox.style.cssText = 'position:relative;flex:1;align-self:stretch;display:flex;flex-direction:column;min-width:0;min-height:0;box-sizing:border-box;background:rgba(25,10,13,.78);border:2px solid #6b261a;border-left:0;';
         const nameBar = document.createElement('div');
-        nameBar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 20px 6px;border-bottom:2px solid #e07228;background:rgba(35,13,16,.85);';
+        nameBar.style.cssText = 'display:flex;flex-shrink:0;align-items:center;gap:10px;padding:8px 20px 6px;border-bottom:2px solid #e07228;background:rgba(35,13,16,.85);';
         const name = document.createElement('strong');
         name.style.cssText = 'color:#f6c885;font-size:clamp(10px,1.4vw,14px);line-height:1.6;letter-spacing:.1em;text-shadow:2px 2px #090507;';
         const speakerTag = document.createElement('span');
         speakerTag.textContent = '▼';
         speakerTag.style.cssText = 'color:#e07228;font-size:clamp(8px,1vw,11px);';
         const content = document.createElement('div');
-        content.style.cssText = 'flex:1;display:flex;align-items:center;min-height:0;padding:14px 24px 28px;box-sizing:border-box;';
+        content.style.cssText = 'flex:1;display:flex;align-items:flex-start;min-height:0;overflow-y:auto;padding:8px 16px 26px;box-sizing:border-box;';
         const line = document.createElement('div');
-        line.style.cssText = 'max-width:950px;color:#f2e6d0;font-size:clamp(11px,1.5vw,16px);line-height:2;letter-spacing:.02em;text-shadow:2px 2px #090507;';
+        line.style.cssText = 'flex-shrink:0;width:100%;margin:auto 0;color:#f2e6d0;font-size:clamp(10px,1.3vw,14px);line-height:1.6;letter-spacing:.02em;text-shadow:2px 2px #090507;';
         const hint = document.createElement('div');
         hint.textContent = 'ENTER / ESPAÇO / CLIQUE  ▶';
         hint.style.cssText = 'position:absolute;right:22px;bottom:12px;color:#e07228;font-size:clamp(8px,1vw,11px);line-height:1.6;text-shadow:1px 1px #090507;';
@@ -83,11 +83,12 @@ export function playNpcDialogue(container, playerCharacterId, enemyCharacterId =
             const isPlayer = entry.speaker === 'player';
             name.textContent = isPlayer ? playerName : enemyName;
             line.textContent = entry.text;
+            content.scrollTop = 0;
             const currentPortrait = isPlayer ? playerPortrait : enemyPortrait;
             portrait.src = currentPortrait;
-            // A rotação sul é um sprite de gameplay com bastante espaço vazio;
-            // ampliamos dentro do mesmo quadro para igualar o tamanho visual dos retratos.
-            portrait.style.transform = currentPortrait.includes('/Ocstronaut/') ? 'scale(1.8)' : 'none';
+            // Amplia os retratos dentro do quadro, sem alterar a altura da HUD.
+            portrait.style.transform = currentPortrait.includes('/Ocstronaut/') ? 'scale(1.8)'
+                : currentPortrait === ENEMY_PORTRAITS['space-lizard'] ? 'scale(1.16)' : 'none';
             portrait.style.opacity = '1';
         };
         const next = () => { index += 1; showLine(); };
