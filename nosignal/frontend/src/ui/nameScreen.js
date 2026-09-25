@@ -8,7 +8,7 @@ import { renderCharacterSelectScreen } from './characterSelectScreen.js';
 import { renderTitleScreen } from './titleScreen.js';
 import { initMainMenu } from './screens.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
-import { applyControls, isControlsModifiedThisSession } from '../state/controlsStorage.js';
+import { applyControls, isControlsModifiedThisSession, loadControls } from '../state/controlsStorage.js';
 import { fetchControlsByPlayer, saveControlsByPlayer } from '../services/controlsRemote.js';
 
 export function renderNameScreen(container) {
@@ -80,21 +80,26 @@ export function renderNameScreen(container) {
         submitting = true;
         input.disabled = true;
         if (btnConfirm) btnConfirm.disabled = true;
-        if (btnBack) btnBack.disabled = true;
+        // O VOLTAR continua ativo: com a rede lenta, o jogador não fica preso
+        // esperando o carregamento dos controles remotos para decidir.
 
         const enteredName = input.value.trim().toUpperCase() || 'ARES-1';
         gameState.playerName = enteredName;
-        console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
+console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
 
-// Ao reconhecer o nome, carrega os controles personalizados salvos
-        // para aquele astronauta (mesmo nome -> mesma config de botões).
-        // Se o jogador acabou de remapear no menu principal (modificação nesta
-        // sessão), a config local vale mais do que um perfil antigo: senão o
-        // remap do menu era sobrescrito ao iniciar a partida e "não salvava".
+        // Vai para a seleção de personagem IMEDIATAMENTE, sem esperar a rede.
+        // Os controles do perfil carregam em segundo plano e não travam a tela.
+        renderCharacterSelectScreen(container);
+        console.log('[No Signal] Avançando para seleção de personagem...');
+
+        // Controles da nuvem: se o jogador remapeou nesta sessão (menu
+        // principal), a config local vence o perfil antigo — senão o remap do
+        // menu era sobrescrito ao iniciar a partida e "não salvava". Em qualquer
+        // caso o carregamento acontece sem bloquear a transição de tela.
         const controlsChangedHere = isControlsModifiedThisSession();
         try {
             const raw = controlsChangedHere ? null : await fetchControlsByPlayer(enteredName);
-            if (raw) {
+            if (raw && gameState.currentScene !== 'TITLE') {
                 applyControls(raw);
                 console.log('[No Signal] Controles carregados para', enteredName);
             }
@@ -102,16 +107,13 @@ export function renderNameScreen(container) {
             console.warn('[No Signal] Falha ao buscar controles remotos:', err);
         }
 
-        // Espelha a config atual (incluindo os remaps feitos no menu principal
-        // ou no jogo) para o perfil deste nome, para a mudança ficar salva de
-        // verdade ao iniciar a partida. Não bloqueia a transição de tela.
-        saveControlsByPlayer(enteredName, loadControls())
-            .then(() => console.log('[No Signal] Controles salvos para', enteredName))
-            .catch(() => { /* sem rede: fica só no localStorage */ });
-
-        // Uma resposta atrasada não pode sobrescrever uma tela mais nova.
-        if (screen.isConnected && gameState.currentScene === 'NAME_ENTRY') {
-            renderCharacterSelectScreen(container);
+        // Se o jogador mexeu nos controles aqui, espelha a config local para o
+        // perfil deste nome pra mudança ficar salva ao iniciar a partida.
+        // Mesmo que não haja rede, o fluxo segue normalmente.
+        if (controlsChangedHere) {
+            saveControlsByPlayer(enteredName, loadControls())
+                .then(() => console.log('[No Signal] Controles salvos para', enteredName))
+                .catch(() => { /* sem rede: fica só no localStorage */ });
         }
     };
 
@@ -127,7 +129,6 @@ export function renderNameScreen(container) {
     });
 
     btnBack?.addEventListener('click', () => {
-        if (submitting) return;
         renderTitleScreen(container);
         initMainMenu();
     });
