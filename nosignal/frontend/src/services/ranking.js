@@ -69,14 +69,40 @@ export async function submitRankingResult({ nome, personagemId, tempoSegundos, m
 }
 
 /** Retorna os 100 melhores resultados: menor tempo, menos mortes e mais moedas.
- * Informe finalId ('final1' a 'final4') para um ranking exclusivo daquele final. */
+ * Informe finalId ('final1' a 'final4') para um ranking exclusivo daquele final.
+ * No GLOBAL cada astronauta conta só uma vez (sua melhor partida), mesmo tendo
+ * linhas para vários finais (a chave do banco agora é nome + final). */
 export async function getTopRanking(limit = 100, finalId = '') {
+    const isFinalFilter = /^final[1-4]$/.test(String(finalId || ''));
+    const target = Math.min(100, Math.max(1, Math.floor(limit)));
+
     const query = new URLSearchParams({
         select: 'nome,personagem_id,tempo_segundos,mortes,moedas,final_id',
         final_feito: 'eq.true',
         order: 'tempo_segundos.asc,mortes.asc,moedas.desc,id.asc',
-        limit: String(Math.min(100, Math.max(1, Math.floor(limit))))
+        // No GLOBAL um nick pode ter até 4 linhas (uma por final); busca um
+        // pouco mais para deduplicar e ainda entregar os `target` melhores.
+        limit: String(isFinalFilter ? target : Math.min(400, target * 4))
     });
-    if (/^final[1-4]$/.test(String(finalId || ''))) query.append('final_id', `eq.${finalId}`);
-    return requestRanking(`/ranking?${query.toString()}`);
+    if (isFinalFilter) query.append('final_id', `eq.${finalId}`);
+
+    const rows = await requestRanking(`/ranking?${query.toString()}`);
+    if (!Array.isArray(rows)) return [];
+
+    // Ranking de um final específico: a unicidade (nome, final) já entrega uma
+    // linha por nick, sem necessidade de deduplicar.
+    if (isFinalFilter) return rows;
+
+    // GLOBAL: mantém só a melhor partida de cada astronauta, na ordem que já
+    // veio (menor tempo; empates: menos mortes, mais moedas).
+    const seen = new Set();
+    const uniq = [];
+    for (const row of rows) {
+        const key = String(row?.nome || '').trim().toUpperCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        uniq.push(row);
+        if (uniq.length >= target) break;
+    }
+    return uniq;
 }

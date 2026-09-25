@@ -50,13 +50,13 @@ Projeto-FETEC-NoSignal/
 
 ## 🏆 Ranking (Supabase)
 
-Execute `nosignal/backend/database/supabase_ranking.sql` no **SQL Editor** do projeto Supabase configurado em `nosignal/frontend/src/services/ranking.js`. O script cria o ranking, o histórico de finais concluídos e as funções para registrar/consultar a contagem (reexecute-o para atualizar instalações existentes). Se usar outro projeto, atualize a URL e a chave **publishable** nesse arquivo (nunca use uma chave `service_role` no frontend).
+Execute `nosignal/backend/database/supabase_ranking.sql` no **SQL Editor** do projeto Supabase configurado em `nosignal/frontend/src/services/ranking.js`. O script cria o ranking, o histórico de finais concluídos e as funções para registrar/consultar a contagem (reexecute-o para atualizar instalações existentes). Instalações que já têm dados rode também `nosignal/backend/database/supabase_ranking_por_final.sql` (migração idempotente que amplia o ranking para **um registro por nome e final**). Se usar outro projeto, atualize a URL e a chave **publishable** nesse arquivo (nunca use uma chave `service_role` no frontend).
 
 Quando um final começa, a partida é registrada **uma única vez** no Supabase (um UUID de partida evita duplicação ao repetir a cutscene). Ao voltar ao menu depois da cutscene, o ranking recebe nome, personagem escolhido, tempo de jogo, mortes, total de moedas ganhas durante a partida (sem incluir as 50 iniciais e sem descontar compras) e o ID do final.
 
 O menu **Ranking** mostra o pódio (os **3 melhores** em destaque) e os demais colocados na tabela, com os filtros **GLOBAL** e **FINAL 01–04** para ver o ranking de um final específico. A ordem é sempre: **menor tempo, menos mortes e mais moedas**.
 
-O ranking mantém apenas o resultado mais recente de cada nome, sem diferenciar maiúsculas e minúsculas. Nomes iguais não comprovam que é a mesma pessoa: qualquer visitante que usar esse nome poderá substituir a entrada, pois não há contas de usuário no jogo. A contagem geral por final pode ser consultada no SQL Editor com `select * from public.contagem_finais();`.
+O ranking guarda **um resultado por astronauta e por final**: o mesmo nick pode aparecer no pódio do GLOBAL e de cada FINAL 01–04 com partidas diferentes, sem que um final sobrescreva o outro. No **GLOBAL**, cada nick conta apenas uma vez, valendo a **melhor** partida (menor tempo; empates: menos mortes, mais moedas). Nomes não diferenciam maiúsculas e não comprovam que é a mesma pessoa: qualquer visitante que usar esse nome poderá substituir a entrada daquele (nome, final), pois não há contas de usuário no jogo. A contagem geral por final pode ser consultada no SQL Editor com `select * from public.contagem_finais();`.
 
 ## 🎬 Guia: como conseguir os 4 finais
 

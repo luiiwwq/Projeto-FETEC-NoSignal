@@ -48,3 +48,46 @@ test('getTopRanking mantém a ordenação e o limite na consulta', async () => {
         globalThis.fetch = originalFetch;
     }
 });
+
+test('getTopRanking GLOBAL deduplica por nick e mantém só a melhor partida', async () => {
+    const originalFetch = globalThis.fetch;
+    let url = '';
+    const rows = [
+        { nome: 'BRENO', personagem_id: 'astronaut', tempo_segundos: 300, mortes: 1, moedas: 50, final_id: 'final2' },
+        { nome: 'ARES', personagem_id: 'space-lizard', tempo_segundos: 120, mortes: 0, moedas: 80, final_id: 'final4' },
+        { nome: 'BRENO', personagem_id: 'ocstronaut', tempo_segundos: 600, mortes: 3, moedas: 20, final_id: 'final4' }
+    ];
+    globalThis.fetch = async (requestUrl) => {
+        url = requestUrl;
+        return { ok: true, status: 200, json: async () => rows };
+    };
+    try {
+        const result = await getTopRanking(100);
+        // O BRENO aparece duas vezes (final2 e final4); no GLOBAL só a primeira
+        // (melhor) conta — e nunca dois BRENOs no mesmo ranking.
+        assert.equal(result.length, 2);
+        const brenos = result.filter((row) => row.nome === 'BRENO');
+        assert.equal(brenos.length, 1, 'nick não pode repetir no GLOBAL');
+        assert.equal(brenos[0].final_id, 'final2', 'o melhor tempo do nick vence');
+        // Busca o dobro para conseguir deduplicar e ainda ter o pedido.
+        const params = new URLSearchParams(url.split('?')[1]);
+        assert.equal(params.get('limit'), '400');
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test('getTopRanking de um final não deduplica (a unicidade nome+final é do banco)', async () => {
+    const originalFetch = globalThis.fetch;
+    const rows = [
+        { nome: 'BRENO', personagem_id: 'astronaut', tempo_segundos: 300, mortes: 1, moedas: 50, final_id: 'final2' },
+        { nome: 'ARES', personagem_id: 'space-lizard', tempo_segundos: 120, mortes: 0, moedas: 80, final_id: 'final2' }
+    ];
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => rows });
+    try {
+        const result = await getTopRanking(100, 'final2');
+        assert.equal(result.length, 2);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
+});

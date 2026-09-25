@@ -24,8 +24,11 @@ with repetidos as (
 )
 delete from public.ranking where id in (select id from repetidos where posicao > 1);
 
-create unique index if not exists ranking_nome_unico_idx
-on public.ranking ((upper(btrim(nome))));
+-- O MESMO astronauta pode aparecer uma vez em CADA final (um nick no pódio dos
+-- 4 finais), então a unicidade é por nome + final — não mais só por nome.
+drop index if exists public.ranking_nome_unico_idx;
+create unique index if not exists public.ranking_nome_final_unico_idx
+on public.ranking ((upper(btrim(nome))), final_id);
 
 alter table public.ranking enable row level security;
 
@@ -89,9 +92,9 @@ begin
     raise exception 'Resultado de ranking inválido';
   end if;
 
-  insert into public.ranking (nome, personagem_id, tempo_segundos, mortes, moedas, final_feito, final_id)
+insert into public.ranking (nome, personagem_id, tempo_segundos, mortes, moedas, final_feito, final_id)
   values (nome_normalizado, p_personagem_id, p_tempo_segundos, p_mortes, p_moedas, true, p_final_id)
-  on conflict ((upper(btrim(nome)))) do update set
+  on conflict ((upper(btrim(nome))), final_id) do update set
     nome = excluded.nome,
     personagem_id = excluded.personagem_id,
     tempo_segundos = excluded.tempo_segundos,
