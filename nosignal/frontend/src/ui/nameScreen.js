@@ -8,8 +8,8 @@ import { renderCharacterSelectScreen } from './characterSelectScreen.js';
 import { renderTitleScreen } from './titleScreen.js';
 import { initMainMenu } from './screens.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
-import { applyControls } from '../state/controlsStorage.js';
-import { fetchControlsByPlayer } from '../services/controlsRemote.js';
+import { applyControls, isControlsModifiedThisSession } from '../state/controlsStorage.js';
+import { fetchControlsByPlayer, saveControlsByPlayer } from '../services/controlsRemote.js';
 
 export function renderNameScreen(container) {
     gameState.currentScene = 'NAME_ENTRY';
@@ -86,10 +86,14 @@ export function renderNameScreen(container) {
         gameState.playerName = enteredName;
         console.log(`[No Signal] Astronauta registrado: ${enteredName}`);
 
-        // Ao reconhecer o nome, carrega os controles personalizados salvos
+// Ao reconhecer o nome, carrega os controles personalizados salvos
         // para aquele astronauta (mesmo nome -> mesma config de botões).
+        // Se o jogador acabou de remapear no menu principal (modificação nesta
+        // sessão), a config local vale mais do que um perfil antigo: senão o
+        // remap do menu era sobrescrito ao iniciar a partida e "não salvava".
+        const controlsChangedHere = isControlsModifiedThisSession();
         try {
-            const raw = await fetchControlsByPlayer(enteredName);
+            const raw = controlsChangedHere ? null : await fetchControlsByPlayer(enteredName);
             if (raw) {
                 applyControls(raw);
                 console.log('[No Signal] Controles carregados para', enteredName);
@@ -97,6 +101,13 @@ export function renderNameScreen(container) {
         } catch (err) {
             console.warn('[No Signal] Falha ao buscar controles remotos:', err);
         }
+
+        // Espelha a config atual (incluindo os remaps feitos no menu principal
+        // ou no jogo) para o perfil deste nome, para a mudança ficar salva de
+        // verdade ao iniciar a partida. Não bloqueia a transição de tela.
+        saveControlsByPlayer(enteredName, loadControls())
+            .then(() => console.log('[No Signal] Controles salvos para', enteredName))
+            .catch(() => { /* sem rede: fica só no localStorage */ });
 
         // Uma resposta atrasada não pode sobrescrever uma tela mais nova.
         if (screen.isConnected && gameState.currentScene === 'NAME_ENTRY') {

@@ -163,6 +163,11 @@ function _refreshAll(screen) {
 function persistControlsRemote() {
     const nome = gameState && gameState.playerName ? gameState.playerName : null;
     if (!nome) return;
+    // No menu principal ainda não existe um astronauta definido: o remap fica
+    // só no localStorage (configuração "padrão do dispositivo") até o nome ser
+    // escolhido. Sem isso a mudança seria gravada sob o nome padrão 'ARES-1' e
+    // depois sobrescrita pelo perfil do nome real ao iniciar a partida.
+    if (gameState && gameState.currentScene === 'TITLE') return;
     saveControlsByPlayer(nome, loadControls())
         .catch(() => { /* sem rede: fica só no localStorage */ });
 }

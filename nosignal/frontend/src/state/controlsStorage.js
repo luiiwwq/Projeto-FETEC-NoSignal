@@ -50,6 +50,11 @@ export const CONTROL_ACTIONS = [
 
 let cached = null;
 
+// true quando o jogador alterou os controles NESTA sessão (remap no menu
+// principal ou no jogo). Usado pela tela de nome para não sobrescrever os
+// controles recém-configurados com um perfil antigo vindo da nuvem.
+let modifiedThisSession = false;
+
 function sanitize(raw) {
     if (!raw || typeof raw !== 'object') {
         return Object.fromEntries(
@@ -94,6 +99,9 @@ export function loadControls() {
 export function applyControls(controls) {
     cached = sanitize(controls);
     safeWrite(cached);
+    // Um perfil carregado da nuvem é a config aceita; zera a marca de edição
+    // para os próximos remaps (volta a valer o "modificado nesta sessão").
+    modifiedThisSession = false;
     return { ...cached };
 }
 
@@ -101,6 +109,7 @@ export function applyControls(controls) {
 export function resetControls() {
     cached = sanitize(DEFAULT_CONTROLS);
     safeWrite(cached);
+    modifiedThisSession = true;
     return { ...cached };
 }
 
@@ -134,6 +143,7 @@ export function setActionCode(action, code, index = 0) {
 
     cached = sanitize(controls);
     safeWrite(cached);
+    modifiedThisSession = true;
     return { ...cached };
 }
 
@@ -146,6 +156,11 @@ export function getActionCodes(action) {
 /** true se `code` está entre os códigos aceitos da ação. */
 export function isBound(action, code) {
     return getActionCodes(action).includes(code);
+}
+
+/** true se o jogador remapeou ou restaurou os controles nesta sessão. */
+export function isControlsModifiedThisSession() {
+    return modifiedThisSession;
 }
 
 /** true se ao menos um código da ação está pressionado em `keys`. */
