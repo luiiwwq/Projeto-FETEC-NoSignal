@@ -1153,9 +1153,11 @@
 .ranking-kicker { margin: 0 0 12px; color: #ed8733; font-size: 8px; letter-spacing: 1px; }
 .ranking-header h2 { margin: 0; font: 20px var(--font-pixel, 'Press Start 2P', monospace); color: #f6c885; }
 .ranking-subtitle { margin: 12px 0 0; color: rgba(246, 200, 133, .68); font-size: 7px; line-height: 1.8; }
-.ranking-ending-counts { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 22px; background: rgba(5, 5, 11, .58); border-bottom: 1px solid rgba(237, 135, 51, .45); color: #ed8733; font: 7px/1.8 var(--font-pixel, 'Press Start 2P', monospace); }
-.ranking-ending-count { display: inline-flex; align-items: center; gap: 12px; padding: 6px 10px; background: rgba(21, 8, 7, .84); border: 1px solid #e07228; }
-.ranking-ending-count span { color: #f6c885; }
+.ranking-filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 22px 0; }
+.ranking-filter { min-height: 34px; padding: 0 12px; color: rgba(246, 200, 133, .8); background: rgba(18, 7, 8, .91); border: 2px solid #a6511f; border-radius: 0; font: 7px var(--font-pixel, 'Press Start 2P', monospace); cursor: pointer; }
+.ranking-filter:hover, .ranking-filter:focus-visible { color: #f6c885; border-color: #ed8733; outline: none; box-shadow: 0 0 10px rgba(216, 90, 34, .3); }
+.ranking-filter.is-active { color: #f6c885; border-color: #ed8733; background: rgba(237, 135, 51, .18); }
+.ranking-filter:disabled { opacity: .55; cursor: wait; }
 .ranking-close { flex: 0 0 auto; width: 38px; height: 38px; color: #ed8733; background: rgba(18, 7, 8, .91); border: 2px solid #e07228; border-radius: 0; font: 13px var(--font-pixel, 'Press Start 2P', monospace); cursor: pointer; }
 .ranking-content { min-height: 150px; overflow: auto; padding: 20px 22px; }
 .ranking-content, .ranking-table-wrap, .pause-panel__options, .pause-panel__options-layer, .controls-panel__body {
@@ -1361,6 +1363,7 @@
     .ranking-header, .ranking-footer { align-items: flex-start; padding: 14px; }
     .ranking-header h2 { font-size: 16px; }
     .ranking-subtitle { max-width: 280px; }
+    .ranking-filters { padding-left: 14px; padding-right: 14px; }
     .ranking-content { padding: 14px; }
     .ranking-footer { flex-direction: column; }
     .ranking-podium { gap: 6px; }

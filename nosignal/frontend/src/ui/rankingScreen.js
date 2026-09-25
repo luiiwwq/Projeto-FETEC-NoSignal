@@ -1,8 +1,9 @@
-import { getEndingCounts, getTopRanking } from '../services/ranking.js';
+import { getTopRanking } from '../services/ranking.js';
 import { playClickButtonSound } from '../audio/uiClickSound.js';
 import { CHARACTER_IDS } from '../content/characters.js';
 
 let activeOverlay = null;
+let activeFinal = '';
 
 const CHARACTER_LABELS = {
     [CHARACTER_IDS.ASTRONAUT]: 'ASTRONAUT',
@@ -27,6 +28,11 @@ function formatTime(totalSeconds) {
 function formatEnding(finalId) {
     const match = /^final(\d+)$/i.exec(String(finalId || ''));
     return match ? `FINAL ${match[1].padStart(2, '0')}` : (finalId || '—');
+}
+
+function labelForFinal(finalId) {
+    const match = /^final(\d+)$/i.exec(String(finalId || ''));
+    return match ? `FINAL ${match[1].padStart(2, '0')}` : 'GLOBAL';
 }
 
 function makeCell(tag, text, className = '') {
@@ -97,37 +103,48 @@ function renderResults(overlay, results) {
 
 async function loadResults(overlay) {
     const content = overlay.querySelector('[data-ranking-content]');
-    const counts = overlay.querySelector('[data-ranking-ending-counts]');
     const refresh = overlay.querySelector('[data-ranking-refresh]');
-    content.replaceChildren(makeCell('p', 'CONSULTANDO TELEMETRIA...', 'ranking-loading'));
-    counts.replaceChildren(makeCell('span', 'CONSULTANDO FINAIS...'));
+    const filters = Array.from(overlay.querySelectorAll('[data-ranking-filter]'));
+    content.replaceChildren(makeCell('p', `CONSULTANDO TELEMETRIA (${labelForFinal(activeFinal)})...`, 'ranking-loading'));
     refresh.disabled = true;
+    filters.forEach((filter) => { filter.disabled = true; });
 
     try {
-        const [rankingResponse, countsResponse] = await Promise.allSettled([getTopRanking(100), getEndingCounts()]);
+        const rankingResponse = await getTopRanking(100, activeFinal);
         if (!overlay.isConnected) return;
-        if (rankingResponse.status === 'fulfilled') {
-            renderResults(overlay, Array.isArray(rankingResponse.value) ? rankingResponse.value : []);
-        } else {
-            console.error('[Ranking] Falha ao carregar os resultados:', rankingResponse.reason);
-            content.replaceChildren(makeCell('p', 'RANKING INDISPONÍVEL. VERIFIQUE A CONEXÃO COM O BANCO DE DADOS.', 'ranking-error'));
-        }
-
-        if (countsResponse.status === 'fulfilled' && Array.isArray(countsResponse.value)) {
-            const totals = new Map(countsResponse.value.map((entry) => [entry.final_id, Number(entry.total) || 0]));
-            counts.replaceChildren(...[1, 2, 3, 4].map((number) => {
-                const item = document.createElement('span');
-                item.className = 'ranking-ending-count';
-                item.append(makeCell('strong', `FINAL ${number}`), makeCell('span', String(totals.get(`final${number}`) || 0)));
-                return item;
-            }));
-        } else {
-            if (countsResponse.status === 'rejected') console.error('[Ranking] Falha ao carregar contagem dos finais:', countsResponse.reason);
-            counts.replaceChildren(makeCell('span', 'CONTAGEM DE FINAIS INDISPONÍVEL'));
-        }
+        renderResults(overlay, Array.isArray(rankingResponse) ? rankingResponse : []);
+    } catch (error) {
+        console.error('[Ranking] Falha ao carregar os resultados:', error);
+        content.replaceChildren(makeCell('p', 'RANKING INDISPONÍVEL. VERIFIQUE A CONEXÃO COM O BANCO DE DADOS.', 'ranking-error'));
     } finally {
         refresh.disabled = false;
+        filters.forEach((filter) => { filter.disabled = false; });
     }
+}
+
+function renderFilters(overlay) {
+    const filters = overlay.querySelector('[data-ranking-filters]');
+    filters.replaceChildren();
+    ['', 'final1', 'final2', 'final3', 'final4'].forEach((finalId) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'ranking-filter';
+        button.dataset.rankingFilter = finalId;
+        button.setAttribute('aria-pressed', String(activeFinal === finalId));
+        if (activeFinal === finalId) button.classList.add('is-active');
+        button.textContent = labelForFinal(finalId);
+        button.addEventListener('click', () => {
+            playClickButtonSound();
+            activeFinal = finalId;
+            filters.querySelectorAll('[data-ranking-filter]').forEach((candidate) => {
+                const selected = candidate.dataset.rankingFilter === finalId;
+                candidate.classList.toggle('is-active', selected);
+                candidate.setAttribute('aria-pressed', String(selected));
+            });
+            loadResults(overlay);
+        });
+        filters.appendChild(button);
+    });
 }
 
 export function renderRankingScreen(container) {
@@ -148,7 +165,7 @@ export function renderRankingScreen(container) {
                 </div>
                 <button type="button" class="ranking-close" data-ranking-back aria-label="Voltar ao menu">X</button>
             </header>
-            <div class="ranking-ending-counts" data-ranking-ending-counts aria-live="polite"></div>
+            <div class="ranking-filters" data-ranking-filters role="group" aria-label="Filtrar ranking por final"></div>
             <div class="ranking-content" data-ranking-content aria-live="polite"></div>
             <footer class="ranking-footer">
                 <span>RESULTADOS REGISTRADOS AO CONCLUIR UM FINAL</span>
@@ -180,6 +197,7 @@ export function renderRankingScreen(container) {
     });
 
     overlay.querySelector('[data-ranking-back]').focus();
+    renderFilters(overlay);
     loadResults(overlay);
     return overlay;
 }

@@ -50,10 +50,6 @@ export async function registerEndingResult({ partidaId, finalId }) {
     });
 }
 
-export async function getEndingCounts() {
-    return requestRanking('/rpc/contagem_finais', { method: 'POST', body: '{}' });
-}
-
 /** Registra uma partida quando a cutscene do final for concluída. */
 export async function submitRankingResult({ nome, personagemId, tempoSegundos, mortes = 0, moedas, finalId }) {
     const result = {
@@ -72,13 +68,15 @@ export async function submitRankingResult({ nome, personagemId, tempoSegundos, m
     });
 }
 
-/** Retorna os 100 melhores resultados: menor tempo, menos mortes e mais moedas. */
-export async function getTopRanking(limit = 100) {
+/** Retorna os 100 melhores resultados: menor tempo, menos mortes e mais moedas.
+ * Informe finalId ('final1' a 'final4') para um ranking exclusivo daquele final. */
+export async function getTopRanking(limit = 100, finalId = '') {
     const query = new URLSearchParams({
         select: 'nome,personagem_id,tempo_segundos,mortes,moedas,final_id',
         final_feito: 'eq.true',
         order: 'tempo_segundos.asc,mortes.asc,moedas.desc,id.asc',
         limit: String(Math.min(100, Math.max(1, Math.floor(limit))))
     });
+    if (/^final[1-4]$/.test(String(finalId || ''))) query.append('final_id', `eq.${finalId}`);
     return requestRanking(`/ranking?${query.toString()}`);
 }
