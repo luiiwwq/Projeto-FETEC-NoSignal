@@ -41,7 +41,7 @@ export function openControlsScreen(container) {
                 <span class="pause-panel__icon">||</span>
             </div>
             <div class="controls-panel__body">
-                <p class="controls-remap__hint">CLIQUE NAS TECLAS PARA TROCAR</p>
+                <p class="controls-remap__hint">CLIQUE NAS TECLAS/BOTÕES PARA TROCAR</p>
                 <div class="controls-grid"></div>
                 <div class="controls-panel__actions">
                     <button type="button" class="pause-panel__btn controls-remap__reset">RESTAURAR PADRÃO</button>
@@ -168,6 +168,10 @@ function persistControlsRemote() {
 }
 
 /* ── Escuta de tecla ─────────────────────────────────────── */
+// Botões laterais do mouse que podem ser capturados no remap (3 e 4 =
+// "voltar"/"avançar"; usados por ex. no DASH). O e.button é a chave.
+const MOUSE_SIDE_BUTTONS = { 3: 'Mouse4', 4: 'Mouse5' };
+
 function startListening(btn) {
     if (listening && listening._cancel) listening._cancel();
     const action = btn.dataset.action;
@@ -175,6 +179,28 @@ function startListening(btn) {
     listening = { action, index, btn };
     btn.classList.add('controls-remap__key--listening');
     btn.textContent = '?';
+
+    const applyCode = (code) => {
+        if (LOCKED_CODES.has(code)) {
+            btn.textContent = 'BLOQUEADA';
+            setTimeout(() => cancelListening(), 400);
+            return;
+        }
+
+        // Evita duplicidade: a mesma tecla não pode atender duas ações.
+        const controls = loadControls();
+        const other = findActionByCode(controls, code);
+        if (other && other !== action) {
+            btn.textContent = 'EM USO';
+            setTimeout(() => cancelListening(), 400);
+            return;
+        }
+
+        setActionCode(action, code, index);
+        _refreshAll(overlay);
+        persistControlsRemote();
+        cancelListening();
+    };
 
     const onKeyDown = (e) => {
         e.preventDefault();
@@ -185,29 +211,32 @@ function startListening(btn) {
             cancelListening();
             return;
         }
-        if (!e.code || LOCKED_CODES.has(e.code)) {
+        if (!e.code) {
             btn.textContent = 'BLOQUEADA';
             setTimeout(() => cancelListening(), 400);
             return;
         }
-
-        // Evita duplicidade: a mesma tecla não pode atender duas ações.
-        const controls = loadControls();
-        const other = findActionByCode(controls, e.code);
-        if (other && other !== action) {
-            btn.textContent = 'EM USO';
-            setTimeout(() => cancelListening(), 400);
-            return;
-        }
-
-        setActionCode(action, e.code, index);
-        _refreshAll(overlay);
-        persistControlsRemote();
-        cancelListening();
+        applyCode(e.code);
     };
 
-    listening._cancel = () => window.removeEventListener('keydown', onKeyDown, true);
+    // Também captura os botões laterais do mouse (4/5) durante o remap:
+    // sem isso o DASH não podia ser trocado para eles, e o navegador
+    // ainda tratava o clique como "voltar"/"avançar" no histórico.
+    const onMouseDown = (e) => {
+        const code = MOUSE_SIDE_BUTTONS[e.button];
+        if (!code) return;
+        e.preventDefault();
+        e.stopPropagation();
+        window.removeEventListener('mousedown', onMouseDown, true);
+        applyCode(code);
+    };
+
+    listening._cancel = () => {
+        window.removeEventListener('keydown', onKeyDown, true);
+        window.removeEventListener('mousedown', onMouseDown, true);
+    };
     window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('mousedown', onMouseDown, true);
 }
 
 function cancelListening() {

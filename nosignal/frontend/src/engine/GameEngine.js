@@ -301,7 +301,9 @@ export class GameEngine {
             mouseY: this.height / 2,
             mouseLeft: false,
             mouseMiddle: false,
-            mouseRight: false
+            mouseRight: false,
+            mouse4: false,
+            mouse5: false
         };
 
         // Bound listeners for cleanup
@@ -2395,11 +2397,9 @@ export class GameEngine {
             return;
         }
 
-        // Dash ([Q]).
-        if (isBound('dash', e.code) && !e.repeat && this.player && !this.player.isDead && !this._cutsceneActive) {
-            if (this.player.dash(this.input, this.camera)) {
-                this._spawnDashFx(this.player);
-            }
+        // Dash ([Q] ou botão lateral do mouse, conforme remap).
+        if (isBound('dash', e.code) && !e.repeat) {
+            this._tryDash();
             return;
         }
 
@@ -2526,12 +2526,14 @@ export class GameEngine {
         this.input.keys[e.code] = false;
     }
 
-    _clearInput() {
+_clearInput() {
         // Um keyup/mouseup liberado fora da aba nunca chega ao jogo.
         this.input.keys = {};
         this.input.mouseLeft = false;
         this.input.mouseMiddle = false;
         this.input.mouseRight = false;
+        this.input.mouse4 = false;
+        this.input.mouse5 = false;
     }
 
     _handleMouseMove(e) {
@@ -2560,8 +2562,18 @@ export class GameEngine {
         } else if (e.button === 1) {
             e.preventDefault();
             this.input.mouseMiddle = true;
-        } else if (e.button === 2) {
+} else if (e.button === 2) {
             this.input.mouseRight = true;
+        } else if (e.button === 3) {
+            // Botão lateral 4 do mouse (voltar): pode ser remapeado (DASH).
+            e.preventDefault();
+            this.input.mouse4 = true;
+            if (isBound('dash', 'Mouse4')) this._tryDash();
+        } else if (e.button === 4) {
+            // Botão lateral 5 do mouse (avançar): pode ser remapeado (DASH).
+            e.preventDefault();
+            this.input.mouse5 = true;
+            if (isBound('dash', 'Mouse5')) this._tryDash();
         }
     }
 
@@ -2572,6 +2584,10 @@ export class GameEngine {
             this.input.mouseMiddle = false;
         } else if (e.button === 2) {
             this.input.mouseRight = false;
+        } else if (e.button === 3) {
+            this.input.mouse4 = false;
+        } else if (e.button === 4) {
+            this.input.mouse5 = false;
         }
     }
 
@@ -2685,6 +2701,20 @@ this.canvas.style.cursor = 'crosshair';
                 size: Math.random() > 0.5 ? 3 : 2
             });
         }
+    }
+
+    /**
+     * Aciona o dash (tecla remapeada ou botão lateral do mouse 4/5) quando o
+     * jogador puder. Usado tanto no keydown quanto no mousedown dos botões
+     * laterais, que também podem ser remapeados para o DASH.
+     */
+    _tryDash() {
+        if (this.paused || this._cutsceneActive || !this.player || this.player.isDead) return false;
+        if (this.player.dash(this.input, this.camera)) {
+            this._spawnDashFx(this.player);
+            return true;
+        }
+        return false;
     }
 
     // Brilhozinho do dash: explosão de partículas ciano/brancas soltas para

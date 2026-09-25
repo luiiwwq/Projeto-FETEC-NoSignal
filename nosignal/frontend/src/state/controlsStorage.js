@@ -160,6 +160,8 @@ export function isCombatActionDown(action, input) {
         if (code === 'MouseLeft') return !!input.mouseLeft;
         if (code === 'MouseRight') return !!input.mouseRight;
         if (code === 'MouseMiddle') return !!input.mouseMiddle;
+        if (code === 'Mouse4') return !!input.mouse4;
+        if (code === 'Mouse5') return !!input.mouse5;
         return input.keys?.[code] === true;
     });
 }
@@ -185,6 +187,9 @@ export function codeDisplay(code) {
         AltRight: 'ALT',
         MouseLeft: 'L-CLICK',
         MouseRight: 'R-CLICK',
+        MouseMiddle: 'M-CLICK',
+        Mouse4: 'M4',
+        Mouse5: 'M5',
         ArrowUp: '↑',
         ArrowDown: '↓',
         ArrowLeft: '←',
