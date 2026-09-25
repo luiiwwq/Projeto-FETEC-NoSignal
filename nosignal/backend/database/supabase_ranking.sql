@@ -27,7 +27,7 @@ delete from public.ranking where id in (select id from repetidos where posicao >
 -- O MESMO astronauta pode aparecer uma vez em CADA final (um nick no pódio dos
 -- 4 finais), então a unicidade é por nome + final — não mais só por nome.
 drop index if exists public.ranking_nome_unico_idx;
-create unique index if not exists public.ranking_nome_final_unico_idx
+create unique index if not exists ranking_nome_final_unico_idx
 on public.ranking ((upper(btrim(nome))), final_id);
 
 alter table public.ranking enable row level security;

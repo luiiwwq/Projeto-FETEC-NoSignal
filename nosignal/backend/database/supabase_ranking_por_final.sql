@@ -13,7 +13,7 @@
 drop index if exists public.ranking_nome_unico_idx;
 
 -- 2) Unicidade nova: por nome E final.
-create unique index if not exists public.ranking_nome_final_unico_idx
+create unique index if not exists ranking_nome_final_unico_idx
 on public.ranking ((upper(btrim(nome))), final_id);
 
 -- 3) Atualiza o upsert para gravar em (nome, final) em vez de sobrescrever o nome.
