@@ -22,9 +22,11 @@ test('getTopRanking filtra por final apenas quando for um dos quatro finais', as
         for (let number = 1; number <= 4; number++) {
             assert.match(urls[number - 1], new RegExp(`final_id=eq\\.final${number}`));
         }
-        assert.doesNotMatch(urls[4], /final_id=/);
-        assert.doesNotMatch(urls[5], /final_id=/);
-        assert.doesNotMatch(urls[6], /final_id=/);
+        // No GLOBAL só os Finais 03 e 04 competem (os finais 01 e 02 ficam de fora).
+        for (const index of [4, 5, 6]) {
+            const params = new URLSearchParams(urls[index].split('?')[1]);
+            assert.equal(params.get('final_id'), 'in.(final3,final4)');
+        }
         assert.ok(urls.every((url) => url.includes('final_feito=eq.true')));
     } finally {
         globalThis.fetch = originalFetch;
@@ -49,13 +51,15 @@ test('getTopRanking mantém a ordenação e o limite na consulta', async () => {
     }
 });
 
-test('getTopRanking GLOBAL deduplica por nick e mantém só a melhor partida', async () => {
+test('getTopRanking GLOBAL ignora finais 01 e 02 e deduplica por nick', async () => {
     const originalFetch = globalThis.fetch;
     let url = '';
     const rows = [
-        { nome: 'BRENO', personagem_id: 'astronaut', tempo_segundos: 300, mortes: 1, moedas: 50, final_id: 'final2' },
+        { nome: 'BRENO', personagem_id: 'astronaut', tempo_segundos: 300, mortes: 1, moedas: 50, final_id: 'final3' },
         { nome: 'ARES', personagem_id: 'space-lizard', tempo_segundos: 120, mortes: 0, moedas: 80, final_id: 'final4' },
-        { nome: 'BRENO', personagem_id: 'ocstronaut', tempo_segundos: 600, mortes: 3, moedas: 20, final_id: 'final4' }
+        { nome: 'BRENO', personagem_id: 'ocstronaut', tempo_segundos: 600, mortes: 3, moedas: 20, final_id: 'final4' },
+        { nome: 'BRENO', personagem_id: 'astronaut', tempo_segundos: 100, mortes: 0, moedas: 99, final_id: 'final1' },
+        { nome: 'QUEM', personagem_id: 'astronaut', tempo_segundos: 50, mortes: 0, moedas: 99, final_id: 'final2' }
     ];
     globalThis.fetch = async (requestUrl) => {
         url = requestUrl;
@@ -63,15 +67,17 @@ test('getTopRanking GLOBAL deduplica por nick e mantém só a melhor partida', a
     };
     try {
         const result = await getTopRanking(100);
-        // O BRENO aparece duas vezes (final2 e final4); no GLOBAL só a primeira
-        // (melhor) conta — e nunca dois BRENOs no mesmo ranking.
+        // O BRENO aparece em cinco linhas: as de final1 e final2 são de fora, e
+        // entre final3/final4 vale a melhor (final3). O QUEM (final2) cai fora.
         assert.equal(result.length, 2);
         const brenos = result.filter((row) => row.nome === 'BRENO');
         assert.equal(brenos.length, 1, 'nick não pode repetir no GLOBAL');
-        assert.equal(brenos[0].final_id, 'final2', 'o melhor tempo do nick vence');
+        assert.equal(brenos[0].final_id, 'final3', 'a melhor partida válida do nick vence');
+        assert.ok(result.every((row) => /^final[34]$/.test(row.final_id)));
         // Busca o dobro para conseguir deduplicar e ainda ter o pedido.
         const params = new URLSearchParams(url.split('?')[1]);
         assert.equal(params.get('limit'), '400');
+        assert.equal(params.get('final_id'), 'in.(final3,final4)');
     } finally {
         globalThis.fetch = originalFetch;
     }

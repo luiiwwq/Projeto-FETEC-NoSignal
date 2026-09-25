@@ -70,11 +70,14 @@ export async function submitRankingResult({ nome, personagemId, tempoSegundos, m
 
 /** Retorna os 100 melhores resultados: menor tempo, menos mortes e mais moedas.
  * Informe finalId ('final1' a 'final4') para um ranking exclusivo daquele final.
- * No GLOBAL cada astronauta conta só uma vez (sua melhor partida), mesmo tendo
- * linhas para vários finais (a chave do banco agora é nome + final). */
+ * No GLOBAL competem apenas os Finais 03 e 04 (os caminhos que exigem o
+ * conserto da nave); cada astronauta conta uma vez, com sua melhor partida.
+ */
 export async function getTopRanking(limit = 100, finalId = '') {
     const isFinalFilter = /^final[1-4]$/.test(String(finalId || ''));
     const target = Math.min(100, Math.max(1, Math.floor(limit)));
+
+    const evaluableFinals = 'in.(final3,final4)';
 
     const query = new URLSearchParams({
         select: 'nome,personagem_id,tempo_segundos,mortes,moedas,final_id',
@@ -85,6 +88,7 @@ export async function getTopRanking(limit = 100, finalId = '') {
         limit: String(isFinalFilter ? target : Math.min(400, target * 4))
     });
     if (isFinalFilter) query.append('final_id', `eq.${finalId}`);
+    else query.append('final_id', evaluableFinals);
 
     const rows = await requestRanking(`/ranking?${query.toString()}`);
     if (!Array.isArray(rows)) return [];
@@ -93,11 +97,13 @@ export async function getTopRanking(limit = 100, finalId = '') {
     // linha por nick, sem necessidade de deduplicar.
     if (isFinalFilter) return rows;
 
-    // GLOBAL: mantém só a melhor partida de cada astronauta, na ordem que já
-    // veio (menor tempo; empates: menos mortes, mais moedas).
+    // GLOBAL: só Finais 03 e 04 contam; mantém a melhor partida de cada
+    // astronauta, na ordem que já veio (menor tempo; empates: menos mortes,
+    // mais moedas).
+    const elegiveis = rows.filter((row) => row && /^final[34]$/.test(String(row.final_id || '')));
     const seen = new Set();
     const uniq = [];
-    for (const row of rows) {
+    for (const row of elegiveis) {
         const key = String(row?.nome || '').trim().toUpperCase();
         if (!key || seen.has(key)) continue;
         seen.add(key);

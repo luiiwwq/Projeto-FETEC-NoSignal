@@ -56,7 +56,7 @@ Quando um final começa, a partida é registrada **uma única vez** no Supabase 
 
 O menu **Ranking** mostra o pódio (os **3 melhores** em destaque) e os demais colocados na tabela, com os filtros **GLOBAL** e **FINAL 01–04** para ver o ranking de um final específico. A ordem é sempre: **menor tempo, menos mortes e mais moedas**.
 
-O ranking guarda **um resultado por astronauta e por final**: o mesmo nick pode aparecer no pódio do GLOBAL e de cada FINAL 01–04 com partidas diferentes, sem que um final sobrescreva o outro. No **GLOBAL**, cada nick conta apenas uma vez, valendo a **melhor** partida (menor tempo; empates: menos mortes, mais moedas). Nomes não diferenciam maiúsculas e não comprovam que é a mesma pessoa: qualquer visitante que usar esse nome poderá substituir a entrada daquele (nome, final), pois não há contas de usuário no jogo. A contagem geral por final pode ser consultada no SQL Editor com `select * from public.contagem_finais();`.
+O ranking guarda **um resultado por astronauta e por final**: o mesmo nick pode aparecer no pódio de cada FINAL 01–04 com partidas diferentes, sem que um final sobrescreva o outro. No **GLOBAL** competem apenas os **Finais 03 e 04** (os caminhos que exigem o conserto da nave — os Finais 01 e 02 ficam de fora dessa categoria), e cada nick conta uma única vez, valendo a **melhor** partida (menor tempo; empates: menos mortes, mais moedas). Nomes não diferenciam maiúsculas e não comprovam que é a mesma pessoa: qualquer visitante que usar esse nome poderá substituir a entrada daquele (nome, final), pois não há contas de usuário no jogo. A contagem geral por final pode ser consultada no SQL Editor com `select * from public.contagem_finais();`.
 
 ## 🎬 Guia: como conseguir os 4 finais
 
