@@ -105,8 +105,8 @@ function setupKeyboardNavigation() {
         const wrapper = document.querySelector('.title-screen-wrapper');
         if (!wrapper) return;
 
-        // Overlays (opções/créditos) interceptam a navegação do menu
-        if (wrapper.querySelector('.credits-overlay, .title-options-overlay, .ranking-overlay')) return;
+        // Overlays (opções/controles/créditos/ranking) interceptam a navegação do menu
+        if (wrapper.querySelector('.credits-overlay, .title-options-overlay, .ranking-overlay, .controls-overlay')) return;
 
         const currentButtons = Array.from(wrapper.querySelectorAll('.menu-btn'));
         if (currentButtons.length === 0) return;

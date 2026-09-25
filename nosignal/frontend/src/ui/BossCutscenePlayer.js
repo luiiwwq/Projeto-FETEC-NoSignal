@@ -68,11 +68,13 @@ export function playBossCutscene(container, videoSrc, resumeAmbientMusic = true)
         skipBtn.type = 'button';
         skipBtn.innerHTML = 'PULAR &nbsp;<span style="opacity:0.75;font-size:0.78em">[ENTER]</span>';
 
-        /* ── Função de encerramento ───────────────────────── */
+/* ── Função de encerramento ───────────────────────── */
         let finished = false;
+        let watchdog = null;
         function finish() {
             if (finished) return;
             finished = true;
+            if (watchdog !== null) clearTimeout(watchdog);
             // Remove listener de teclado
             window.removeEventListener('keydown', onKeyDown, true);
             // Pausa o vídeo e remove o overlay
@@ -84,6 +86,23 @@ export function playBossCutscene(container, videoSrc, resumeAmbientMusic = true)
             }
             resolve();
         }
+
+        // Watchdog anti-stall: se o vídeo travar (buffering eterno, rede lenta),
+        // o jogo inteiro congela esperando este Promise (changeMap fica preso e
+        // o update do motor retorna cedo). Sem atividade o suficiente, avança.
+        const scheduleWatchdog = () => {
+            if (finished) return;
+            if (watchdog !== null) clearTimeout(watchdog);
+            const hasDuration = Number.isFinite(video.duration) && video.duration > 0;
+            // Sem metadata ainda, sobra um minuto antes de desistir do download.
+            const budgetMs = hasDuration ? 12000 : 60000;
+            watchdog = setTimeout(() => {
+                if (finished) return;
+                console.warn('[BossCutscene] Vídeo travado no carregamento/reprodução; pulando.');
+                finish();
+            }, budgetMs);
+        };
+        scheduleWatchdog();
 
         /* ── Tecla ENTER para pular ───────────────────────── */
         function onKeyDown(e) {
@@ -103,6 +122,12 @@ export function playBossCutscene(container, videoSrc, resumeAmbientMusic = true)
             console.warn('[BossCutscene] Falha ao carregar vídeo:', videoSrc);
             finish();
         }, { once: true });
+
+        // Activity do vídeo renova o watchdog: enquanto há progresso, a
+        // reprodução está saudável e o timer não dispara.
+        video.addEventListener('loadedmetadata', scheduleWatchdog, { once: true });
+        video.addEventListener('durationchange', scheduleWatchdog);
+        video.addEventListener('timeupdate', scheduleWatchdog);
 
         skipBtn.addEventListener('click', finish);
 

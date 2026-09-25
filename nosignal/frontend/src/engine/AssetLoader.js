@@ -160,12 +160,12 @@ export class AssetLoader {
             }, 15000);
             img.onload = () => {
                 entry.images.set(key, img);
-                this.loadedAssets++;
+                if (!settled) this.loadedAssets++;
                 done(img);
             };
             img.onerror = () => {
                 console.warn(`[AssetLoader] Could not load sprite: ${url}`);
-                this.loadedAssets++;
+                if (!settled) this.loadedAssets++;
                 done(null);
             };
             img.src = url;

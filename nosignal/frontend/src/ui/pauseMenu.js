@@ -251,12 +251,18 @@ function _returnToMainMenu() {
 
     if (!container) return;
 
-    import('./titleScreen.js').then(({ renderTitleScreen }) => {
-        renderTitleScreen(container);
-        import('./screens.js').then(({ initMainMenu }) => {
-            initMainMenu();
+    import('./titleScreen.js')
+        .then(({ renderTitleScreen }) => {
+            renderTitleScreen(container);
+            return import('./screens.js').then(({ initMainMenu }) => initMainMenu());
+        })
+        .catch((error) => {
+            // Se os módulos do menu falharem ao carregar, o jogo foi zerado e o
+            // canvas está congelado: recarrega para não deixar o jogador preso.
+            console.error('[Pause] Falha ao voltar ao menu; recarregando.', error);
+            gameState.reset();
+            window.location.reload();
         });
-    });
 
     // Ao voltar ao menu, retoma a música do menu uma única vez.
     startMenuMusic();

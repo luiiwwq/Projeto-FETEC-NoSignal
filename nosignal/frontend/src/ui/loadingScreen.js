@@ -110,15 +110,40 @@ export function renderLoadingScreen(container) {
         if (percentElement) percentElement.innerText = `${pct}%`;
     }, gameState.selectedCharacter);
 
-    let launchScheduled = false;
+let launchScheduled = false;
     const launchGame = (delay) => {
         if (launchScheduled) return;
         launchScheduled = true;
         setTimeout(() => {
             if (!loadingScreen?.isConnected || gameState.currentScene !== 'LOADING') return;
-            startGameMusic();
-            const engine = new GameEngine(container);
-            engine.init();
+            try {
+                startGameMusic();
+                const engine = new GameEngine(container);
+                engine.init();
+            } catch (err) {
+                // Uma falha no init não pode virar tela preta eterna: restaura o
+                // estado e oferece um caminho de volta ao fluxo do jogo.
+                console.error('[Loading] Falha ao iniciar o jogo; recuperando.', err);
+                gameState.currentScene = 'TITLE';
+                container.innerHTML = `
+                    <div class="loading-screen-wrapper">
+                        <div class="loading-panel">
+                            <div class="loading-header">
+                                <span class="pulse-beacon"></span>
+                                <h2 class="loading-title">FALHA NA INICIALIZAÇÃO</h2>
+                            </div>
+                            <div class="loading-status-text">
+                                O SISTEMA NÃO CONSEGUIU INICIAR A SIMULAÇÃO.
+                            </div>
+                            <div class="name-panel-actions" style="justify-content:center;">
+                                <button type="button" class="btn-retro btn-primary" onclick="window.location.reload()">
+                                    TENTAR NOVAMENTE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         }, delay);
     };
 

@@ -186,9 +186,20 @@ function startListening(btn) {
     btn.textContent = '?';
 
     const applyCode = (code) => {
+        // Feedback de tecla bloqueada/em uso com cancelamento retardado. O
+        // setTimeout só cancela a escuta SE ela ainda for esta sessão: um novo
+        // clique em outro bind nos 400ms seguintes não pode ser desfeito por
+        // um timer antigo.
+        const delayedReject = (label) => {
+            const session = listening;
+            if (session && session.btn) session.btn.textContent = label;
+            setTimeout(() => {
+                if (session && listening === session) cancelListening();
+            }, 400);
+        };
+
         if (LOCKED_CODES.has(code)) {
-            btn.textContent = 'BLOQUEADA';
-            setTimeout(() => cancelListening(), 400);
+            delayedReject('BLOQUEADA');
             return;
         }
 
@@ -196,8 +207,7 @@ function startListening(btn) {
         const controls = loadControls();
         const other = findActionByCode(controls, code);
         if (other && other !== action) {
-            btn.textContent = 'EM USO';
-            setTimeout(() => cancelListening(), 400);
+            delayedReject('EM USO');
             return;
         }
 
@@ -217,8 +227,11 @@ function startListening(btn) {
             return;
         }
         if (!e.code) {
-            btn.textContent = 'BLOQUEADA';
-            setTimeout(() => cancelListening(), 400);
+            const session = listening;
+            if (session && session.btn) session.btn.textContent = 'BLOQUEADA';
+            setTimeout(() => {
+                if (session && listening === session) cancelListening();
+            }, 400);
             return;
         }
         applyCode(e.code);

@@ -168,6 +168,35 @@ export async function playStartGameCutscene(container) {
     };
     window.addEventListener('keydown', onSkipKey, true);
 
+    // Overlay de feedback durante o pré-carregamento: sem ele o jogador via a
+    // seleção de tripulante com os botões desabilitados, sem nada na tela,
+    // esperando as imagens/texto baixarem.
+    const preparing = document.createElement('div');
+    preparing.id = 'start-cutscene-preparing';
+    preparing.style.cssText = `
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9000;
+    `;
+    const preparingMsg = document.createElement('div');
+    preparingMsg.style.cssText = `
+        color: #6cf26f;
+        font-size: 14px;
+        letter-spacing: 3px;
+        text-align: center;
+        line-height: 2;
+        font-family: inherit;
+    `;
+    preparingMsg.textContent = 'SINCRONIZANDO MEMÓRIA DA MISSÃO...\n[ENTER] PULAR';
+    preparing.appendChild(preparingMsg);
+    container.appendChild(preparing);
+
     try {
         // Carrega imagens e texto em paralelo com um limite de segurança.
         const texts = await withTimeout(
@@ -177,11 +206,14 @@ export async function playStartGameCutscene(container) {
         );
         await withTimeout(preloadAllImages(TOTAL_SCENES), PRELOAD_TIMEOUT_MS + 500, []);
 
+        if (preparing.parentNode) preparing.parentNode.removeChild(preparing);
+
         if (skip.triggered) return;
 
         await confirmCutscene(container, texts || FALLBACK_TEXTS, skip);
     } finally {
         window.removeEventListener('keydown', onSkipKey, true);
+        if (preparing.parentNode) preparing.parentNode.removeChild(preparing);
         // Ao sair das cutscenes, a tela de loading assume a música do gameplay.
         stopCutsceneMusic();
     }

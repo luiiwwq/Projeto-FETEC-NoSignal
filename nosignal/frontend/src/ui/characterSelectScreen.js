@@ -139,7 +139,7 @@ export function renderCharacterSelectScreen(container) {
         if (btnBack) btnBack.disabled = true;
         console.log(`[No Signal] Tripulante selecionado: ${selectedId}`);
 
-        try {
+try {
             await playStartGameCutscene(container);
         } catch (error) {
             console.error('[StartGameCutscene] Falha inesperada; seguindo para o jogo.', error);
@@ -147,7 +147,14 @@ export function renderCharacterSelectScreen(container) {
 
         // Ignora continuações de uma seleção que já foi substituída.
         if (screen.isConnected && gameState.currentScene === 'OPENING_CUTSCENE') {
-            renderLoadingScreen(container);
+            try {
+                renderLoadingScreen(container);
+            } catch (error) {
+                // Se o loading falhar, devolve o jogador para a seleção com os
+                // botões vivos, em vez de deixá-lo preso numa tela congelada.
+                console.error('[CharacterSelect] Falha ao abrir o loading; voltando à seleção.', error);
+                renderCharacterSelectScreen(container);
+            }
         }
     };
 

@@ -4,6 +4,10 @@ import { CHARACTER_IDS } from '../content/characters.js';
 
 let activeOverlay = null;
 let activeFinal = '';
+// Só a carga de ranking mais recente pode pintar a tela ou reabilitar os
+// botões: evita que uma consulta antiga (network lenta) sobrescreva um filtro
+// novo recém-escolhido com dados obsoletos.
+let rankingLoadSeq = 0;
 
 const CHARACTER_LABELS = {
     [CHARACTER_IDS.ASTRONAUT]: 'ASTRONAUT',
@@ -102,6 +106,7 @@ function renderResults(overlay, results) {
 }
 
 async function loadResults(overlay) {
+    const mySeq = ++rankingLoadSeq;
     const content = overlay.querySelector('[data-ranking-content]');
     const refresh = overlay.querySelector('[data-ranking-refresh]');
     const filters = Array.from(overlay.querySelectorAll('[data-ranking-filter]'));
@@ -111,12 +116,14 @@ async function loadResults(overlay) {
 
     try {
         const rankingResponse = await getTopRanking(100, activeFinal);
-        if (!overlay.isConnected) return;
+        if (!overlay.isConnected || mySeq !== rankingLoadSeq) return;
         renderResults(overlay, Array.isArray(rankingResponse) ? rankingResponse : []);
     } catch (error) {
+        if (mySeq !== rankingLoadSeq) return;
         console.error('[Ranking] Falha ao carregar os resultados:', error);
         content.replaceChildren(makeCell('p', 'RANKING INDISPONÍVEL. VERIFIQUE A CONEXÃO COM O BANCO DE DADOS.', 'ranking-error'));
     } finally {
+        if (mySeq !== rankingLoadSeq) return;
         refresh.disabled = false;
         filters.forEach((filter) => { filter.disabled = false; });
     }
