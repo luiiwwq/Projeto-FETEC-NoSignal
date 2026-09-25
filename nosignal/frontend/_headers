@@ -1,0 +1,16 @@
+# Configuração de cache do Cloudflare Pages (raiz de deploy: nosignal/frontend).
+# Regras mais específicas vencem (maior prefixo do path).
+
+# HTML, JS e CSS: revalida a cada acesso (304). Sem isso o Cloudflare mantém
+# o código em cache por 7 dias e uma nova versão do jogo demora a chegar —
+# causa de "assets velhos" e comportamento estranho depois de cada deploy.
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+
+# Imagens e áudio grandes (chão, cavernas, castelos, sprites): cache longo.
+# Como as URLs agora são estáveis (?v= fixo), navegador e CDN reutilizam a
+# mesma entrada; depois de 7 dias revalidam em segundo plano.
+/src/assets/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+  X-Content-Type-Options: nosniff

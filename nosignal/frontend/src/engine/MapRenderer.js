@@ -62,9 +62,11 @@ const CAVERN_SPRITE_PATHS = {
 // ── Sprite-castle maps (Sala Principal + Sala do Rei) ─────────────
 // Each map is a single pre-composed PNG (1790×879). Drawn 1:1 at world
 // (0,0). Collisions are defined by a walkability mask in maps.js.
+// IMPORTANTE: os `?v=` são fixos. Usar Date.now() aqui quebraria o cache
+// do navegador e do CDN no Cloudflare (URL nova a cada visita = redownload).
 const SPRITE_CASTLE_PATHS = {
-    'castle-principal-room': `./src/assets/sprites/Castle/map_principal_room.png?v=${Date.now()}`,
-    'castle-king-room': `./src/assets/sprites/Castle/map_king_room.png?v=${Date.now()}`,
+    'castle-principal-room': './src/assets/sprites/Castle/map_principal_room.png?v=1',
+    'castle-king-room': './src/assets/sprites/Castle/map_king_room.png?v=1',
 };
 
 // Ground texture (tileable PNG), loaded once and used as a CanvasPattern in
@@ -75,6 +77,29 @@ const MAP_SURFACE_PATTERN_SCALE = 0.5; // pattern.setTransform scale (texture ce
 // saturated ONCE when it is baked into the offscreen canvas (the procedural
 // ground it replaces was ~100); never applied per frame.
 const SURFACE_PATTERN_FILTER = 'brightness(1.15) saturate(1.1)';
+
+/**
+ * Aquece todos os cenários estáticos grandes (chão da superfície, entrada da
+ * caverna, fachada do castelo e os mapas completos de caverna/castelo) usando
+ * EXATAMENTE os mesmos URLs do runtime. Chamado uma vez na tela de loading,
+ * em paralelo aos sprites. Não bloqueia o início — só popula o cache do
+ * navegador/CDN para os mapas não abrirem pretos nem com textura faltando.
+ */
+export function preloadBackgroundAssets() {
+    if (typeof Image === 'undefined') return; // non-browser (tests)
+    const urls = [
+        CASTLE_SPRITE_PATH,
+        CAVE_SPRITE_PATH,
+        MAP_SURFACE_TEXTURE_PATH,
+        ...Object.values(CAVERN_SPRITE_PATHS),
+        ...Object.values(SPRITE_CASTLE_PATHS),
+    ];
+    for (const url of new Set(urls)) {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+    }
+}
 
 /* The old Catacombs/Núcleo procedural terrain + wall/edge texture system was
  * removed: both maps are now rendered by the `sprite-cavern` pipeline. */
@@ -130,11 +155,11 @@ export class MapRenderer {
         // Sprite-cavern full-map PNGs (mars-core / mars-catacombs): cached per
         // map id, requested once, never reloaded per frame or per map swap.
         this.cavernSprites = new Map();
-        this._cavernSpriteRequested = new Set();
+        this._cavernAttempts = new Map();
         this._cavernSpriteWarned = new Set();
         // Sprite-castle full-map PNGs (castle-principal-room / castle-king-room)
         this.castleMapSprites = new Map();
-        this._castleMapSpriteRequested = new Set();
+        this._castleMapAttempts = new Map();
         this._castleMapSpriteWarned = new Set();
         // Generic individual-sprite cache shared by surface props and the shop
         // NPC (key = full URL; value = Image once ready, null while loading or
@@ -186,51 +211,63 @@ export class MapRenderer {
     }
 
     /**
-     * Loads the full-map PNG of a sprite-cavern map exactly once (cached per
-     * map id). While it is loading/failed the map stays pure black — there is
-     * NO procedural fallback texture for these maps.
+     * Loads the full-map PNG of a sprite-cavern map (cached per map id).
+     * While it is loading the map stays pure black; on a transient failure
+     * (lenta CDN/reserva) a single retry is scheduled before giving up.
      */
     loadCavernMapSprite(mapId) {
         if (!CAVERN_SPRITE_PATHS[mapId]) return;
-        if (this.cavernSprites.has(mapId) || this._cavernSpriteRequested.has(mapId)) return;
-        this._cavernSpriteRequested.add(mapId);
+        if (this.cavernSprites.has(mapId)) return;
+        const attempts = (this._cavernAttempts.get(mapId) || 0) + 1;
+        if (attempts > 2) return; // carga inicial + um retry
+        this._cavernAttempts.set(mapId, attempts);
         if (typeof Image === 'undefined') return; // non-browser (tests)
         const img = new Image();
         img.onload = () => {
             this.cavernSprites.set(mapId, img);
         };
         img.onerror = () => {
-            if (!this._cavernSpriteWarned.has(mapId)) {
-                this._cavernSpriteWarned.add(mapId);
-                console.warn(
-                    `[MapRenderer] ${CAVERN_SPRITE_PATHS[mapId]} não carregou — mapa de caverna permanece preto.`
-                );
+            if (attempts >= 2) {
+                if (!this._cavernSpriteWarned.has(mapId)) {
+                    this._cavernSpriteWarned.add(mapId);
+                    console.warn(
+                        `[MapRenderer] ${CAVERN_SPRITE_PATHS[mapId]} não carregou — mapa de caverna permanece preto.`
+                    );
+                }
+                return;
             }
+            setTimeout(() => this.loadCavernMapSprite(mapId), 1200);
         };
         img.src = CAVERN_SPRITE_PATHS[mapId];
     }
 
     /**
-     * Loads the full-map PNG of a sprite-castle map exactly once (cached per
-     * map id). While it is loading/failed the map stays pure black — there is
-     * NO procedural fallback texture for these maps.
+     * Loads the full-map PNG of a sprite-castle map (cached per map id).
+     * While it is loading the map stays pure black; on a transient failure
+     * (lenta CDN/reserva) a single retry is scheduled before giving up.
      */
     loadSpriteCastleMapSprite(mapId) {
         if (!SPRITE_CASTLE_PATHS[mapId]) return;
-        if (this.castleMapSprites.has(mapId) || this._castleMapSpriteRequested.has(mapId)) return;
-        this._castleMapSpriteRequested.add(mapId);
+        if (this.castleMapSprites.has(mapId)) return;
+        const attempts = (this._castleMapAttempts.get(mapId) || 0) + 1;
+        if (attempts > 2) return; // carga inicial + um retry
+        this._castleMapAttempts.set(mapId, attempts);
         if (typeof Image === 'undefined') return; // non-browser (tests)
         const img = new Image();
         img.onload = () => {
             this.castleMapSprites.set(mapId, img);
         };
         img.onerror = () => {
-            if (!this._castleMapSpriteWarned.has(mapId)) {
-                this._castleMapSpriteWarned.add(mapId);
-                console.warn(
-                    `[MapRenderer] ${SPRITE_CASTLE_PATHS[mapId]} não carregou — mapa do castelo permanece preto.`
-                );
+            if (attempts >= 2) {
+                if (!this._castleMapSpriteWarned.has(mapId)) {
+                    this._castleMapSpriteWarned.add(mapId);
+                    console.warn(
+                        `[MapRenderer] ${SPRITE_CASTLE_PATHS[mapId]} não carregou — mapa do castelo permanece preto.`
+                    );
+                }
+                return;
             }
+            setTimeout(() => this.loadSpriteCastleMapSprite(mapId), 1200);
         };
         img.src = SPRITE_CASTLE_PATHS[mapId];
     }

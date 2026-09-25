@@ -5,6 +5,7 @@
  */
 
 import { assetLoader } from '../engine/AssetLoader.js';
+import { preloadBackgroundAssets } from '../engine/MapRenderer.js';
 import { GameEngine } from '../engine/GameEngine.js';
 import { gameState } from '../state/gameState.js';
 import { stopMenuMusic } from '../audio/menuMusic.js';
@@ -91,6 +92,12 @@ export function renderLoadingScreen(container) {
     // Pré-carrega os efeitos do jogador (dano, morte e passos) para tocarem
     // imediatamente quando o primeiro acontecer em gameplay.
     preloadPlayerSounds();
+
+    // Aquece os cenários grandes em paralelo aos sprites (mesmos URLs do
+    // runtime): chão da superfície, entrada da caverna e mapas de caverna/
+    // castelo. Não bloqueia o início — só evita abrir mapas pretos ou com
+    // textura faltando esperando o download dentro do jogo.
+    preloadBackgroundAssets();
 
     // Um servidor lento não pode manter a tela de loading aberta para sempre.
     const preloadDeadline = new Promise((_, reject) => {
